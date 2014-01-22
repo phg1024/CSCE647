@@ -1,0 +1,29 @@
+- name: Basic Ray Tracer
+  id: "01"
+
+- name: Shadow Casting
+  id: "02"
+
+- name: Texturing
+  id: "03"
+  
+- name: Ray Casting Triangles  
+  id: "04"
+ 
+- name: Specular Reflection
+  id: "05"
+   
+- name: Refraction
+  id: "06"
+  
+- name: Distributed Ray Tracing
+  id: "07"
+  
+- name: Radiosity effects & Caustics with Final Gathering
+  id: "08"
+  
+- name: Scattering and Subsurface scattering Effects
+  id: "09"
+  
+- name: Volume Rendering with Ray Marching
+  id: "10"

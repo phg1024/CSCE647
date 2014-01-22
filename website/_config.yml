@@ -1,0 +1,4 @@
+name: Peihong's CSCE 647 Projects
+markdown: redcarpet
+pygments: true
+destination: _deploy

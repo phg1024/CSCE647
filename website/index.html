@@ -1,0 +1,15 @@
+---
+layout: default
+title: Peihong's CSCE 647 Projects
+---
+
+<div id="home">
+  <div class="projects">
+    {% for project in site.data.projects %}
+	<div class="projectentry">
+		<div class="projectdes"><a href="/projects/pr{{ project.id }}/index.html">Project {{project.id}}: {{ project.name }}</a></div>
+		<a href="/projects/pr{{ project.id }}/index.html"><image class="projectimg"  src="/projects/pr{{ project.id }}/thumbnail.png"></image></a>
+	</div>
+    {% endfor %}
+  </div>
+</div>
