@@ -13,7 +13,7 @@ TEMPLATE -= app
 
 QMAKE_CXXFLAGS += -std=c++0x -stdlib=libc++ -mmacosx-version-min=10.8
 
-LIBS += -lm -lc++
+LIBS += -lm -lc++ -framework OpenGL -framework GLUT -lGLEW
 
 CONFIG-=app_bundle
 
@@ -32,3 +32,7 @@ INCLUDEPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
 DEPENDPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
 
 unix: PRE_TARGETDEPS += $$PWD/../../../../../../Documents/Codes/build-PhGLib-Qt_4_8_4_Clang-Release/libPhGLib.a
+
+OTHER_FILES += \
+    frag.glsl \
+    vert.glsl

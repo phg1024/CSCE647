@@ -2,22 +2,23 @@
 #define MAINCANVAS_H
 
 #include "OpenGL/gl3dcanvas.h"
-#include "Geometry/Mesh.h"
-#include "Geometry/MeshLoader.h"
+#include <QGLShaderProgram>
+#include <QGLShader>
 
 class MainCanvas : public GL3DCanvas
 {
 public:
-    MainCanvas();
-
+    MainCanvas(QWidget *parent = 0);
+    ~MainCanvas();
 
 protected:
-    virtual void initialzeGL();
+    virtual void initializeGL();
     virtual void paintGL();
     virtual void resizeGL(int w, int h);
 
 private:
-    PhGUtils::TriMesh mesh;
+    QGLShaderProgram* program;
+    QGLShader* vShader, *fShader;
 };
 
 #endif // MAINCANVAS_H

@@ -1,16 +1,37 @@
 #include "maincanvas.h"
 
-MainCanvas::MainCanvas()
+MainCanvas::MainCanvas(QWidget* parent):
+    GL3DCanvas(parent, qglformat_3d, ORTHONGONAL),
+    program(nullptr),
+    vShader(nullptr),
+    fShader(nullptr)
 {
-    PhGUtils::OBJLoader loader;
-    loader.load("bunny.obj");
-
-    mesh.initWithLoader(loader);
+    cout << "main canvas constructed." << endl;
+    setSceneScale(1.0);
 }
 
-void MainCanvas::initialzeGL()
+MainCanvas::~MainCanvas()
+{
+    delete program;
+    delete vShader;
+    delete fShader;
+}
+
+void MainCanvas::initializeGL()
 {
     GL3DCanvas::initializeGL();
+
+    program = new QGLShaderProgram(this);
+    vShader = new QGLShader(QGLShader::Vertex);
+    fShader = new QGLShader(QGLShader::Fragment);
+
+    fShader->compileSourceFile("../Project1/frag.glsl");
+    vShader->compileSourceFile("../Project1/vert.glsl");
+
+    //program->addShader(vShader);
+    program->addShader(fShader);
+
+    program->link();
 }
 
 void MainCanvas::resizeGL(int w, int h)
@@ -20,14 +41,23 @@ void MainCanvas::resizeGL(int w, int h)
 
 void MainCanvas::paintGL()
 {
-    GL3DCanvas::paintGL();
+    // obtain the transform matrix from the trackball
+    // apply the inverse transform to the camera
 
-    glClearColor(1, 1, 1, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glColor4f(0, 0, 0, 1);
 
-    glPushMatrix();
-    glScalef(1000, 1000, 1000);
-    mesh.drawFrame();
-    glPopMatrix();
+    if( program ) {
+        program->bind();
+
+        // upload scene structure
+        program->setUniformValue("windowSize", QVector2D(width(), height()));
+
+        glBegin(GL_QUADS);
+        glVertex3f(-1.0, -1.0, 0.1);
+        glVertex3f(1.0, -1.0, 0.1);
+        glVertex3f(1.0, 1.0, 0.1);
+        glVertex3f(-1.0, 1.0, 0.1);
+        glEnd();
+
+        program->release();
+    }
 }
