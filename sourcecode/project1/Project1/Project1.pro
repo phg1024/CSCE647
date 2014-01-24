@@ -19,20 +19,25 @@ CONFIG-=app_bundle
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    maincanvas.cpp
+    maincanvas.cpp \
+    camera.cpp \
+    shape.cpp
 
 HEADERS  += mainwindow.h \
-    maincanvas.h
+    maincanvas.h \
+    camera.h \
+    shape.h
 
 FORMS    += mainwindow.ui
 
-unix: LIBS += -L$$PWD/../../../../../../Documents/Codes/build-PhGLib-Qt_4_8_4_Clang-Release/ -lPhGLib
-
-INCLUDEPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
-DEPENDPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
-
-unix: PRE_TARGETDEPS += $$PWD/../../../../../../Documents/Codes/build-PhGLib-Qt_4_8_4_Clang-Release/libPhGLib.a
 
 OTHER_FILES += \
     frag.glsl \
     vert.glsl
+
+unix: LIBS += -L$$PWD/../../../../../Documents/PhGLib/lib/ -lPhGLib
+
+INCLUDEPATH += $$PWD/../../../../../Documents/PhGLib/include
+DEPENDPATH += $$PWD/../../../../../Documents/PhGLib/include
+
+unix: PRE_TARGETDEPS += $$PWD/../../../../../Documents/PhGLib/lib/libPhGLib.a

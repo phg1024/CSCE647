@@ -16,9 +16,13 @@ protected:
     virtual void paintGL();
     virtual void resizeGL(int w, int h);
 
+    virtual void keyPressEvent(QKeyEvent *e);
+
 private:
     QGLShaderProgram* program;
     QGLShader* vShader, *fShader;
+
+    int shadingMode;
 };
 
 #endif // MAINCANVAS_H
