@@ -12,7 +12,7 @@ struct Camera
     Camera();
 
     point_t pos;
-    vector_t up, dir, left;
+    vector_t up, dir;
     float f;
     float w, h;
 };

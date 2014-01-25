@@ -5,6 +5,12 @@ uniform vec2 windowSize;
 uniform int lightCount;
 uniform int shapeCount;
 uniform int shadingMode;    // 1 = lambert, 2 = phong, 3 = gooch, 4 = cook-torrance
+uniform int AAsamples;
+
+// camera info
+uniform vec3 camPos, camUp, camDir;
+uniform float camF;
+
 
 // for gooch shading
 uniform vec3 kdiff, kspec;
@@ -39,7 +45,7 @@ struct Light {
     float spotCosCutoff;
 
     vec3 attenuation;   // K0, K1, K2
-} lights[16];
+} lights[4];
 
 // shape types
 const int SPHERE = 0;
@@ -48,6 +54,19 @@ const int ELLIPSOID = 2;
 const int CYLINDER = 3;
 const int CONE = 4;
 const int HYPERBOLOID = 5;
+
+struct Material {
+    // material property
+    vec3 emission;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+
+    vec3 kcool;
+    vec3 kwarm;
+
+    float shininess;
+};
 
 struct Shape {
     int type;           // sphere = 0, plane = 1, ellipsoid = 2
@@ -72,7 +91,7 @@ struct Shape {
     vec3 kwarm;
 
     float shininess;
-} shapes[128];
+} shapes[8];
 
 struct Ray {
     vec3 origin;
@@ -87,11 +106,12 @@ struct Hit {
 Hit background;
 
 void initializeCamera() {
-    caminfo.pos = vec3(0.0, 0.0, -5.0);
-    caminfo.up = vec3(0.0, 1.0, 0.0);
-    caminfo.dir = vec3(0.0, 0.0, 1.0);
-    caminfo.right = vec3(1.0, 0.0, 0.0);
-    caminfo.f = 1.0;
+    caminfo.pos = camPos;
+    caminfo.up = camUp;
+    caminfo.dir = camDir;
+
+    caminfo.right = cross(caminfo.dir, caminfo.up);
+    caminfo.f = camF;
     caminfo.w = 1.0;
     caminfo.h = windowSize.y / windowSize.x;
 }
@@ -192,11 +212,6 @@ Ray constructRay(vec2 pos) {
     return r;
 }
 
-struct Roots {
-    int length;
-    float x0, x1;
-};
-
 // light ray intersection tests
 float lightRayIntersectsSphere(Ray r, Shape s) {
     vec3 pq = r.origin - s.p;
@@ -205,31 +220,22 @@ float lightRayIntersectsSphere(Ray r, Shape s) {
     float c = length(pq)*length(pq) - s.radius[0] * s.radius[0];
 
     // solve the quadratic equation
-    Roots roots;
     float delta = b*b - 4.0*a*c;
     if( delta < 0.0 )
-    {
-        roots.length = 0;
-    }
-    else
-    {
-        roots.length = 2;
-        roots.x0 = (-b+sqrt(delta))/(2.0*a);
-        roots.x1 = (-b-sqrt(delta))/(2.0*a);
-    }
-
-    if( roots.length == 0 )
     {
         return -1.0;
     }
     else
     {
+        float x0 = (-b+sqrt(delta))/(2.0*a);
+        float x1 = (-b-sqrt(delta))/(2.0*a);
+
         float THRES = 1e-4;
 
-        float r1 = roots.x0, r2 = roots.x1;
+        float r1 = x0, r2 = x1;
         if( r1 > r2 ){
-            r1 = roots.x1;
-            r2 = roots.x0;
+            r1 = x1;
+            r2 = x0;
         }
 
         if( r2 < THRES ) {
@@ -245,7 +251,7 @@ float lightRayIntersectsSphere(Ray r, Shape s) {
 
 float lightRayIntersectsPlane(Ray r, Shape s) {
     float t = 1e10;
-    float THRES = 1e-6;
+    float THRES = 1e-4;
     vec3 pq = s.p - r.origin;
     float ldotn = dot(s.axis[0], r.dir);
     if( abs(ldotn) < THRES ) return -1.0;
@@ -411,31 +417,21 @@ Hit rayIntersectsSphere(Ray r, Shape s) {
     float c = length(pq)*length(pq) - s.radius[0] * s.radius[0];
 
     // solve the quadratic equation
-    Roots roots;
     float delta = b*b - 4.0*a*c;
     if( delta < 0.0 )
-    {
-        roots.length = 0;
-    }
-    else
-    {
-        roots.length = 2;
-        roots.x0 = (-b+sqrt(delta))/(2.0*a);
-        roots.x1 = (-b-sqrt(delta))/(2.0*a);
-    }
-
-    if( roots.length == 0 )
     {
         return background;
     }
     else
     {
+        float x0 = (-b+sqrt(delta))/(2.0*a);
+        float x1 = (-b-sqrt(delta))/(2.0*a);
         float THRES = 1e-8;
 
-        float r1 = roots.x0, r2 = roots.x1;
+        float r1 = x0, r2 = x1;
         if( r1 > r2 ){
-            r1 = roots.x1;
-            r2 = roots.x0;
+            r1 = x1;
+            r2 = x0;
         }
 
         if( r2 < THRES ) {
@@ -519,11 +515,14 @@ void main(void)
     initializeLights();
     initializeShapes();
 
+	float edgeSamples = sqrt(AAsamples);
+	float step = 1.0 / edgeSamples;
+
     vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
-    for(int i=0;i<16;i++) {
-        float x = floor(float(i) * 0.25);
-        float y = mod(float(i), 4.0);
-        vec4 offsets = vec4(x*0.25, y*0.25, 0, 0);
+    for(int i=0;i<AAsamples;i++) {
+        float x = floor(float(i) * step);
+        float y = mod(float(i), edgeSamples);
+        vec4 offsets = vec4(x*step, y*step, 0, 0);
         vec4 pos = gl_FragCoord + offsets;
 
         Ray r = constructRay(pos.xy);
@@ -534,5 +533,5 @@ void main(void)
         color = color + vec4(hit.color, 1.0);
     }
 
-    gl_FragColor = color * 0.0625;
+    gl_FragColor = color / AAsamples;
 }
