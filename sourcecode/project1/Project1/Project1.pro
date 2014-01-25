@@ -35,9 +35,9 @@ OTHER_FILES += \
     frag.glsl \
     vert.glsl
 
-unix: LIBS += -L$$PWD/../../../../../Documents/PhGLib/lib/ -lPhGLib
+unix: LIBS += -L$$PWD/../../../../../../Documents/Codes/PhGLib/lib/ -lPhGLib
 
-INCLUDEPATH += $$PWD/../../../../../Documents/PhGLib/include
-DEPENDPATH += $$PWD/../../../../../Documents/PhGLib/include
+INCLUDEPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
+DEPENDPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
 
-unix: PRE_TARGETDEPS += $$PWD/../../../../../Documents/PhGLib/lib/libPhGLib.a
+unix: PRE_TARGETDEPS += $$PWD/../../../../../../Documents/Codes/PhGLib/lib/libPhGLib.a
