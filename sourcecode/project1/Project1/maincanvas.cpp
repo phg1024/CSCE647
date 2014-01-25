@@ -1,7 +1,7 @@
 #include "maincanvas.h"
 
-MainCanvas::MainCanvas(QWidget* parent):
-    GL3DCanvas(parent, qglformat_3d, ORTHONGONAL),
+MainCanvas::MainCanvas(QWidget* parent, QGLFormat format):
+    GL3DCanvas(parent, format, ORTHONGONAL),
     program(nullptr),
     vShader(nullptr),
     fShader(nullptr)
@@ -9,7 +9,7 @@ MainCanvas::MainCanvas(QWidget* parent):
     cout << "main canvas constructed." << endl;
     setSceneScale(1.0);
     shadingMode = 1;
-	samples = 1;
+    samples = 4;
 
 	renderingEnabled = true;
 
@@ -23,16 +23,18 @@ MainCanvas::MainCanvas(QWidget* parent):
 MainCanvas::~MainCanvas()
 {
     delete program;
-    delete vShader;
+    //delete vShader;
     delete fShader;
 }
 
 void MainCanvas::initializeGL()
 {
-    GL3DCanvas::initializeGL();
+    qDebug() << "OpenGL Versions Supported: " << QGLFormat::openGLVersionFlags();
+    QString versionString(QLatin1String(reinterpret_cast<const char*>(glGetString(GL_VERSION))));
+    qDebug() << "Driver Version String:" << versionString;
+    qDebug() << "Current Context:" << this->format();
 
-	cout << "initializing GLEW ..." << endl;
-	glewInit();
+    GL3DCanvas::initializeGL();
 
 	cout << "loading shaders ..." << endl;
     program = new QGLShaderProgram(this);
@@ -42,8 +44,9 @@ void MainCanvas::initializeGL()
     fShader->compileSourceFile("../Project1/frag.glsl");
 	cout << qPrintable(fShader->log()) << endl;
     vShader->compileSourceFile("../Project1/vert.glsl");
+    cout << qPrintable(vShader->log()) << endl;
 
-    //program->addShader(vShader);
+    program->addShader(vShader);
     program->addShader(fShader);
 
     program->link();
@@ -94,7 +97,7 @@ void MainCanvas::keyPressEvent(QKeyEvent *e)
 }
 
 void MainCanvas::paintGL()
-{	
+{
 	if( !renderingEnabled ) return;
     // obtain the transform matrix from the trackball
     // apply the inverse transform to the camera
@@ -113,7 +116,7 @@ void MainCanvas::paintGL()
     if( program ) {
         program->bind();
 
-        // upload scene structure
+        // upload scene parameters
         program->setUniformValue("windowSize", QVector2D(width(), height()));
         program->setUniformValue("lightCount", 3);
         program->setUniformValue("shapeCount", 4);
@@ -126,6 +129,74 @@ void MainCanvas::paintGL()
 		program->setUniformValue("camDir", camDir);
 		program->setUniformValue("camF", cam.f);
 
+        // set up ray tracing parameters
+        program->setUniformValue("background.t", -1.0f);
+        program->setUniformValue("background.color", QVector3D(0.85, .85, .85));
+
+        // upload object information
+        program->setUniformValue("shapes[0].type", 0);
+        program->setUniformValue("shapes[0].p", QVector3D(0, 0, 1));
+        program->setUniformValue("shapes[0].radius[0]", 1.0f);
+        program->setUniformValue("shapes[0].diffuse", QVector3D(0.25, 0.5, 1.0));
+        program->setUniformValue("shapes[0].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("shapes[0].ambient", QVector3D(0.05, 0.10, 0.15));
+        program->setUniformValue("shapes[0].shininess", 50.0f);
+        program->setUniformValue("shapes[0].kcool", QVector3D(0, 0, .4));
+        program->setUniformValue("shapes[0].kwarm", QVector3D(.4, .4, 0));
+
+        program->setUniformValue("shapes[1].type", 1);
+        program->setUniformValue("shapes[1].p", QVector3D(0, -1, 0));
+        program->setUniformValue("shapes[1].axis[0]", QVector3D(0, 1.0, 0));
+        program->setUniformValue("shapes[1].axis[1]", QVector3D(1.0, 0, 0));
+        program->setUniformValue("shapes[1].axis[2]", QVector3D(0, 0, 1.0));
+        program->setUniformValue("shapes[1].radius[0]", 3.0f);
+        program->setUniformValue("shapes[1].radius[1]", 6.0f);
+        program->setUniformValue("shapes[1].diffuse", QVector3D(0.75, 0.75, 0.75));
+        program->setUniformValue("shapes[1].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("shapes[1].ambient", QVector3D(0.05, 0.05, 0.05));
+        program->setUniformValue("shapes[1].shininess", 50.0f);
+        program->setUniformValue("shapes[1].kcool", QVector3D(0, 0, .4));
+        program->setUniformValue("shapes[1].kwarm", QVector3D(.4, .4, 0));
+
+        program->setUniformValue("shapes[2].type", 0);
+        program->setUniformValue("shapes[2].p", QVector3D(-0.5, 0.5, -1));
+        program->setUniformValue("shapes[2].radius[0]", 0.25f);
+        program->setUniformValue("shapes[2].diffuse", QVector3D(0.25, 0.75, 0.25));
+        program->setUniformValue("shapes[2].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("shapes[2].ambient", QVector3D(0.05, 0.05, 0.05));
+        program->setUniformValue("shapes[2].shininess", 20.0f);
+        program->setUniformValue("shapes[2].kcool", QVector3D(0, 0.4, 0));
+        program->setUniformValue("shapes[2].kwarm", QVector3D(.4, 0, .4));
+
+        program->setUniformValue("shapes[3].type", 0);
+        program->setUniformValue("shapes[3].p", QVector3D(0.75, -0.5, -0.5));
+        program->setUniformValue("shapes[3].radius[0]", 0.5f);
+        program->setUniformValue("shapes[3].diffuse", QVector3D(0.75, 0.75, 0.25));
+        program->setUniformValue("shapes[3].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("shapes[3].ambient", QVector3D(0.05, 0.05, 0.05));
+        program->setUniformValue("shapes[3].shininess", 100.0f);
+        program->setUniformValue("shapes[3].kcool", QVector3D(.9, .1, .6));
+        program->setUniformValue("shapes[3].kwarm", QVector3D(.05, .45, .05));
+
+        // setup lights
+        program->setUniformValue("lights[0].intensity", 0.75f);
+        program->setUniformValue("lights[0].ambient", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[0].diffuse", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[0].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[0].pos", QVector3D(-2.0, 2.0, -10.0));
+
+        program->setUniformValue("lights[1].intensity", 0.25f);
+        program->setUniformValue("lights[1].ambient", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[1].diffuse", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[1].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[1].pos", QVector3D(4.0, 4.0, -10.0));
+
+        program->setUniformValue("lights[2].intensity", 0.25f);
+        program->setUniformValue("lights[2].ambient", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[2].diffuse", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[2].specular", QVector3D(1.0, 1.0, 1.0));
+        program->setUniformValue("lights[2].pos", QVector3D(0.0, 1.0, -10.0));
+
         // for gooch shading
         program->setUniformValue("kdiff", QVector3D(1.0, 1.0, 1.0));
         program->setUniformValue("kspec", QVector3D(1, 1, 1));
@@ -133,7 +204,7 @@ void MainCanvas::paintGL()
         program->setUniformValue("alpha", 0.15f);
         program->setUniformValue("beta", 0.25f);
 
-		
+        glColor4f(0.2, 0.3, 0.5, 1.0);
         glBegin(GL_QUADS);
         glVertex3f(-1.0, -1.0, 0.1);
         glVertex3f(1.0, -1.0, 0.1);

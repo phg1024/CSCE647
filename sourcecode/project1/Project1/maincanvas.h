@@ -10,7 +10,7 @@
 class MainCanvas : public GL3DCanvas
 {
 public:
-    MainCanvas(QWidget *parent = 0);
+    MainCanvas(QWidget *parent = 0, QGLFormat format = qglformat_3d);
     ~MainCanvas();
 
 protected:

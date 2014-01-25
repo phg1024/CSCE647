@@ -1,6 +1,4 @@
-uniform sampler2D qt_Texture0;
-varying vec4 qt_TexCoord0;
-
+#version 120
 uniform vec2 windowSize;
 uniform int lightCount;
 uniform int shapeCount;
@@ -45,7 +43,7 @@ struct Light {
     float spotCosCutoff;
 
     vec3 attenuation;   // K0, K1, K2
-} lights[4];
+};
 
 // shape types
 const int SPHERE = 0;
@@ -91,7 +89,7 @@ struct Shape {
     vec3 kwarm;
 
     float shininess;
-} shapes[8];
+};
 
 struct Ray {
     vec3 origin;
@@ -103,7 +101,9 @@ struct Hit {
     vec3 color;
 };
 
-Hit background;
+uniform Light lights[4];
+uniform Shape shapes[8];
+uniform Hit background;
 
 void initializeCamera() {
     caminfo.pos = camPos;
@@ -114,84 +114,6 @@ void initializeCamera() {
     caminfo.f = camF;
     caminfo.w = 1.0;
     caminfo.h = windowSize.y / windowSize.x;
-}
-
-void initializeLights() {
-    int idx = 0;
-    lights[idx].intensity = 1.0;
-    lights[idx].ambient = vec3(1.0, 1.0, 1.0);
-    lights[idx].diffuse = vec3(0.75, 0.75, 0.75);
-    lights[idx].specular = vec3(1.0, 1.0, 0.0);
-    lights[idx].pos = vec3(-2.0, 2.0, -10.0);
-
-    idx++;
-    lights[idx].intensity = 0.25;
-    lights[idx].ambient = vec3(1.0, 1.0, 1.0);
-    lights[idx].diffuse = vec3(0.75, 0.75, 0.75);
-    lights[idx].specular = vec3(0.0, 1.0, 1.0);
-    lights[idx].pos = vec3(4.0, 4.0, -10.0);
-
-    idx++;
-    lights[idx].intensity = 0.25;
-    lights[idx].ambient = vec3(1.0, 1.0, 1.0);
-    lights[idx].diffuse = vec3(0.75, 0.75, 0.75);
-    lights[idx].specular = vec3(0.0, 1.0, 1.0);
-    lights[idx].pos = vec3(0.0, 1.0, -10.0);
-}
-
-void initializeShapes() {
-    int idx = 0;
-    shapes[idx].type = SPHERE;
-    shapes[idx].p = vec3(0.0, 0.0, 1.0);
-    shapes[idx].radius[0] = 1.0;
-
-    shapes[idx].diffuse = vec3(0.25, 0.5, 1.0);
-    shapes[idx].specular = vec3(1.0, 1.0, 1.0);
-    shapes[idx].ambient = vec3(0.05, 0.10, 0.15);
-    shapes[idx].shininess = 50.0;
-    shapes[idx].kcool = vec3(0, 0, 0.4);
-    shapes[idx].kwarm = vec3(0.4, 0.4, 0);
-
-
-    idx++;
-    shapes[idx].type = PLANE;
-    shapes[idx].p = vec3(0.0, -1.0, 0.0);
-    shapes[idx].axis[0] = vec3(0.0, 1.0, 0.0);    // normal
-    shapes[idx].axis[1] = vec3(1.0, 0.0, 0.0);    // u
-    shapes[idx].axis[2] = vec3(0.0, 0.0, 1.0);    // v
-    shapes[idx].radius[0] = 3.0;  // width
-    shapes[idx].radius[1] = 6.0;  // height
-
-    shapes[idx].diffuse = vec3(0.75, 0.75, 0.75);
-    shapes[idx].specular = vec3(1.0, 1.0, 1.0);
-    shapes[idx].ambient = vec3(0.05, 0.05, 0.05);
-    shapes[idx].shininess = 50.0;
-
-    idx++;
-    shapes[idx].type = SPHERE;
-    shapes[idx].p = vec3(-0.5, 0.5, -1.0);
-    shapes[idx].radius[0] = 0.25;
-
-    shapes[idx].diffuse = vec3(0.25, 0.75, 0.25);
-    shapes[idx].specular = vec3(1.0, 1.0, 1.0);
-    shapes[idx].ambient = vec3(0.05, 0.05, 0.05);
-    shapes[idx].shininess = 5.0;
-
-    shapes[idx].kcool = vec3(0, 0.4, 0.0);
-    shapes[idx].kwarm = vec3(0.4, 0.0, 0.4);
-
-    idx++;
-    shapes[idx].type = SPHERE;
-    shapes[idx].p = vec3(0.75, -0.5, -0.5);
-    shapes[idx].radius[0] = 0.5;
-
-    shapes[idx].diffuse = vec3(0.75, 0.75, 0.25);
-    shapes[idx].specular = vec3(1.0, 1.0, 1.0);
-    shapes[idx].ambient = vec3(0.15, 0.05, 0.05);
-    shapes[idx].shininess = 100.0;
-
-    shapes[idx].kcool = vec3(0.9, 0.1, 0.6);
-    shapes[idx].kwarm = vec3(0.05, 0.45, 0.05);
 }
 
 // initial rays
@@ -216,42 +138,36 @@ Ray constructRay(vec2 pos) {
 float lightRayIntersectsSphere(Ray r, Shape s) {
     vec3 pq = r.origin - s.p;
     float a = 1.0;
-    float b = 2.0 * dot(pq, r.dir);
-    float c = length(pq)*length(pq) - s.radius[0] * s.radius[0];
+    float b = dot(pq, r.dir);
+    float c = dot(pq, pq) - s.radius[0] * s.radius[0];
 
     // solve the quadratic equation
-    float delta = b*b - 4.0*a*c;
+    float delta = b*b - a*c;
     if( delta < 0.0 )
     {
         return -1.0;
     }
     else
     {
-        float x0 = (-b+sqrt(delta))/(2.0*a);
-        float x1 = (-b-sqrt(delta))/(2.0*a);
+        delta = sqrt(delta);
+        float x0 = -b+delta; // a = 1, no need to do the division
+        float x1 = -b-delta;
+        float THRES = 1e-3;
 
-        float THRES = 1e-4;
-
-        float r1 = x0, r2 = x1;
-        if( r1 > r2 ){
-            r1 = x1;
-            r2 = x0;
-        }
-
-        if( r2 < THRES ) {
+        if( x1 < THRES ) {
             return -1.0;
         }
         else
         {
-            if( r1 < THRES ) return r2;
-            else return r1;
+            if( x0 < THRES ) return x1;
+            else return x0;
         }
     }
 }
 
 float lightRayIntersectsPlane(Ray r, Shape s) {
     float t = 1e10;
-    float THRES = 1e-4;
+    float THRES = 1e-3;
     vec3 pq = s.p - r.origin;
     float ldotn = dot(s.axis[0], r.dir);
     if( abs(ldotn) < THRES ) return -1.0;
@@ -301,7 +217,7 @@ bool checkLightVisibility(vec3 p, Light lt) {
     r.dir = normalize(lt.pos - p);
     float t = lightRayIntersectsShapes(r);
 
-    float THRES = 1e-6;
+    float THRES = 1e-3;
     return t < THRES || t > dist;
 }
 
@@ -413,34 +329,29 @@ Hit rayIntersectsSphere(Ray r, Shape s) {
 
     vec3 pq = r.origin - s.p;
     float a = 1.0;
-    float b = 2.0 * dot(pq, r.dir);
-    float c = length(pq)*length(pq) - s.radius[0] * s.radius[0];
+    float b = dot(pq, r.dir);
+    float c = dot(pq, pq) - s.radius[0] * s.radius[0];
 
     // solve the quadratic equation
-    float delta = b*b - 4.0*a*c;
+    float delta = b*b - a*c;
     if( delta < 0.0 )
     {
         return background;
     }
     else
     {
-        float x0 = (-b+sqrt(delta))/(2.0*a);
-        float x1 = (-b-sqrt(delta))/(2.0*a);
-        float THRES = 1e-8;
+        delta = sqrt(delta);
+        float x0 = -b+delta; // a = 1, no need to do the division
+        float x1 = -b-delta;
+        float THRES = 1e-3;
 
-        float r1 = x0, r2 = x1;
-        if( r1 > r2 ){
-            r1 = x1;
-            r2 = x0;
-        }
-
-        if( r2 < THRES ) {
+        if( x0 < THRES ) {
             return background;
         }
         else
         {
-            if( r1 < THRES ) h.t = r2;
-            else h.t = r1;
+            if( x1 < THRES ) h.t = x0;
+            else h.t = x1;
 
             // hit point
             vec3 p = h.t * r.dir + r.origin;
@@ -454,13 +365,11 @@ Hit rayIntersectsSphere(Ray r, Shape s) {
 }
 
 Hit rayIntersectsPlane(Ray r, Shape s) {
-    Hit h;
-    h.t = 1e10;
-    h.color = vec3(0, 0, 0);
     vec3 pq = s.p - r.origin;
     float ldotn = dot(s.axis[0], r.dir);
     if( abs(ldotn) < 1e-3 ) return background;
     else {
+        Hit h;
         h.t = dot(s.axis[0], pq) / ldotn;
 
         if( h.t > 0.0 ) {
@@ -503,27 +412,28 @@ Hit rayIntersectsShapes(Ray r) {
     return h;
 }
 
-void init() {
-    background.t = -1.0;
-    background.color = vec3(0.85, 0.85, 0.85);
+float rand(vec2 co){
+  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
 void main(void)
 {
-    init();
     initializeCamera();
-    initializeLights();
-    initializeShapes();
+    //initializeLights();
+    //initializeShapes();
 
-	float edgeSamples = sqrt(AAsamples);
-	float step = 1.0 / edgeSamples;
+    float edgeSamples = sqrt(AAsamples);
+    float step = 1.0 / edgeSamples;
 
     vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
     for(int i=0;i<AAsamples;i++) {
+        // uniform jitter
         float x = floor(float(i) * step);
         float y = mod(float(i), edgeSamples);
-        vec4 offsets = vec4(x*step, y*step, 0, 0);
-        vec4 pos = gl_FragCoord + offsets;
+
+        float xoffset = rand(gl_FragCoord.xy + vec2(x*step, y*step)) - 0.5;
+        float yoffset = rand(gl_FragCoord.xy + vec2(y*step, x*step)) - 0.5;
+        vec4 pos = gl_FragCoord + vec4((x + xoffset) * step, (y + yoffset) * step, 0, 0);
 
         Ray r = constructRay(pos.xy);
 
