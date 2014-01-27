@@ -9,10 +9,7 @@ uniform int AAsamples;
 uniform vec3 camPos, camUp, camDir;
 uniform float camF;
 
-
 // for gooch shading
-uniform vec3 kdiff, kspec;
-uniform vec3 kpos;
 uniform float alpha, beta;
 
 struct Camera {
@@ -26,7 +23,13 @@ struct Camera {
     float w, h;     // canvas size
 } caminfo;
 
+const int POINT_LIGHT = 0;
+const int DIRECTIONAL_LIGHT = 1;
+const int SPOT_LIGHT = 2;
+
 struct Light {
+	int type;	// POINT = 0, DIRECTIONAL = 1, SPOT = 2
+
     float intensity;
 
     vec3 ambient;
@@ -34,10 +37,8 @@ struct Light {
     vec3 specular;
 
     vec3 pos;
+	vec3 dir;
 
-    bool isDirectional;
-    bool isSpot;
-    vec3 dir;
     float spotExponent;
     float spotCutoff;
     float spotCosCutoff;
@@ -76,6 +77,7 @@ struct Shape {
                         // normal and u, v for plane
     float radius[3];    // radius for sphere, ellipsoid, cylinder, width and height for plane
     float angle;        // open angle for cone
+	mat3 m;				// for ellipsoid
 
     float height;       // for cylinder and cone
 
@@ -89,6 +91,12 @@ struct Shape {
     vec3 kwarm;
 
     float shininess;
+
+	bool hasTexture;
+	sampler2D tex;
+
+	bool hasNormalMap;
+	sampler2D nTex;
 };
 
 struct Ray {
@@ -104,6 +112,23 @@ struct Hit {
 uniform Light lights[4];
 uniform Shape shapes[8];
 uniform Hit background;
+
+
+vec2 spheremap(vec3 p) {
+	const float PI = 3.1415926536;
+	return vec2((atan(-p.z, p.x) / PI + 1.0) * 0.5,
+                -((asin(p.y) / PI + 0.5)));
+}
+
+
+vec3 sphere_tangent(vec3 p) {
+	const float PI = 3.1415926536;
+	float psi = atan(-p.z, p.x);
+	float phi = asin(p.y);
+	
+	vec2 bn = normalize(vec2(p.x, p.z)) * sin(phi);
+	return vec3(bn.x, -cos(phi), bn.y);
+}
 
 void initializeCamera() {
     caminfo.pos = camPos;
@@ -197,130 +222,214 @@ float lightRayIntersectsShape(Ray r, Shape s) {
 }
 
 float lightRayIntersectsShapes(Ray r) {
+	float T_INIT = 1e10;
     // go through a list of shapes and find closest hit
-    float t = 1e10;
+    float t = T_INIT;
+
+	float THRES = 1e-3;
 
     for(int i=0;i<shapeCount;i++) {
         float hitT = lightRayIntersectsShape(r, shapes[i]);
-        if( (hitT >= 0.0) && (hitT < t) ) {
+        if( (hitT > -THRES) && (hitT < t) ) {
             t = hitT;
         }
     }
 
-    return t;
+	if( t < T_INIT )
+		return t;
+	else return -1.0;
 }
 
-bool checkLightVisibility(vec3 p, Light lt) {
-    float dist = length(p - lt.pos);
-    Ray r;
-    r.origin = p;
-    r.dir = normalize(lt.pos - p);
-    float t = lightRayIntersectsShapes(r);
+bool checkLightVisibility(vec3 p, vec3 N, Light lt) {
+	if( lt.type == POINT_LIGHT ) {
+		float dist = length(p - lt.pos);
+		Ray r;
+		r.origin = p;
+		r.dir = normalize(lt.pos - p);
+		float t = lightRayIntersectsShapes(r);
 
-    float THRES = 1e-3;
-    return t < THRES || t > dist;
+		float THRES = 1e-3;
+		return t < THRES || t > dist;
+	}
+	else if( lt.type == SPOT_LIGHT ) {
+	}
+	else if( lt.type == DIRECTIONAL_LIGHT ) {
+		Ray r;
+		r.origin = p;
+		r.dir = -lt.dir;
+		float t = lightRayIntersectsShapes(r);
+
+		float THRES = 1e-3;
+		return (t < THRES && (dot(N, lt.dir)<0));
+	}
 }
 
 
-vec3 phongShading(vec3 v, vec3 N, vec3 eyePos, vec3 diffuse, vec3 ambient, vec3 specular, float shininess) {
+vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
     vec3 c = vec3(0, 0, 0);
 
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
 
         // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, lights[i]);
+        bool isVisible = checkLightVisibility(v, N, lights[i]);
 
         //calculate Ambient Term:
-        vec3 Iamb = ambient * lights[i].ambient;
+        vec3 Iamb = s.ambient * lights[i].ambient;
 
         if( isVisible ) {
-            vec3 L = normalize(lights[i].pos - v);
-            vec3 E = normalize(eyePos-v);
+            vec3 L;
+			if( lights[i].type != DIRECTIONAL_LIGHT)
+				L = normalize(lights[i].pos - v);
+			else
+				L = -lights[i].dir;
+
+            vec3 E = normalize(r.origin-v);
             vec3 R = normalize(-reflect(L,N));
 
+			float NdotL, RdotE;
+			if( s.hasNormalMap ) {
+				// normal defined in tangent space
+				vec3 n_normalmap = normalize(texture2D(s.nTex, t).rgb * 2.0 - 1.0);
+
+				vec3 tangent = normalize(sphere_tangent(N));
+				vec3 bitangent = cross(N, tangent);
+
+				// find the mapping from tangent space to camera space
+				mat3 m_t = transpose(mat3(tangent, bitangent, N));
+
+				NdotL = dot(n_normalmap, normalize(m_t*L));
+				RdotE = dot(m_t*R, normalize(m_t*E));
+			}
+			else {
+				NdotL = dot(N, L);
+				RdotE = dot(R, E);
+			}
+
             //calculate Diffuse Term:
-            vec3 Idiff = diffuse * lights[i].diffuse * max(dot(N,L), 0.0);
+            vec3 Idiff = s.diffuse * lights[i].diffuse * max(NdotL, 0.0);
             Idiff = clamp(Idiff, 0.0, 1.0);
 
             // calculate Specular Term:
-            vec3 Ispec = specular * lights[i].specular
-                         * pow(max(dot(R,E),0.0),0.3*shininess);
+            vec3 Ispec = s.specular * lights[i].specular
+                         * pow(max(RdotE,0.0),0.3*s.shininess);
             Ispec = clamp(Ispec, 0.0, 1.0);
 
-            c = c + (Idiff + Ispec + Iamb) * lights[i].intensity;
+			if( s.hasTexture ) {
+				vec3 Itexture = texture2D (s.tex, t).rgb;
+				c = c + Itexture * (Idiff + Ispec + Iamb) * lights[i].intensity;
+			}
+			else
+	            c = c + (Idiff + Ispec + Iamb) * lights[i].intensity;
         }
         else {
-            c = c + Iamb * lights[i].intensity;
+			if( s.hasTexture ) {
+				vec3 Itexture = texture2D (s.tex, t).rgb;
+				c = c + Itexture * Iamb * lights[i].intensity;
+			}
+			else
+	            c = c + Iamb * lights[i].intensity;
         }
     }
 
     return c;
 }
 
-vec3 lambertShading(vec3 v, vec3 N, vec3 eyePos, vec3 diffuse) {
+vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
     vec3 c = vec3(0, 0, 0);
 
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
         // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, lights[i]);
+        bool isVisible = checkLightVisibility(v, N, lights[i]);
 
         if( isVisible ) {
-            vec3 L = normalize(lights[i].pos - v);
+			vec3 L;
+			if( lights[i].type != DIRECTIONAL_LIGHT)
+				L = normalize(lights[i].pos - v);
+			else
+				L = -lights[i].dir;
 
-            vec3 Idiff = clamp(diffuse * lights[i].diffuse * max(dot(N, L), 0.0), 0.0, 1.0);
+			float NdotL;
 
-            c = c + Idiff * lights[i].intensity;
+			// change the normal with normal map
+			if( s.hasNormalMap ) {
+				// normal defined in tangent space
+				vec3 n_normalmap = normalize(texture2D(s.nTex, t).rgb * 2.0 - 1.0);
+
+				vec3 tangent = normalize(sphere_tangent(N));
+				vec3 bitangent = cross(N, tangent);
+
+				// find the mapping from tangent space to camera space
+				mat3 m_t = transpose(mat3(tangent, bitangent, N));
+
+				// convert the normal to to camera space
+				NdotL = dot(n_normalmap, normalize(m_t*L));
+			}
+			else {
+				NdotL = dot(N, L);
+			}
+
+			vec3 Itexture;
+			if( s.hasTexture ) {
+				Itexture = texture2D (s.tex, t).rgb;
+			}
+			else Itexture = vec3(1, 1, 1);
+
+            vec3 Idiff = clamp(s.diffuse * lights[i].diffuse * max(NdotL, 0.0), 0.0, 1.0);
+
+            c = c + Itexture * Idiff * lights[i].intensity;
         }
     }
 
     return c;
 }
 
-vec3 goochShading(vec3 v, vec3 N, vec3 eyePos, vec3 kcool, vec3 kwarm, float shininess) {
+vec3 goochShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 
     vec3 c = vec3(0, 0, 0);
 
     for(int i=0;i<lightCount;i++) {
-        // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, lights[i]);
+		vec3 L;
+		if( lights[i].type != DIRECTIONAL_LIGHT)
+			L = normalize(lights[i].pos - v);
+		else
+			L = -lights[i].dir;
 
-        if( isVisible ) {
-            vec3 L = normalize(lights[i].pos - v);
-            vec3 E = normalize(eyePos - v);
-            vec3 R = normalize(-reflect(L,N));
+        vec3 E = normalize(r.origin - v);
+        vec3 R = normalize(-reflect(L,N));
+        float NdotL = dot(N, L);
 
-            float NdotL = dot(N, L);
-            vec3 Idiff = kdiff * NdotL;
+		vec3 diffuse;
+		if( s.hasTexture ) {
+			diffuse = texture2D (s.tex, t).rgb;
+		}
+		else diffuse = s.diffuse;
 
-            vec3 kcdiff = min(kcool + alpha * Idiff, 1.0);
-            vec3 kwdiff = min(kwarm + beta * Idiff, 1.0);
-
-            vec3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5);
-
-            // calculate Specular Term:
-            vec3 Ispec = kspec
-                         * pow(max(dot(R,E),0.0),0.3*shininess);
-            //Ispec = clamp(Ispec, 0.0, 1.0);
-            Ispec = step(vec3(0.5, 0.5, 0.5), Ispec);
-
+        vec3 Idiff = diffuse * NdotL;
+        vec3 kcdiff = min(s.kcool + alpha * Idiff, 1.0);
+        vec3 kwdiff = min(s.kwarm + beta * Idiff, 1.0);
+        vec3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5);
+        // calculate Specular Term:
+            vec3 Ispec = s.specular
+                         * pow(max(dot(R,E),0.0),0.3*s.shininess);
+        Ispec = step(vec3(0.5, 0.5, 0.5), Ispec);
+        // edge effect
             float EdotN = dot(E, N);
-            if( EdotN >= 0.2 ) c = c + min(kfinal + Ispec, 1.0) * lights[i].intensity;
-        }
+        if( EdotN >= 0.2 ) c = c + min(kfinal + Ispec, 1.0) * lights[i].intensity;
     }
 
     return c;
 }
 
-vec3 computeShading(vec3 p, vec3 n, Ray r, Shape s) {
+vec3 computeShading(vec3 p, vec3 n, vec2 t, Ray r, Shape s) {
     if( shadingMode == 1 )
-        return lambertShading(p, n, r.origin, s.diffuse);
+        return lambertShading(p, n, t, r, s);
     else if( shadingMode == 2 )
-        return phongShading(p, n, r.origin, s.diffuse, s.ambient, s.specular, s.shininess);
+        return phongShading(p, n, t, r, s);
     else if( shadingMode == 3 )
-        if( s.type == PLANE ) return lambertShading(p, n, r.origin, s.diffuse);
-        else return goochShading(p, n, r.origin, s.kcool, s.kwarm, s.shininess);
+        if( s.type == PLANE ) return lambertShading(p, n, t, r, s);
+        else return goochShading(p, n, t, r, s);
 }
 
 // ray intersection test with shading computation
@@ -358,7 +467,12 @@ Hit rayIntersectsSphere(Ray r, Shape s) {
             // normal at hit point
             vec3 n = normalize(p - s.p);
 
-            h.color = computeShading(p, n, r, s);
+			// hack, move the point a little bit outer
+			p = s.p + (s.radius[0] + 1e-6) * n;
+
+			vec2 t = spheremap(n);
+
+            h.color = computeShading(p, n, t, r, s);
             return h;
         }
     }
@@ -381,7 +495,8 @@ Hit rayIntersectsPlane(Ray r, Shape s) {
             float v = dot(pp0, s.axis[2]);
             if( abs(u) > s.radius[0] || abs(v) > s.radius[1] ) return background;
             else {
-                h.color = computeShading(p, s.axis[0], r, s);
+				vec2 t = clamp((vec2(u / s.radius[0], v / s.radius[1]) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
+                h.color = computeShading(p, s.axis[0], t, r, s);
                 return h;
             }
         }
@@ -422,7 +537,7 @@ void main(void)
     //initializeLights();
     //initializeShapes();
 
-    float edgeSamples = sqrt(AAsamples);
+    float edgeSamples = sqrt(float(AAsamples));
     float step = 1.0 / edgeSamples;
 
     vec4 color = vec4(0.0, 0.0, 0.0, 0.0);

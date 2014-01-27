@@ -1,5 +1,5 @@
+#include "common.h"
 #include "mainwindow.h"
-#include <QApplication>
 
 #ifdef WIN32
 #include "Utils/console.h"

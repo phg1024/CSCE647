@@ -1,11 +1,12 @@
 #ifndef MAINCANVAS_H
 #define MAINCANVAS_H
 
+#include "common.h"
 #include "OpenGL/gl3dcanvas.h"
-#include <QGLShaderProgram>
-#include <QGLShader>
 
+#include "scene.h"
 #include "camera.h"
+#include "light.h"
 
 class MainCanvas : public GL3DCanvas
 {
@@ -22,6 +23,11 @@ protected:
 	virtual void mousePressEvent(QMouseEvent *e);
 	virtual void mouseMoveEvent(QMouseEvent *e);
 
+	void initShapes();
+	void initLights();
+
+	int loadTexture(const string& filename, int texSlot);
+
 private:
     QGLShaderProgram* program;
     QGLShader* vShader, *fShader;
@@ -29,7 +35,8 @@ private:
 	bool renderingEnabled;
     int shadingMode;
 	int samples;
-	Camera cam;
+
+	Scene scene;
 };
 
 #endif // MAINCANVAS_H

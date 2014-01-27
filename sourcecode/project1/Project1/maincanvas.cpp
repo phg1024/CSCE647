@@ -13,11 +13,11 @@ MainCanvas::MainCanvas(QWidget* parent, QGLFormat format):
 
 	renderingEnabled = true;
 
-	cam.pos = Camera::point_t(0, 0, -5);
-	cam.dir = Camera::vector_t(0, 0, 1);
-	cam.up = Camera::vector_t(0, 1, 0);
-	cam.f = 1.0;
-	cam.w = 1.0;
+	scene.cam.pos = float3(0, 0, -5);
+	scene.cam.dir = float3(0, 0, 1);
+	scene.cam.up = float3(0, 1, 0);
+	scene.cam.f = 1.0;
+	scene.cam.w = 1.0;
 }
 
 MainCanvas::~MainCanvas()
@@ -50,6 +50,10 @@ void MainCanvas::initializeGL()
     program->addShader(fShader);
 
     program->link();
+
+	initLights();
+	initShapes();
+
 	cout << "init done." << endl;
 }
 
@@ -105,9 +109,9 @@ void MainCanvas::paintGL()
 	QMatrix4x4 mat(m);
 	mat = mat.transposed();
 
-	QVector3D camPos = cam.pos.toQVector();
-	QVector3D camDir = cam.dir.toQVector();
-	QVector3D camUp = cam.up.toQVector();
+	QVector3D camPos = scene.cam.pos.toQVector();
+	QVector3D camDir = scene.cam.dir.toQVector();
+	QVector3D camUp = scene.cam.up.toQVector();
 
 	camPos = (mat * QVector4D(camPos / trackBall.getScale(), 1.0)).toVector3D();
 	camDir = (mat * QVector4D(camDir, 1.0)).toVector3D();
@@ -118,8 +122,8 @@ void MainCanvas::paintGL()
 
         // upload scene parameters
         program->setUniformValue("windowSize", QVector2D(width(), height()));
-        program->setUniformValue("lightCount", 3);
-        program->setUniformValue("shapeCount", 4);
+        program->setUniformValue("lightCount", (int)scene.lights.size());
+        program->setUniformValue("shapeCount", (int)scene.shapes.size());
         program->setUniformValue("shadingMode", shadingMode);
 		program->setUniformValue("AAsamples", samples);
 
@@ -127,80 +131,23 @@ void MainCanvas::paintGL()
 		program->setUniformValue("camPos", camPos);
 		program->setUniformValue("camUp", camUp);
 		program->setUniformValue("camDir", camDir);
-		program->setUniformValue("camF", cam.f);
+		program->setUniformValue("camF", scene.cam.f);
 
         // set up ray tracing parameters
         program->setUniformValue("background.t", -1.0f);
-        program->setUniformValue("background.color", QVector3D(0.85, .85, .85));
+        program->setUniformValue("background.color", QVector3D(0.85f, .85f, .85f));
 
         // upload object information
-        program->setUniformValue("shapes[0].type", 0);
-        program->setUniformValue("shapes[0].p", QVector3D(0, 0, 1));
-        program->setUniformValue("shapes[0].radius[0]", 1.0f);
-        program->setUniformValue("shapes[0].diffuse", QVector3D(0.25, 0.5, 1.0));
-        program->setUniformValue("shapes[0].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("shapes[0].ambient", QVector3D(0.05, 0.10, 0.15));
-        program->setUniformValue("shapes[0].shininess", 50.0f);
-        program->setUniformValue("shapes[0].kcool", QVector3D(0, 0, .4));
-        program->setUniformValue("shapes[0].kwarm", QVector3D(.4, .4, 0));
-
-        program->setUniformValue("shapes[1].type", 1);
-        program->setUniformValue("shapes[1].p", QVector3D(0, -1, 0));
-        program->setUniformValue("shapes[1].axis[0]", QVector3D(0, 1.0, 0));
-        program->setUniformValue("shapes[1].axis[1]", QVector3D(1.0, 0, 0));
-        program->setUniformValue("shapes[1].axis[2]", QVector3D(0, 0, 1.0));
-        program->setUniformValue("shapes[1].radius[0]", 3.0f);
-        program->setUniformValue("shapes[1].radius[1]", 6.0f);
-        program->setUniformValue("shapes[1].diffuse", QVector3D(0.75, 0.75, 0.75));
-        program->setUniformValue("shapes[1].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("shapes[1].ambient", QVector3D(0.05, 0.05, 0.05));
-        program->setUniformValue("shapes[1].shininess", 50.0f);
-        program->setUniformValue("shapes[1].kcool", QVector3D(0, 0, .4));
-        program->setUniformValue("shapes[1].kwarm", QVector3D(.4, .4, 0));
-
-        program->setUniformValue("shapes[2].type", 0);
-        program->setUniformValue("shapes[2].p", QVector3D(-0.5, 0.5, -1));
-        program->setUniformValue("shapes[2].radius[0]", 0.25f);
-        program->setUniformValue("shapes[2].diffuse", QVector3D(0.25, 0.75, 0.25));
-        program->setUniformValue("shapes[2].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("shapes[2].ambient", QVector3D(0.05, 0.05, 0.05));
-        program->setUniformValue("shapes[2].shininess", 20.0f);
-        program->setUniformValue("shapes[2].kcool", QVector3D(0, 0.4, 0));
-        program->setUniformValue("shapes[2].kwarm", QVector3D(.4, 0, .4));
-
-        program->setUniformValue("shapes[3].type", 0);
-        program->setUniformValue("shapes[3].p", QVector3D(0.75, -0.5, -0.5));
-        program->setUniformValue("shapes[3].radius[0]", 0.5f);
-        program->setUniformValue("shapes[3].diffuse", QVector3D(0.75, 0.75, 0.25));
-        program->setUniformValue("shapes[3].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("shapes[3].ambient", QVector3D(0.05, 0.05, 0.05));
-        program->setUniformValue("shapes[3].shininess", 100.0f);
-        program->setUniformValue("shapes[3].kcool", QVector3D(.9, .1, .6));
-        program->setUniformValue("shapes[3].kwarm", QVector3D(.05, .45, .05));
+        for(int idx=0;idx<scene.shapes.size();idx++) {
+			scene.shapes[idx].uploadToShader(program, "shapes", idx);
+		}
 
         // setup lights
-        program->setUniformValue("lights[0].intensity", 0.75f);
-        program->setUniformValue("lights[0].ambient", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[0].diffuse", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[0].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[0].pos", QVector3D(-2.0, 2.0, -10.0));
-
-        program->setUniformValue("lights[1].intensity", 0.25f);
-        program->setUniformValue("lights[1].ambient", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[1].diffuse", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[1].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[1].pos", QVector3D(4.0, 4.0, -10.0));
-
-        program->setUniformValue("lights[2].intensity", 0.25f);
-        program->setUniformValue("lights[2].ambient", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[2].diffuse", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[2].specular", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("lights[2].pos", QVector3D(0.0, 1.0, -10.0));
+		for(int idx=0;idx<scene.lights.size();idx++) {
+			scene.lights[idx].uploadToShader(program, "lights", idx);
+		}
 
         // for gooch shading
-        program->setUniformValue("kdiff", QVector3D(1.0, 1.0, 1.0));
-        program->setUniformValue("kspec", QVector3D(1, 1, 1));
-        program->setUniformValue("kpos", QVector3D(-1, 0.5, -1));
         program->setUniformValue("alpha", 0.15f);
         program->setUniformValue("beta", 0.25f);
 
@@ -275,4 +222,157 @@ void MainCanvas::mouseMoveEvent(QMouseEvent *e)
 	case INTERACTION:
 		break;
 	}    
+}
+
+void MainCanvas::initShapes()
+{
+	scene.shapes.clear();
+
+	Shape s0( Shape::SPHERE, 
+		float3(0, 0, 1),	// p 
+		1.0, 0.0, 0.0,		// radius
+		float3(),			// axis[0]
+		float3(),			// axis[1]
+		float3(),			// axis[2]
+		Material(
+		float3(1.0, 1.0, 1.0),		// diffuse
+		float3(1.0, 1.0, 1.0),		// specular
+		float3(0.10, 0.10, 0.1),		// ambient
+		50.0f,							// shininess
+		float3(0, 0, .4),				// kcool
+		float3(.4, .4, 0)				// kwarm
+		)
+	);
+	s0.hasTexture = true;
+	s0.texId = loadTexture("textures/earth/earthmap4k.png", 0);
+	s0.hasNormalMap = true;
+	s0.normalTexId = loadTexture("textures/earth/earth_normalmap_flat_4k.png", 1);
+	//s0.texId = loadTexture("textures/gabby.jpg", 0);
+	scene.shapes.push_back(s0);
+
+	Shape s(
+		Shape::PLANE,
+		float3(0, -1, 0),
+		3.0, 3.0, 0.0,
+		float3(0, 1, 0),
+		float3(1, 0, 0),
+		float3(0, 0, 1),
+		Material(
+		float3(0.75, 0.75, 0.75),
+		float3(1, 1, 1),
+		float3(0.05, 0.05, 0.05),
+		50.0,
+		float3(0, 0, .4),
+		float3(.4, .4, 0)
+		));
+	s.hasTexture = true;
+	s.texId = loadTexture("chessboard.png", 2);
+	scene.shapes.push_back(s);
+
+	scene.shapes.push_back(Shape( Shape::SPHERE, 
+		float3(0, 0, 1),	// p 
+		1.0, 0.0, 0.0,		// radius
+		float3(),			// axis[0]
+		float3(),			// axis[1]
+		float3(),			// axis[2]
+		Material(
+		float3(0.25, 0.5 , 1.0 ),		// diffuse
+		float3(1.0 , 1.0 , 1.0 ),		// specular
+		float3(0.05, 0.10, 0.15),		// ambient
+		50.0f,							// shininess
+		float3(0, 0, .4),				// kcool
+		float3(.4, .4, 0)				// kwarm
+		)
+		)
+		);
+
+	Shape s2( Shape::SPHERE, 
+		float3(-0.5, 0.5, -1),	// p 
+		0.25, 0.0, 0.0,		// radius
+		float3(),			// axis[0]
+		float3(),			// axis[1]
+		float3(),			// axis[2]
+		Material(
+		float3(0.75, 0.75, 0.75),		// diffuse
+		float3(1.0 , 1.0 , 1.0),		// specular
+		float3(0.05, 0.05, 0.05),		// ambient
+		20.0f,							// shininess
+		float3(0, .4, 0),				// kcool
+		float3(.4, 0, .4)				// kwarm
+		));
+	s2.hasTexture = true;
+	s2.texId = loadTexture("textures/moon/moon_map_4k.png", 3);
+	s2.hasNormalMap = true;
+	s2.normalTexId = loadTexture("textures/moon/moon_normal_4k.png", 4);
+	scene.shapes.push_back(s2);
+
+	scene.shapes.push_back(Shape( Shape::SPHERE, 
+		float3(0.75, -0.5, -0.5),	// p 
+		0.5, 0.0, 0.0,		// radius
+		float3(),			// axis[0]
+		float3(),			// axis[1]
+		float3(),			// axis[2]
+		Material(
+		float3(0.75, 0.75, 0.25),		// diffuse
+		float3(1.0 , 1.0 , 1.0),		// specular
+		float3(0.05, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		float3(.9, .1, .6),				// kcool
+		float3(.05, .45, .05)				// kwarm
+		)
+		)
+		);
+}
+
+void MainCanvas::initLights()
+{
+	scene.lights.clear();
+
+	scene.lights.push_back(Light(Light::POINT, 0.75, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(-2, 2, -10)));
+	scene.lights.push_back(Light(Light::POINT, 0.25, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(4, 4, -10)));
+	scene.lights.push_back(Light(Light::DIRECTIONAL, 0.25, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(0, 3, -10), float3(0, -3/sqrtf(109.f), 10/sqrtf(109.f))));
+}
+
+int MainCanvas::loadTexture(const string& filename, int texSlot)
+{
+	QImage img(filename.c_str());
+	cout << img.width() << "x" << img.height() << endl;
+
+	unsigned char* data = new unsigned char[img.width()*img.height()*4];
+	for(int i=0;i<img.height();i++) {
+		for(int j=0;j<img.width();j++) {
+			int idx=(i*img.width()+j)*4;
+			QRgb pix = img.pixel(j, i);
+
+			data[idx] = (unsigned char)qRed(pix);
+			data[idx+1] = (unsigned char)qGreen(pix);
+			data[idx+2] = (unsigned char)qBlue(pix);
+			data[idx+3] = (unsigned char)qAlpha(pix);
+		}
+	}
+
+	GLuint texture;
+	glGenTextures( 1, &texture ); //generate the texture with the loaded data
+	glActiveTexture (GL_TEXTURE0 + texSlot);
+	glBindTexture( GL_TEXTURE_2D, texture ); //bind the texture to its array
+	glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE ); //set texture environment parameters
+
+	//And if you go and use extensions, you can use Anisotropic filtering textures which are of an
+	//even better quality, but this will do for now.
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
+		GL_LINEAR);
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, 
+		GL_LINEAR);
+
+	//Here we are setting the parameter to repeat the texture instead of clamping the texture
+	//to the edge of our shape. 
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+
+	//Generate the texture
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.width(), img.height(), 0, GL_RGBA, 
+		GL_UNSIGNED_BYTE, data);
+
+	delete[] data;
+	return texSlot; //return whether it was successful
 }
