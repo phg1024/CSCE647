@@ -21,6 +21,9 @@ void Shape::uploadToShader(QGLShaderProgram *program, const string& var)
 	program->setUniformValue(str.c_str(), radius[1]);
 	str = var + ".radius[2]";
 	program->setUniformValue(str.c_str(), radius[2]);
+	str = var + ".m";
+	program->setUniformValue(str.c_str(), m.toQMatrix());
+
 
 	// material info
 	str = var + ".diffuse";
@@ -70,6 +73,8 @@ void Shape::uploadToShader(QGLShaderProgram *program, const string& var, int idx
 	program->setUniformValue(str.c_str(), radius[1]);
 	str = var + "[" + PhGUtils::toString(idx) + "].radius[2]";
 	program->setUniformValue(str.c_str(), radius[2]);
+	str = var + "[" + PhGUtils::toString(idx) + "].m";
+	program->setUniformValue(str.c_str(), m.toQMatrix());
 
 	// material info
 	str = var + "[" + PhGUtils::toString(idx) + "].diffuse";

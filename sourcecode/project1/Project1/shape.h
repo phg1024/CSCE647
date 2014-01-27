@@ -6,6 +6,7 @@
 #include "Geometry/point.hpp"
 #include "Geometry/vector.hpp"
 #include "Geometry/matrix.hpp"
+#include "Geometry/geometryutils.hpp"
 
 #include "Utils/stringutils.h"
 
@@ -31,8 +32,8 @@ struct Shape
 {
 	enum ShapeType {
 		SPHERE = 0,
-		PLANE,
-		ELLIPSOID,
+		PLANE = 1,
+		ELLIPSOID = 2,
 		CYLINDER,
 		CONE,
 		HYPERBOLOID,
@@ -40,14 +41,19 @@ struct Shape
 	};
     Shape(){}
 	Shape(ShapeType t, float3 p, float r0, float r1, float r2,
-		  float3 a0, float3 a1, float3 a2,
-		  Material m):
-	t(t), p(p), material(m), hasTexture(false), texId(-1), hasNormalMap(false), normalTexId(-1) {
+		  vec3f a0, vec3f a1, vec3f a2,
+		  Material mater):
+	t(t), p(p), material(mater), hasTexture(false), texId(-1), hasNormalMap(false), normalTexId(-1) {
 		axis[0] = a0; axis[1] = a1; axis[2] = a2;
 		radius[0] = r0; radius[1] = r1; radius[2] = r2;
+
+		vec3f ratio0 = a0/r0;
+		vec3f ratio1 = a1/r1;
+		vec3f ratio2 = a2/r2;
+		m = PhGUtils::outerProduct(ratio0, ratio0) + PhGUtils::outerProduct(ratio1, ratio1) + PhGUtils::outerProduct(ratio2, ratio2);
 	}
 
-	Shape(const Shape& s):t(s.t), p(s.p), angle(s.angle), height(s.height), 
+	Shape(const Shape& s):t(s.t), p(s.p), angle(s.angle), m(s.m), height(s.height), 
 		material(s.material), hasTexture(s.hasTexture), texId(s.texId), hasNormalMap(s.hasNormalMap),
 	normalTexId(s.normalTexId){
 		for(int i=0;i<3;i++) {
@@ -63,7 +69,7 @@ struct Shape
 
 	// geometry
 	float3 p;
-	float3 axis[3];
+	vec3f axis[3];
 	float radius[3];
 	float angle;
 	mat3 m;

@@ -180,7 +180,7 @@ void MainCanvas::mousePressEvent(QMouseEvent *e)
 				}
 			case Qt::LeftButton:
 				{
-					trackBall.mouse_rotate(e->x(), height() - e->y());
+					trackBall.mouse_rotate(width() - e->x(), height() - e->y());
 					break;
 				}
 			default:
@@ -210,7 +210,7 @@ void MainCanvas::mouseMoveEvent(QMouseEvent *e)
 				}
 			case Qt::LeftButton:
 				{
-					trackBall.motion_rotate(e->x(), height() - e->y());
+					trackBall.motion_rotate(width() - e->x(), height() - e->y());
 					update();
 					break;
 				}
@@ -231,9 +231,9 @@ void MainCanvas::initShapes()
 	Shape s0( Shape::SPHERE, 
 		float3(0, 0, 1),	// p 
 		1.0, 0.0, 0.0,		// radius
-		float3(),			// axis[0]
-		float3(),			// axis[1]
-		float3(),			// axis[2]
+		vec3f(),			// axis[0]
+		vec3f(),			// axis[1]
+		vec3f(),			// axis[2]
 		Material(
 		float3(1.0, 1.0, 1.0),		// diffuse
 		float3(1.0, 1.0, 1.0),		// specular
@@ -254,9 +254,9 @@ void MainCanvas::initShapes()
 		Shape::PLANE,
 		float3(0, -1, 0),
 		3.0, 3.0, 0.0,
-		float3(0, 1, 0),
-		float3(1, 0, 0),
-		float3(0, 0, 1),
+		vec3f(0, 1, 0),
+		vec3f(1, 0, 0),
+		vec3f(0, 0, 1),
 		Material(
 		float3(0.75, 0.75, 0.75),
 		float3(1, 1, 1),
@@ -272,9 +272,9 @@ void MainCanvas::initShapes()
 	scene.shapes.push_back(Shape( Shape::SPHERE, 
 		float3(0, 0, 1),	// p 
 		1.0, 0.0, 0.0,		// radius
-		float3(),			// axis[0]
-		float3(),			// axis[1]
-		float3(),			// axis[2]
+		vec3f(),			// axis[0]
+		vec3f(),			// axis[1]
+		vec3f(),			// axis[2]
 		Material(
 		float3(0.25, 0.5 , 1.0 ),		// diffuse
 		float3(1.0 , 1.0 , 1.0 ),		// specular
@@ -289,9 +289,9 @@ void MainCanvas::initShapes()
 	Shape s2( Shape::SPHERE, 
 		float3(-0.5, 0.5, -1),	// p 
 		0.25, 0.0, 0.0,		// radius
-		float3(),			// axis[0]
-		float3(),			// axis[1]
-		float3(),			// axis[2]
+		vec3f(),			// axis[0]
+		vec3f(),			// axis[1]
+		vec3f(),			// axis[2]
 		Material(
 		float3(0.75, 0.75, 0.75),		// diffuse
 		float3(1.0 , 1.0 , 1.0),		// specular
@@ -306,12 +306,12 @@ void MainCanvas::initShapes()
 	s2.normalTexId = loadTexture("textures/moon/moon_normal_4k.png", 4);
 	scene.shapes.push_back(s2);
 
-	scene.shapes.push_back(Shape( Shape::SPHERE, 
-		float3(0.75, -0.5, -0.5),	// p 
-		0.5, 0.0, 0.0,		// radius
-		float3(),			// axis[0]
-		float3(),			// axis[1]
-		float3(),			// axis[2]
+	scene.shapes.push_back(Shape( Shape::ELLIPSOID, 
+		float3(1.0, -0.5, -0.5),	// p 
+		0.75, 0.25, 0.25,		// radius
+		vec3f(1, 0, 1),			// axis[0]
+		vec3f(1, 1, 0),			// axis[1]
+		vec3f(0, 1, 1),			// axis[2]
 		Material(
 		float3(0.75, 0.75, 0.25),		// diffuse
 		float3(1.0 , 1.0 , 1.0),		// specular
@@ -328,9 +328,9 @@ void MainCanvas::initLights()
 {
 	scene.lights.clear();
 
-	scene.lights.push_back(Light(Light::POINT, 0.75, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(-2, 2, -10)));
+	scene.lights.push_back(Light(Light::POINT, 0.75, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(-2, 4, -10)));
 	scene.lights.push_back(Light(Light::POINT, 0.25, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(4, 4, -10)));
-	scene.lights.push_back(Light(Light::DIRECTIONAL, 0.25, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(0, 3, -10), float3(0, -3/sqrtf(109.f), 10/sqrtf(109.f))));
+	scene.lights.push_back(Light(Light::DIRECTIONAL, 0.25, float3(1, 1, 1), float3(1, 1, 1), float3(1, 1, 1), float3(0, 10, -10), float3(0, -10/sqrtf(200.f), 10/sqrtf(200.f))));
 }
 
 int MainCanvas::loadTexture(const string& filename, int texSlot)

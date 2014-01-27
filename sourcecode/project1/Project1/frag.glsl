@@ -116,14 +116,13 @@ uniform Hit background;
 
 vec2 spheremap(vec3 p) {
 	const float PI = 3.1415926536;
-	return vec2((atan(-p.z, p.x) / PI + 1.0) * 0.5,
+	return vec2((atan(p.z, p.x) / PI + 1.0) * 0.5,
                 -((asin(p.y) / PI + 0.5)));
 }
 
 
 vec3 sphere_tangent(vec3 p) {
 	const float PI = 3.1415926536;
-	float psi = atan(-p.z, p.x);
 	float phi = asin(p.y);
 	
 	vec2 bn = normalize(vec2(p.x, p.z)) * sin(phi);
@@ -153,7 +152,7 @@ Ray constructRay(vec2 pos) {
     vec3 pcanvas;
 
     vec3 canvasCenter = caminfo.f * caminfo.dir + caminfo.pos;
-    pcanvas = canvasCenter + x * caminfo.w * caminfo.right + y * caminfo.h * caminfo.up;
+    pcanvas = canvasCenter - x * caminfo.w * caminfo.right + y * caminfo.h * caminfo.up;
 
     r.dir = normalize(pcanvas - caminfo.pos);
     return r;
@@ -215,9 +214,41 @@ float lightRayIntersectsPlane(Ray r, Shape s) {
     }
 }
 
+float lightRayIntersectsEllipsoid(Ray r, Shape s) {
+	vec3 pq = s.p - r.origin;
+	float a = dot(r.dir, s.m*r.dir);
+	float b = -dot(pq, s.m*r.dir);
+	float c = dot(pq, s.m*pq) - 1;
+
+    float delta = b*b - a*c;
+    if (delta < 0.0)
+    {
+		return -1.0;
+    }
+    else
+    {
+		delta = sqrt(delta);        
+		float inv = 1.0 / a;
+
+		float x0 = (-b-delta)*inv;
+		float x1 = (-b+delta)*inv;
+        
+		const float THRES = 1e-3;
+		if( x0 < THRES ) {
+			return -1.0;
+        }
+        else
+        {			
+			if( x1 < THRES ) return x0;
+			else return x1;
+		}
+    }
+}
+
 float lightRayIntersectsShape(Ray r, Shape s) {
     if(s.type == SPHERE) return lightRayIntersectsSphere(r, s);
     else if( s.type == PLANE ) return lightRayIntersectsPlane(r, s);
+	else if( s.type == ELLIPSOID ) return lightRayIntersectsEllipsoid(r, s);
     else return -1.0;
 }
 
@@ -504,9 +535,51 @@ Hit rayIntersectsPlane(Ray r, Shape s) {
     }
 }
 
+Hit rayIntersectsEllipsoid(Ray r, Shape s) {
+	vec3 pq = s.p - r.origin;
+	float a = dot(r.dir, s.m*r.dir);
+	float b = -dot(pq, s.m*r.dir);
+	float c = dot(pq, s.m*pq) - 1;
+
+    float delta = b*b - a*c;
+    if (delta < 0.0)
+    {
+		return background;
+    }
+    else
+    {
+		delta = sqrt(delta);        
+		float inv = 1.0 / a;
+
+		float x0 = (-b-delta)*inv;
+		float x1 = (-b+delta)*inv;
+        
+		const float THRES = 1e-3;
+		if( x1 < THRES ) {
+			return background;
+        }
+        else
+        {
+			Hit h;
+			if( x0 < THRES ) h.t = x1;
+			else h.t = x0;
+
+			// hit point
+			vec3 p = h.t * r.dir + r.origin;
+			// normal at hit point
+			vec3 n = normalize(2.0 * s.m * (p - s.p));
+
+			vec2 t = spheremap(n);
+            h.color = computeShading(p, n, t, r, s);
+            return h;
+		}
+    }
+}
+
 Hit rayIntersectsShape(Ray r, Shape s) {
     if(s.type == SPHERE) return rayIntersectsSphere(r, s);
     else if( s.type == PLANE ) return rayIntersectsPlane(r, s);
+	else if( s.type == ELLIPSOID ) return rayIntersectsEllipsoid(r, s);
     else return background;
 }
 
