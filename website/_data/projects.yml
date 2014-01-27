@@ -19,10 +19,10 @@
 - name: Distributed Ray Tracing
   id: "07"
   
-- name: Radiosity effects & Caustics with Final Gathering
+- name: Radiosity Effects & Caustics with Final Gathering
   id: "08"
   
-- name: Scattering and Subsurface scattering Effects
+- name: Scattering and Subsurface Scattering Effects
   id: "09"
   
 - name: Volume Rendering with Ray Marching
