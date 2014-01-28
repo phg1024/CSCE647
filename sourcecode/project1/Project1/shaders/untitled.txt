@@ -1,0 +1,9 @@
+#version 400
+struct Dummy {
+	float a;
+	vec3 color;
+};
+
+Dummy d[];
+
+d[0] = Dummy(1.0, vec3(1, 2, 3));

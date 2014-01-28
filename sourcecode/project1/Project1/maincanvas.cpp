@@ -43,14 +43,25 @@ void MainCanvas::initializeGL()
     glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, &x);
     cout << "max frag uniform comp = " << x << endl;
 
-	cout << "loading shaders ..." << endl;
+    initLights();
+    initShapes();
+
+    cout << "constructing shaders ..." << endl;
     program = new QGLShaderProgram(this);
     vShader = new QGLShader(QGLShader::Vertex);
     fShader = new QGLShader(QGLShader::Fragment);
 
-    fShader->compileSourceFile("../Project1/frag.glsl");
+    string fragStr = buildFragmentShaderSourceCode();
+    string vertStr = buildVertexShaderSourceCode();
+
+    cout << fragStr << endl;
+    fShader->compileSourceCode(fragStr.c_str());
+    //fShader->compileSourceFile("../Project1/frag.glsl");
 	cout << qPrintable(fShader->log()) << endl;
-    vShader->compileSourceFile("../Project1/vert.glsl");
+
+    cout << vertStr << endl;
+    vShader->compileSourceCode(vertStr.c_str());
+    //vShader->compileSourceFile("../Project1/vert.glsl");
     cout << qPrintable(vShader->log()) << endl;
 
     program->addShader(vShader);
@@ -58,10 +69,11 @@ void MainCanvas::initializeGL()
 
     program->link();
 
-	initLights();
-	initShapes();
-
 	cout << "init done." << endl;
+
+//    cout << "pause" << endl;
+//    char dummy;
+//    cin >> dummy;
 }
 
 void MainCanvas::resizeGL(int w, int h)
@@ -156,8 +168,6 @@ void MainCanvas::paintGL()
     if( program ) {
         program->bind();
 
-
-
         // upload scene parameters
         program->setUniformValue("windowSize", QVector2D(width(), height()));
         program->setUniformValue("lightCount", (int)scene.lights.size());
@@ -175,27 +185,14 @@ void MainCanvas::paintGL()
         program->setUniformValue("background.t", -1.0f);
         program->setUniformValue("background.color", QVector3D(0.85f, .85f, .85f));
 
-
         // upload object information
         for(int idx=0;idx<scene.shapes.size();idx++) {
-            scene.shapes[idx].uploadToShader(program, "rawShapeData", idx*32);
             string str;
             str = "textures[" + PhGUtils::toString(scene.shapes[idx].texId) + "]";
             program->setUniformValue(str.c_str(), scene.shapes[idx].texId);
             str = "textures[" + PhGUtils::toString(scene.shapes[idx].normalTexId) + "]";
             program->setUniformValue(str.c_str(), scene.shapes[idx].normalTexId);
         }
-
-
-        // setup lights
-		for(int idx=0;idx<scene.lights.size();idx++) {
-            scene.lights[idx].uploadToShader(program, "rawLightData", idx*16);
-		}
-
-        // for gooch shading
-        program->setUniformValue("alpha", 0.15f);
-        program->setUniformValue("beta", 0.25f);
-
 
         glBindVertexArray (vao);
         // draw points 0-3 from the currently bound VAO with current in-use shader
@@ -271,10 +268,10 @@ void MainCanvas::initShapes()
 
 	Shape s0( Shape::SPHERE, 
 		float3(0, 0, 1),	// p 
-		1.0, 0.0, 0.0,		// radius
-		vec3f(),			// axis[0]
-		vec3f(),			// axis[1]
-		vec3f(),			// axis[2]
+        1.0, 1.0, 1.0,		// radius
+        vec3f(1, 0, 0),			// axis[0]
+        vec3f(0, 1, 0),			// axis[1]
+        vec3f(0, 0, 1),			// axis[2]
 		Material(
 		float3(1.0, 1.0, 1.0),		// diffuse
 		float3(1.0, 1.0, 1.0),		// specular
@@ -285,15 +282,15 @@ void MainCanvas::initShapes()
 		)
 	);
     s0.hasTexture = true;
-    s0.texId = loadTexture("textures/earth/earthmap4k.png", 0);
+    s0.texId = loadTexture("textures/earth/earthmap2k.png", 0);
     s0.hasNormalMap = true;
-    s0.normalTexId = loadTexture("textures/earth/earth_normalmap_flat_4k.png", 1);
+    s0.normalTexId = loadTexture("textures/earth/earth_normalmap_flat_2k.png", 1);
 	scene.shapes.push_back(s0);
 
 	Shape s(
 		Shape::PLANE,
 		float3(0, -1, 0),
-		3.0, 3.0, 0.0,
+        3.0, 3.0, 3.0,
 		vec3f(0, 1, 0),
 		vec3f(1, 0, 0),
 		vec3f(0, 0, 1),
@@ -311,10 +308,10 @@ void MainCanvas::initShapes()
 
 	scene.shapes.push_back(Shape( Shape::SPHERE, 
 		float3(0, 0, 1),	// p 
-		1.0, 0.0, 0.0,		// radius
-		vec3f(),			// axis[0]
-		vec3f(),			// axis[1]
-		vec3f(),			// axis[2]
+        1.0, 1.0, 1.0,		// radius
+        vec3f(1, 0, 0),			// axis[0]
+        vec3f(0, 1, 0),			// axis[1]
+        vec3f(0, 0, 1),			// axis[2]
 		Material(
 		float3(0.25, 0.5 , 1.0 ),		// diffuse
 		float3(1.0 , 1.0 , 1.0 ),		// specular
@@ -328,10 +325,10 @@ void MainCanvas::initShapes()
 
 	Shape s2( Shape::SPHERE, 
 		float3(-0.5, 0.5, -1),	// p 
-		0.25, 0.0, 0.0,		// radius
-		vec3f(),			// axis[0]
-		vec3f(),			// axis[1]
-		vec3f(),			// axis[2]
+        0.25, 0.25, 0.25,		// radius
+        vec3f(1, 0, 0),			// axis[0]
+        vec3f(0, 1, 0),			// axis[1]
+        vec3f(0, 0, 1),			// axis[2]
 		Material(
 		float3(0.75, 0.75, 0.75),		// diffuse
 		float3(1.0 , 1.0 , 1.0),		// specular
@@ -340,10 +337,10 @@ void MainCanvas::initShapes()
 		float3(0, .4, 0),				// kcool
 		float3(.4, 0, .4)				// kwarm
 		));
-    s2.hasTexture = true;
-    s2.texId = loadTexture("textures/moon/moon_map_4k.png", 3);
-    s2.hasNormalMap = true;
-    s2.normalTexId = loadTexture("textures/moon/moon_normal_4k.png", 4);
+//    s2.hasTexture = true;
+//    s2.texId = loadTexture("textures/moon/moon_map_4k.png", 3);
+//    s2.hasNormalMap = true;
+//    s2.normalTexId = loadTexture("textures/moon/moon_normal_4k.png", 4);
 	scene.shapes.push_back(s2);
 
 	scene.shapes.push_back(Shape( Shape::ELLIPSOID, 
@@ -414,5 +411,91 @@ int MainCanvas::loadTexture(const string& filename, int texSlot)
 		GL_UNSIGNED_BYTE, data);
 
 	delete[] data;
-	return texSlot; //return whether it was successful
+    return texSlot; //return whether it was successful
+}
+
+unsigned long getFileLength(ifstream& file)
+{
+    if(!file.good()) return 0;
+
+    unsigned long pos=file.tellg();
+    file.seekg(0,ios::end);
+    unsigned long len = file.tellg();
+    file.seekg(ios::beg);
+
+    return len;
+}
+
+string readFileAsString(const string &filename)
+{
+    ifstream file;
+    file.open(filename, ios::in); // opens as ASCII!
+    if(!file) return string();
+
+    int shaderLength = getFileLength(file);
+
+    if (shaderLength==0) return string();   // Error: Empty File
+
+    char* shaderSource = new char[shaderLength+1];
+    if (shaderSource == 0) return string();   // can't reserve memory
+
+     // len isn't always strlen cause some characters are stripped in ascii read...
+     // it is important to 0-terminate the real length later, len is just max possible value...
+    shaderSource[shaderLength] = 0;
+
+    unsigned int i=0;
+    while (file.good())
+    {
+        shaderSource[i] = file.get();       // get character from file.
+        if (!file.eof())
+         i++;
+    }
+
+    shaderSource[i] = 0;  // 0-terminate it at the correct position
+
+    file.close();
+
+    return string(shaderSource);
+}
+
+string MainCanvas::buildFragmentShaderSourceCode()
+{
+    //return readFileAsString("../Project1/shaders/frag3.glsl");
+
+    string versionTag = "#version 400";
+    string defStr = readFileAsString("../Project1/shaders/definitions.glsl");
+    string varStr = readFileAsString("../Project1/shaders/variables.glsl");
+
+    string shapeStr = scene.createShapesSourceCode();
+
+    string lightStr = scene.createLightSourceCode();
+
+    string utilStr = readFileAsString("../Project1/shaders/utils.glsl");
+    string initStr = readFileAsString("../Project1/shaders/initialize.glsl");
+    initStr += scene.createInitializationSourceCode();
+    string rayStr = readFileAsString("../Project1/shaders/rays.glsl");
+
+    string intStr = readFileAsString("../Project1/shaders/intersectionTests_simple.glsl");
+    string shadingStr = readFileAsString("../Project1/shaders/shading_simple.glsl");
+    string tracingStr = readFileAsString("../Project1/shaders/rayTracing.glsl");
+    string fragStr = readFileAsString("../Project1/shaders/frag.glsl");
+
+
+    return versionTag + "\n"
+         + defStr + "\n"
+         + varStr + "\n"
+         + shapeStr + "\n"
+         + lightStr + "\n"
+         + utilStr + "\n"
+         + initStr + "\n"
+         + rayStr + "\n"
+         + intStr + "\n"
+         + shadingStr + "\n"
+         + tracingStr + "\n"
+         + fragStr;
+}
+
+string MainCanvas::buildVertexShaderSourceCode()
+{
+    return readFileAsString("../Project1/shaders/vert.glsl");
 }

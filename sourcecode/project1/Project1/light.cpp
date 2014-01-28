@@ -1,5 +1,29 @@
 #include "light.h"
 
+string Light::toString(const string &var, int idx) const
+{
+    string str = "Light " + var + PhGUtils::toString(idx) + " = Light(";
+    str += PhGUtils::toString(t) + ",\n";
+
+    str += PhGUtils::toString(intensity) + ",\n";
+
+    str += "vec3" + ambient.toString() + ",\n";
+    str += "vec3" + diffuse.toString() + ",\n";
+    str += "vec3" + specular.toString() + ",\n";
+
+    str += "vec3" + position.toString() + ",\n";
+    str += "vec3" + direction.toString() + ",\n";
+
+    str += PhGUtils::toString(spotExponent) + ",\n";
+    str += PhGUtils::toString(spotCutOff) + ",\n";
+    str += PhGUtils::toString(cos(spotCutOff)) + ",\n";
+
+    str += "vec3" + attenuation.toString();
+
+    str += ");\n";
+    return str;
+}
+
 void Light::uploadToShader(QGLShaderProgram* program, const string& var)
 {	
     vector<QVector3D> vecs;

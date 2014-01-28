@@ -11,33 +11,50 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = Project1
 TEMPLATE -= app
 
-QMAKE_CXXFLAGS += -std=c++0x -stdlib=libc++ -mmacosx-version-min=10.8
+INCLUDEPATH += $$PWD/../../../../../../Utils/glew-1.10.0/include
+LIBS += -L$$PWD/../../../../../../Utils/glew-1.10.0/lib -lGLEW
+LIBS += -framework GLUT
 
-LIBS += -lm -lc++ -framework OpenGL -framework GLUT -lGLEW
-
-CONFIG-=app_bundle
+CONFIG -= app_bundle
+CONFIG += c++11
 
 SOURCES += main.cpp\
         mainwindow.cpp \
     maincanvas.cpp \
     camera.cpp \
-    shape.cpp
+    shape.cpp \
+    light.cpp \
+    scene.cpp
 
 HEADERS  += mainwindow.h \
     maincanvas.h \
     camera.h \
-    shape.h
+    shape.h \
+    light.h \
+    common.h \
+    element.h \
+    scene.h
 
 FORMS    += mainwindow.ui
 
 
 OTHER_FILES += \
-    frag.glsl \
-    vert.glsl
+    shaders/definitions.glsl \
+    shaders/frag.glsl \
+    shaders/initialize.glsl \
+    shaders/intersectionTests.glsl \
+    shaders/rays.glsl \
+    shaders/rayTracing.glsl \
+    shaders/shading.glsl \
+    shaders/utils.glsl \
+    shaders/variables.glsl \
+    shaders/vert.glsl \
+    shaders/shading_simple.glsl \
+    shaders/intersectionTests_simple.glsl
 
-unix: LIBS += -L$$PWD/../../../../../../Documents/Codes/PhGLib/lib/ -lPhGLib
+unix: LIBS += -L$$PWD/../../../../../../Utils/PhGLib/lib/ -lPhGLib
 
-INCLUDEPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
-DEPENDPATH += $$PWD/../../../../../../Documents/Codes/PhGLib/include
+INCLUDEPATH += $$PWD/../../../../../../Utils/PhGLib/include
+DEPENDPATH += $$PWD/../../../../../../Utils/PhGLib/include
 
-unix: PRE_TARGETDEPS += $$PWD/../../../../../../Documents/Codes/PhGLib/lib/libPhGLib.a
+unix: PRE_TARGETDEPS += $$PWD/../../../../../../Utils/PhGLib/lib/libPhGLib.a

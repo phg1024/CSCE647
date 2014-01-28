@@ -1,14 +1,4 @@
 #version 400
-uniform vec2 windowSize;
-uniform int lightCount;
-uniform int shapeCount;
-uniform int shadingMode;    // 1 = lambert, 2 = phong, 3 = gooch, 4 = cook-torrance
-uniform int AAsamples;
-
-// camera info
-uniform vec3 camPos, camUp, camDir;
-uniform float camF;
-
 struct Camera {
     vec3 pos;
 
@@ -107,18 +97,150 @@ struct Hit {
     float t;
     vec3 color;
 };
+uniform vec2 windowSize;
+uniform int lightCount;
+uniform int shapeCount;
+uniform int shadingMode;    // 1 = lambert, 2 = phong, 3 = gooch, 4 = cook-torrance
+uniform int AAsamples;
 
-const int VecPerLight = 16;
-uniform vec3 rawLightData[VecPerLight*4];    // 8 * vec3 for each light
-Light lights[4];
+// camera info
+uniform vec3 camPos, camUp, camDir;
+uniform float camF;
 
-const int VecPerShape = 32;
-uniform vec3 rawShapeData[VecPerShape*8];    // 16 * vec3 for each shape
-Shape shapes[8];
 uniform Hit background;
-
 uniform sampler2D textures[8];
 
+Light lights[4];
+Shape shapes[8];
+shapes[0].type = 0;
+shapes[0].p = vec3(0, 0, 1);
+shapes[0].axis[0] = vec3(0, 0, 0);
+shapes[0].axis[1] = vec3(0, 0, 0);
+shapes[0].axis[2] = vec3(0, 0, 0);
+shapes[0].radius = vec3(1, 0, 0);
+shapes[0].m = mat3(nan, nan, nan,nan, nan, nan,nan, nan, nan);
+shapes[0].diffuse = vec3(1, 1, 1);
+shapes[0].specular = vec3(1, 1, 1);
+shapes[0].ambient = vec3(0.1, 0.1, 0.1);
+shapes[0].kwarm = vec3(0.4, 0.4, 0);
+shapes[0].kcool = vec3(0, 0, 0.4);
+shapes[0].shininess = 50;
+shapes[0].alpha = 0.15;
+shapes[0].beta = 0.25;
+shapes[0].hasTexture = true;
+shapes[0].tex = 0;
+shapes[0].hasNormalMap = true;
+shapes[0].nTex = 1;
+shapes[1].type = 1;
+shapes[1].p = vec3(0, -1, 0);
+shapes[1].axis[0] = vec3(0, 1, 0);
+shapes[1].axis[1] = vec3(1, 0, 0);
+shapes[1].axis[2] = vec3(0, 0, 1);
+shapes[1].radius = vec3(3, 3, 0);
+shapes[1].m = mat3(nan, nan, nan,nan, nan, nan,nan, nan, inf);
+shapes[1].diffuse = vec3(0.75, 0.75, 0.75);
+shapes[1].specular = vec3(1, 1, 1);
+shapes[1].ambient = vec3(0.05, 0.05, 0.05);
+shapes[1].kwarm = vec3(0.4, 0.4, 0);
+shapes[1].kcool = vec3(0, 0, 0.4);
+shapes[1].shininess = 50;
+shapes[1].alpha = 0.15;
+shapes[1].beta = 0.25;
+shapes[1].hasTexture = true;
+shapes[1].tex = 2;
+shapes[1].hasNormalMap = false;
+shapes[1].nTex = -1;
+shapes[2].type = 0;
+shapes[2].p = vec3(0, 0, 1);
+shapes[2].axis[0] = vec3(0, 0, 0);
+shapes[2].axis[1] = vec3(0, 0, 0);
+shapes[2].axis[2] = vec3(0, 0, 0);
+shapes[2].radius = vec3(1, 0, 0);
+shapes[2].m = mat3(nan, nan, nan,nan, nan, nan,nan, nan, nan);
+shapes[2].diffuse = vec3(0.25, 0.5, 1);
+shapes[2].specular = vec3(1, 1, 1);
+shapes[2].ambient = vec3(0.05, 0.1, 0.15);
+shapes[2].kwarm = vec3(0.4, 0.4, 0);
+shapes[2].kcool = vec3(0, 0, 0.4);
+shapes[2].shininess = 50;
+shapes[2].alpha = 0.15;
+shapes[2].beta = 0.25;
+shapes[2].hasTexture = false;
+shapes[2].tex = -1;
+shapes[2].hasNormalMap = false;
+shapes[2].nTex = -1;
+shapes[3].type = 0;
+shapes[3].p = vec3(-0.5, 0.5, -1);
+shapes[3].axis[0] = vec3(0, 0, 0);
+shapes[3].axis[1] = vec3(0, 0, 0);
+shapes[3].axis[2] = vec3(0, 0, 0);
+shapes[3].radius = vec3(0.25, 0, 0);
+shapes[3].m = mat3(nan, nan, nan,nan, nan, nan,nan, nan, nan);
+shapes[3].diffuse = vec3(0.75, 0.75, 0.75);
+shapes[3].specular = vec3(1, 1, 1);
+shapes[3].ambient = vec3(0.05, 0.05, 0.05);
+shapes[3].kwarm = vec3(0.4, 0, 0.4);
+shapes[3].kcool = vec3(0, 0.4, 0);
+shapes[3].shininess = 20;
+shapes[3].alpha = 0.15;
+shapes[3].beta = 0.25;
+shapes[3].hasTexture = true;
+shapes[3].tex = 3;
+shapes[3].hasNormalMap = true;
+shapes[3].nTex = 4;
+shapes[4].type = 2;
+shapes[4].p = vec3(1, -0.5, -0.5);
+shapes[4].axis[0] = vec3(1, 0, 1);
+shapes[4].axis[1] = vec3(1, 1, 0);
+shapes[4].axis[2] = vec3(0, 1, 1);
+shapes[4].radius = vec3(0.75, 0.25, 0.25);
+shapes[4].m = mat3(17.7778, 16, 1.77778,16, 32, 16,1.77778, 16, 17.7778);
+shapes[4].diffuse = vec3(0.75, 0.75, 0.25);
+shapes[4].specular = vec3(1, 1, 1);
+shapes[4].ambient = vec3(0.05, 0.05, 0.05);
+shapes[4].kwarm = vec3(0.05, 0.45, 0.05);
+shapes[4].kcool = vec3(0.9, 0.1, 0.6);
+shapes[4].shininess = 100;
+shapes[4].alpha = 0.15;
+shapes[4].beta = 0.25;
+shapes[4].hasTexture = false;
+shapes[4].tex = -1;
+shapes[4].hasNormalMap = false;
+shapes[4].nTex = -1;
+
+lights[0].type = 0;
+lights[0].intensity = 0.75;
+lights[0].ambient = vec3(1, 1, 1);
+lights[0].diffuse = vec3(1, 1, 1);
+lights[0].specular = vec3(1, 1, 1);
+lights[0].pos = vec3(-2, 4, -10);
+lights[0].dir = vec3(0, 0, 0);
+lights[0].spotExponent = 2.43583e-31;
+lights[0].spotCutOff = 1.4013e-45;
+lights[0].spotCosCutoff = 1;
+lights[0].attenuation = vec3(0, 0, 0);
+lights[1].type = 0;
+lights[1].intensity = 0.25;
+lights[1].ambient = vec3(1, 1, 1);
+lights[1].diffuse = vec3(1, 1, 1);
+lights[1].specular = vec3(1, 1, 1);
+lights[1].pos = vec3(4, 4, -10);
+lights[1].dir = vec3(0, 0, 0);
+lights[1].spotExponent = 7.02068e+11;
+lights[1].spotCutOff = 4.59163e-41;
+lights[1].spotCosCutoff = 1;
+lights[1].attenuation = vec3(0, 0, 0);
+lights[2].type = 1;
+lights[2].intensity = 0.25;
+lights[2].ambient = vec3(1, 1, 1);
+lights[2].diffuse = vec3(1, 1, 1);
+lights[2].specular = vec3(1, 1, 1);
+lights[2].pos = vec3(0, 10, -10);
+lights[2].dir = vec3(0, -0.707107, 0.707107);
+lights[2].spotExponent = 1.83266e+31;
+lights[2].spotCutOff = 4.59163e-41;
+lights[2].spotCosCutoff = 1;
+lights[2].attenuation = vec3(0, 0, 0);
 
 vec2 spheremap(vec3 p) {
     const float PI = 3.1415926536;
@@ -135,6 +257,9 @@ vec3 sphere_tangent(vec3 p) {
     return vec3(bn.x, -cos(phi), bn.y);
 }
 
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
 void initializeCamera() {
     caminfo.pos = camPos;
     caminfo.up = camUp;
@@ -145,67 +270,6 @@ void initializeCamera() {
     caminfo.w = 1.0;
     caminfo.h = windowSize.y / windowSize.x;
 }
-
-void initializeShapes() {
-    // unpack the shapes
-    for(int i=0;i<shapeCount;i++) {
-        int offset = i * VecPerShape;
-        shapes[i].type = int(rawShapeData[offset].x);
-        shapes[i].p = rawShapeData[offset+1];
-
-        shapes[i].axis[0] = rawShapeData[offset+2];
-        shapes[i].axis[1] = rawShapeData[offset+3];
-        shapes[i].axis[2] = rawShapeData[offset+4];
-
-        shapes[i].radius = rawShapeData[offset+5];
-
-        shapes[i].angle = rawShapeData[offset+6].x;
-        shapes[i].height = rawShapeData[offset+6].y;
-
-        shapes[i].m = mat3(rawShapeData[offset+7], rawShapeData[offset+8], rawShapeData[offset+9]);
-
-
-        shapes[i].emission = rawShapeData[offset+10];
-        shapes[i].ambient = rawShapeData[offset+11];
-        shapes[i].diffuse = rawShapeData[offset+12];
-        shapes[i].specular = rawShapeData[offset+13];
-        shapes[i].kcool = rawShapeData[offset+14];
-        shapes[i].kwarm = rawShapeData[offset+15];
-
-        shapes[i].shininess = rawShapeData[offset+16].x;
-        shapes[i].alpha = rawShapeData[offset+16].y;
-        shapes[i].beta = rawShapeData[offset+16].z;
-
-        shapes[i].hasTexture = (rawShapeData[offset+17].x==0.0)?false:true;
-        shapes[i].tex = int(rawShapeData[offset+17].y);
-
-        shapes[i].hasNormalMap = (rawShapeData[offset+18].x==0.0)?false:true;
-        shapes[i].nTex = int(rawShapeData[offset+18].y);
-    }
-}
-
-void initializeLights() {
-    // unpack the lights
-    for(int i=0, offset=0;i<shapeCount;i++, offset+=VecPerShape) {
-        lights[i].type = int(rawLightData[offset].x);
-
-        lights[i].intensity = rawLightData[offset+1].x;
-
-        lights[i].ambient = rawLightData[offset+2];
-        lights[i].diffuse = rawLightData[offset+3];
-        lights[i].specular = rawLightData[offset+4];
-
-        lights[i].pos = rawLightData[offset+5];
-        lights[i].dir = rawLightData[offset+6];
-
-        lights[i].spotExponent = rawLightData[offset+7].x;
-        lights[i].spotCutoff = rawLightData[offset+7].y;
-        lights[i].spotCosCutoff = rawLightData[offset+7].z;
-
-        lights[i].attenuation = rawLightData[offset+8];
-    }
-}
-
 // initial rays
 Ray constructRay(vec2 pos) {
     Ray r;
@@ -223,7 +287,6 @@ Ray constructRay(vec2 pos) {
     r.dir = normalize(pcanvas - caminfo.pos);
     return r;
 }
-
 // light ray intersection tests
 float lightRayIntersectsSphere(Ray r, Shape s) {
     vec3 pq = r.origin - s.p;
@@ -360,8 +423,6 @@ bool checkLightVisibility(vec3 p, vec3 N, Light lt) {
         return (t < THRES && (dot(N, lt.dir)<0));
     }
 }
-
-
 vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
     vec3 c = vec3(0, 0, 0);
 
@@ -528,7 +589,6 @@ vec3 computeShading(vec3 p, vec3 n, vec2 t, Ray r, Shape s) {
         if( s.type == PLANE ) return lambertShading(p, n, t, r, s);
         else return goochShading(p, n, t, r, s);
 }
-
 // ray intersection test with shading computation
 Hit rayIntersectsSphere(Ray r, Shape s) {
     Hit h;
@@ -665,18 +725,13 @@ Hit rayIntersectsShapes(Ray r) {
 
     return h;
 }
-
-float rand(vec2 co){
-    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
-
 out vec4 fragColor;
 
 void main(void)
 {
     initializeCamera();
-    initializeLights();
-    initializeShapes();
+    //initializeLights();
+    //initializeShapes();
 
     float edgeSamples = sqrt(float(AAsamples));
     float step = 1.0 / edgeSamples;

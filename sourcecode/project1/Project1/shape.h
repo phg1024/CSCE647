@@ -16,7 +16,11 @@ struct Material {
     Material(){}
     Material(float3 diffuse, float3 specular, float3 ambient, float shininess, float3 kcool, float3 kwarm):
         diffuse(diffuse), specular(specular), ambient(ambient), shininess(shininess), kcool(kcool), kwarm(kwarm)
-    {}
+    {
+        // default values
+        alpha = 0.15f;
+        beta = 0.25f;
+    }
     float3 emission;
     float3 ambient;
     float3 diffuse;
@@ -63,6 +67,7 @@ struct Shape
         }
     }
 
+    string toString(const string& var, int idx) const;
     void uploadToShader(QGLShaderProgram *program, const string& var);
     void uploadToShader(QGLShaderProgram *program, const string& var, int idx);
 

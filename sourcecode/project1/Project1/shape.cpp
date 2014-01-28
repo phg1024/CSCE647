@@ -1,5 +1,46 @@
 #include "shape.h"
 
+string Shape::toString(const string& var, int idx) const
+{
+    string prefix = var + PhGUtils::toString(idx);
+    string str = "Shape " + prefix + " = Shape(";
+    str += PhGUtils::toString(t) + ",\n";
+
+    // geometric info
+    str += "vec3" + p.toString() + ",\n";
+    str += "vec3" + axis[0].toString() + ",\n";
+    str += "vec3" + axis[1].toString() + ",\n";
+    str += "vec3" + axis[2].toString() + ",\n";
+
+    str += "vec3" + float3(radius[0], radius[1], radius[2]).toString() + ",\n";
+
+    str += PhGUtils::toString(angle) + ",\n";
+    str += PhGUtils::toString(height) + ",\n";
+
+    str += "mat3" + m.transposed().toString() + ",\n";
+
+    str += "vec3" + material.emission.toString() + ",\n";
+    str += "vec3" + material.ambient.toString() + ",\n";
+    str += "vec3" + material.diffuse.toString() + ",\n";
+    str += "vec3" + material.specular.toString() + ",\n";
+
+    str += "vec3" + material.kcool.toString() + ",\n";
+    str += "vec3" + material.kwarm.toString() + ",\n";
+
+    str += PhGUtils::toString(material.shininess) + ",\n";
+    str += PhGUtils::toString(material.alpha) + ",\n";
+    str += PhGUtils::toString(material.beta) + ",\n";
+
+    str += PhGUtils::toString(hasTexture) + ",\n";
+    str += PhGUtils::toString(texId) + ",\n";
+
+    str += PhGUtils::toString(hasNormalMap) + ",\n";
+    str += PhGUtils::toString(normalTexId);
+
+    str += ");\n";
+    return str;
+}
+
 void Shape::uploadToShader(QGLShaderProgram *program, const string& var)
 {
     vector<QVector3D> vecs;

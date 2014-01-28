@@ -9,6 +9,10 @@
 struct Scene {
 	Scene(){}
 
+    string createInitializationSourceCode() const;
+    string createShapesSourceCode() const;
+    string createLightSourceCode() const;
+
 	Camera cam;
 	vector<Shape> shapes;
 	vector<Light> lights;

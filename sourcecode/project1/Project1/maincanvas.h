@@ -28,6 +28,9 @@ protected:
 
 	int loadTexture(const string& filename, int texSlot);
 
+    string buildFragmentShaderSourceCode();
+    string buildVertexShaderSourceCode();
+
 private:
     QGLShaderProgram* program;
     QGLShader* vShader, *fShader;
