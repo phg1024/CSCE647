@@ -9,7 +9,7 @@ MainCanvas::MainCanvas(QWidget* parent, QGLFormat format):
     cout << "main canvas constructed." << endl;
     setSceneScale(1.0);
     shadingMode = 1;
-    samples = 4;
+    samples = 1;
 
 	renderingEnabled = true;
 
@@ -35,6 +35,13 @@ void MainCanvas::initializeGL()
     qDebug() << "Current Context:" << this->format();
 
     GL3DCanvas::initializeGL();
+
+    glewExperimental = true;
+    glewInit();
+
+    int x;
+    glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, &x);
+    cout << "max frag uniform comp = " << x << endl;
 
 	cout << "loading shaders ..." << endl;
     program = new QGLShaderProgram(this);
@@ -117,49 +124,83 @@ void MainCanvas::paintGL()
 	camDir = (mat * QVector4D(camDir, 1.0)).toVector3D();
 	camUp = (mat * QVector4D(camUp, 1.0)).toVector3D();
 
+    float points[] = {
+       -1.0f,  1.0f,  0.0f,
+        1.0f,  1.0f,  0.0f,
+        1.0f, -1.0f,  0.0f,
+       -1.0f, -1.0f,  0.0f
+    };
+
+    // vertex buffer object
+    unsigned int vbo = 0;
+    // create buffer
+    glGenBuffers (1, &vbo);
+    // bind the buffer
+    glBindBuffer (GL_ARRAY_BUFFER, vbo);
+    // bind data to the buffer
+    glBufferData (GL_ARRAY_BUFFER, 12 * sizeof (float), points, GL_STATIC_DRAW);
+
+    // vertex attribute object
+    unsigned int vao = 0;
+    // create attr object
+    glGenVertexArrays (1, &vao);
+    // bind the object
+    glBindVertexArray (vao);
+    // enable it
+    glEnableVertexAttribArray (0);
+    // bind buffer to current vao
+    glBindBuffer (GL_ARRAY_BUFFER, vbo);
+    // specify vao specs
+    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
     if( program ) {
         program->bind();
+
+
 
         // upload scene parameters
         program->setUniformValue("windowSize", QVector2D(width(), height()));
         program->setUniformValue("lightCount", (int)scene.lights.size());
         program->setUniformValue("shapeCount", (int)scene.shapes.size());
         program->setUniformValue("shadingMode", shadingMode);
-		program->setUniformValue("AAsamples", samples);
+        program->setUniformValue("AAsamples", samples);
 
-		// update camera info
-		program->setUniformValue("camPos", camPos);
-		program->setUniformValue("camUp", camUp);
-		program->setUniformValue("camDir", camDir);
-		program->setUniformValue("camF", scene.cam.f);
+//		// update camera info
+        program->setUniformValue("camPos", camPos);
+        program->setUniformValue("camUp", camUp);
+        program->setUniformValue("camDir", camDir);
+        program->setUniformValue("camF", scene.cam.f);
 
-        // set up ray tracing parameters
+//        // set up ray tracing parameters
         program->setUniformValue("background.t", -1.0f);
         program->setUniformValue("background.color", QVector3D(0.85f, .85f, .85f));
 
+
         // upload object information
         for(int idx=0;idx<scene.shapes.size();idx++) {
-			scene.shapes[idx].uploadToShader(program, "shapes", idx);
-		}
+            scene.shapes[idx].uploadToShader(program, "rawShapeData", idx*32);
+            string str;
+            str = "textures[" + PhGUtils::toString(scene.shapes[idx].texId) + "]";
+            program->setUniformValue(str.c_str(), scene.shapes[idx].texId);
+            str = "textures[" + PhGUtils::toString(scene.shapes[idx].normalTexId) + "]";
+            program->setUniformValue(str.c_str(), scene.shapes[idx].normalTexId);
+        }
+
 
         // setup lights
 		for(int idx=0;idx<scene.lights.size();idx++) {
-			scene.lights[idx].uploadToShader(program, "lights", idx);
+            scene.lights[idx].uploadToShader(program, "rawLightData", idx*16);
 		}
 
         // for gooch shading
         program->setUniformValue("alpha", 0.15f);
         program->setUniformValue("beta", 0.25f);
 
-        glColor4f(0.2, 0.3, 0.5, 1.0);
-        glBegin(GL_QUADS);
-        glVertex3f(-1.0, -1.0, 0.1);
-        glVertex3f(1.0, -1.0, 0.1);
-        glVertex3f(1.0, 1.0, 0.1);
-        glVertex3f(-1.0, 1.0, 0.1);
-        glEnd();
-		
 
+        glBindVertexArray (vao);
+        // draw points 0-3 from the currently bound VAO with current in-use shader
+        glDrawArrays (GL_TRIANGLE_FAN, 0, 4);
+		
         program->release();
     }
 }
@@ -243,11 +284,10 @@ void MainCanvas::initShapes()
 		float3(.4, .4, 0)				// kwarm
 		)
 	);
-	s0.hasTexture = true;
-	s0.texId = loadTexture("textures/earth/earthmap4k.png", 0);
-	s0.hasNormalMap = true;
-	s0.normalTexId = loadTexture("textures/earth/earth_normalmap_flat_4k.png", 1);
-	//s0.texId = loadTexture("textures/gabby.jpg", 0);
+    s0.hasTexture = true;
+    s0.texId = loadTexture("textures/earth/earthmap4k.png", 0);
+    s0.hasNormalMap = true;
+    s0.normalTexId = loadTexture("textures/earth/earth_normalmap_flat_4k.png", 1);
 	scene.shapes.push_back(s0);
 
 	Shape s(
@@ -265,8 +305,8 @@ void MainCanvas::initShapes()
 		float3(0, 0, .4),
 		float3(.4, .4, 0)
 		));
-	s.hasTexture = true;
-	s.texId = loadTexture("chessboard.png", 2);
+    s.hasTexture = true;
+    s.texId = loadTexture("chessboard.png", 2);
 	scene.shapes.push_back(s);
 
 	scene.shapes.push_back(Shape( Shape::SPHERE, 
@@ -300,10 +340,10 @@ void MainCanvas::initShapes()
 		float3(0, .4, 0),				// kcool
 		float3(.4, 0, .4)				// kwarm
 		));
-	s2.hasTexture = true;
-	s2.texId = loadTexture("textures/moon/moon_map_4k.png", 3);
-	s2.hasNormalMap = true;
-	s2.normalTexId = loadTexture("textures/moon/moon_normal_4k.png", 4);
+    s2.hasTexture = true;
+    s2.texId = loadTexture("textures/moon/moon_map_4k.png", 3);
+    s2.hasNormalMap = true;
+    s2.normalTexId = loadTexture("textures/moon/moon_normal_4k.png", 4);
 	scene.shapes.push_back(s2);
 
 	scene.shapes.push_back(Shape( Shape::ELLIPSOID, 

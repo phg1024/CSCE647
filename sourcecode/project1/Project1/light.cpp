@@ -2,40 +2,39 @@
 
 void Light::uploadToShader(QGLShaderProgram* program, const string& var)
 {	
-	string str;	
-	str = var + ".type";
-	program->setUniformValue(str.c_str(), t);
-	str = var + ".intensity";
-	program->setUniformValue(str.c_str(), 0.75f);
-	str = var + ".ambient";
-	program->setUniformValue(str.c_str(), ambient.toQVector());
-	str = var + ".diffuse";
-	program->setUniformValue(str.c_str(), diffuse.toQVector());
-	str = var + ".specular";
-	program->setUniformValue(str.c_str(), specular.toQVector());
+    vector<QVector3D> vecs;
 
-	str = var + ".pos";
-	program->setUniformValue(str.c_str(), position.toQVector());
-	str = var + ".dir";
-	program->setUniformValue(str.c_str(), direction.toQVector());
+    vecs.push_back(QVector3D(t, 0, 0));
+    vecs.push_back(QVector3D(intensity, 0, 0));
+    vecs.push_back(ambient.toQVector());
+    vecs.push_back(diffuse.toQVector());
+    vecs.push_back(specular.toQVector());
+
+    vecs.push_back(position.toQVector());
+    vecs.push_back(direction.toQVector());
+
+    vecs.push_back(QVector3D(spotExponent, spotCutOff, cos(spotCutOff)));
+    vecs.push_back(attenuation.toQVector());
+
+    program->setUniformValueArray(var.c_str(), &(vecs[0]), vecs.size());
 }
 
 void Light::uploadToShader(QGLShaderProgram* program, const string& var, int idx)
 {
-	string str;	
-	str = var + "[" + PhGUtils::toString(idx) + "].type";
-	program->setUniformValue(str.c_str(), t);
-	str = var + "[" + PhGUtils::toString(idx) + "].intensity";
-	program->setUniformValue(str.c_str(), intensity);
-	str = var + "[" + PhGUtils::toString(idx) + "].ambient";
-	program->setUniformValue(str.c_str(), ambient.toQVector());
-	str = var + "[" + PhGUtils::toString(idx) + "].diffuse";
-	program->setUniformValue(str.c_str(), diffuse.toQVector());
-	str = var + "[" + PhGUtils::toString(idx) + "].specular";
-	program->setUniformValue(str.c_str(), specular.toQVector());
+    vector<QVector3D> vecs;
 
-	str = var + "[" + PhGUtils::toString(idx) + "].pos";
-	program->setUniformValue(str.c_str(), position.toQVector());
-	str = var + "[" + PhGUtils::toString(idx) + "].dir";
-	program->setUniformValue(str.c_str(), direction.toQVector());
+    vecs.push_back(QVector3D(t, 0, 0));
+    vecs.push_back(QVector3D(intensity, 0, 0));
+    vecs.push_back(ambient.toQVector());
+    vecs.push_back(diffuse.toQVector());
+    vecs.push_back(specular.toQVector());
+
+    vecs.push_back(position.toQVector());
+    vecs.push_back(direction.toQVector());
+
+    vecs.push_back(QVector3D(spotExponent, spotCutOff, cos(spotCutOff)));
+    vecs.push_back(attenuation.toQVector());
+
+    string str = var + "[" + PhGUtils::toString(idx) + "]";
+    program->setUniformValueArray(str.c_str(), &(vecs[0]), vecs.size());
 }

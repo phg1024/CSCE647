@@ -23,6 +23,7 @@ struct Material {
     float3 specular;
 
     float shininess;
+    float alpha, beta;
 
     float3 kcool;
     float3 kwarm;
@@ -50,7 +51,7 @@ struct Shape
         vec3f ratio0 = a0/r0;
         vec3f ratio1 = a1/r1;
         vec3f ratio2 = a2/r2;
-        m = PhGUtils::outerProduct<double, float>(ratio0, ratio0) + PhGUtils::outerProduct<double, float>(ratio1, ratio1) + PhGUtils::outerProduct<double, float>(ratio2, ratio2);
+        m = PhGUtils::outerProduct(ratio0, ratio0) + PhGUtils::outerProduct(ratio1, ratio1) + PhGUtils::outerProduct(ratio2, ratio2);
     }
 
     Shape(const Shape& s):t(s.t), p(s.p), angle(s.angle), m(s.m), height(s.height),

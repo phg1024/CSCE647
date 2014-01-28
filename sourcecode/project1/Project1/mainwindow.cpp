@@ -24,8 +24,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     //QGLFormat::setDefaultFormat(format);
 
-    //canvas = new MainCanvas(parent, format);
-    canvas = new MainCanvas(parent);
+    canvas = new MainCanvas(parent, format);
+    //canvas = new MainCanvas(parent);
 
     this->setCentralWidget(canvas);
 }
