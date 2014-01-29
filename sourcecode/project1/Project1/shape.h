@@ -53,7 +53,7 @@ struct Shape
 		m = PhGUtils::outerProduct(ratio0, ratio0) + PhGUtils::outerProduct(ratio1, ratio1) + PhGUtils::outerProduct(ratio2, ratio2);
 	}
 
-	Shape(const Shape& s):t(s.t), p(s.p), angle(s.angle), m(s.m), height(s.height), 
+	Shape(const Shape& s):t(s.t), p(s.p), m(s.m), 
 		material(s.material), hasTexture(s.hasTexture), texId(s.texId), hasNormalMap(s.hasNormalMap),
 	normalTexId(s.normalTexId){
 		for(int i=0;i<3;i++) {
@@ -71,9 +71,7 @@ struct Shape
 	float3 p;
 	vec3f axis[3];
 	float radius[3];
-	float angle;
 	mat3 m;
-	float height;
 
 	Material material;
 

@@ -8,6 +8,8 @@
 #include "camera.h"
 #include "light.h"
 
+#include "Utils/Timer.h"
+
 class MainCanvas : public GL3DCanvas
 {
 public:

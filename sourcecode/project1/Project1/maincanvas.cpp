@@ -23,7 +23,7 @@ MainCanvas::MainCanvas(QWidget* parent, QGLFormat format):
 MainCanvas::~MainCanvas()
 {
     delete program;
-    //delete vShader;
+    delete vShader;
     delete fShader;
 }
 
@@ -41,6 +41,8 @@ void MainCanvas::initializeGL()
     vShader = new QGLShader(QGLShader::Vertex);
     fShader = new QGLShader(QGLShader::Fragment);
 
+	PhGUtils::Timer t;
+	t.tic();
     fShader->compileSourceFile("../Project1/frag.glsl");
 	cout << qPrintable(fShader->log()) << endl;
     vShader->compileSourceFile("../Project1/vert.glsl");
@@ -48,11 +50,17 @@ void MainCanvas::initializeGL()
 
     program->addShader(vShader);
     program->addShader(fShader);
+	t.toc("shader compilation");
 
+	t.tic();
     program->link();
+	t.toc("shader linking");
+	cout << "done." << endl;
 
+	cout << "initializing scene ..." << endl;
 	initLights();
 	initShapes();
+	cout << "done." << endl;
 
 	cout << "init done." << endl;
 }
@@ -71,6 +79,7 @@ void MainCanvas::keyPressEvent(QKeyEvent *e)
     case Qt::Key_2:
     case Qt::Key_3:
     {
+		cout << e->key() << endl;
         int key = e->key() - Qt::Key_0;
         shadingMode = key;
         update();
@@ -228,6 +237,7 @@ void MainCanvas::initShapes()
 {
 	scene.shapes.clear();
 
+	
 	Shape s0( Shape::SPHERE, 
 		float3(0, 0, 1),	// p 
 		1.0, 0.0, 0.0,		// radius
@@ -249,6 +259,7 @@ void MainCanvas::initShapes()
 	s0.normalTexId = loadTexture("textures/earth/earth_normalmap_flat_4k.png", 1);
 	//s0.texId = loadTexture("textures/gabby.jpg", 0);
 	scene.shapes.push_back(s0);
+	
 
 	Shape s(
 		Shape::PLANE,
@@ -268,7 +279,7 @@ void MainCanvas::initShapes()
 	s.hasTexture = true;
 	s.texId = loadTexture("chessboard.png", 2);
 	scene.shapes.push_back(s);
-
+	
 	scene.shapes.push_back(Shape( Shape::SPHERE, 
 		float3(0, 0, 1),	// p 
 		1.0, 0.0, 0.0,		// radius
@@ -310,6 +321,40 @@ void MainCanvas::initShapes()
 		float3(1.0, -0.5, -0.5),	// p 
 		0.75, 0.25, 0.25,		// radius
 		vec3f(1, 0, 1),			// axis[0]
+		vec3f(1, 1, 0),			// axis[1]
+		vec3f(0, 1, 1),			// axis[2]
+		Material(
+		float3(0.75, 0.75, 0.25),		// diffuse
+		float3(1.0 , 1.0 , 1.0),		// specular
+		float3(0.05, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		float3(.9, .1, .6),				// kcool
+		float3(.05, .45, .05)				// kwarm
+		)
+		)
+		);
+	
+	scene.shapes.push_back(Shape( Shape::CYLINDER, 
+		float3(-1.0, -0.5, 0.5),	// p 
+		0.5, 1.0, 0.25,		// radius
+		vec3f(0, 1, 0),			// axis[0]
+		vec3f(1, 1, 0),			// axis[1]
+		vec3f(0, 1, 1),			// axis[2]
+		Material(
+		float3(0.75, 0.75, 0.25),		// diffuse
+		float3(1.0 , 1.0 , 1.0),		// specular
+		float3(0.05, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		float3(.9, .1, .6),				// kcool
+		float3(.05, .45, .05)				// kwarm
+		)
+		)
+		);
+	
+	scene.shapes.push_back(Shape( Shape::CONE, 
+		float3(0.5, -0.5, -1.0),	// p 
+		0.25, 1.0, 0.8,		// radius
+		vec3f(0, 1, 0),			// axis[0]
 		vec3f(1, 1, 0),			// axis[1]
 		vec3f(0, 1, 1),			// axis[2]
 		Material(

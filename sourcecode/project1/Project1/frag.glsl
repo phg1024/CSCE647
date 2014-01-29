@@ -75,11 +75,8 @@ struct Shape {
                         // vertex for cylinder and cone, hyperboloid
     vec3 axis[3];       // axes for ellipsoid, main axis for cylinder, cone and hyperboloid
                         // normal and u, v for plane
-    float radius[3];    // radius for sphere, ellipsoid, cylinder, width and height for plane
-    float angle;        // open angle for cone
+    float radius[3];    // radius for sphere, ellipsoid, cylinder(height also), cone(height and angle also), width and height for plane
 	mat3 m;				// for ellipsoid
-
-    float height;       // for cylinder and cone
 
     // material property
     vec3 emission;
@@ -110,7 +107,7 @@ struct Hit {
 };
 
 uniform Light lights[4];
-uniform Shape shapes[8];
+uniform Shape shapes[16];
 uniform Hit background;
 
 
@@ -178,13 +175,13 @@ float lightRayIntersectsSphere(Ray r, Shape s) {
         float x1 = -b-delta;
         float THRES = 1e-3;
 
-        if( x1 < THRES ) {
+        if( x0 < THRES ) {
             return -1.0;
         }
         else
         {
-            if( x0 < THRES ) return x1;
-            else return x0;
+            if( x1 < THRES ) return x0;
+            else return x1;
         }
     }
 }
@@ -234,21 +231,177 @@ float lightRayIntersectsEllipsoid(Ray r, Shape s) {
 		float x1 = (-b+delta)*inv;
         
 		const float THRES = 1e-3;
-		if( x0 < THRES ) {
+		if( x1 < THRES ) {
 			return -1.0;
         }
         else
         {			
-			if( x1 < THRES ) return x0;
-			else return x1;
+			if( x0 < THRES ) return x1;
+			else return x0;
 		}
     }
+}
+
+float lightRayIntersectsCylinder( Ray r, Shape s ) {
+	vec3 m = s.p - r.origin;
+	float dDa = dot(r.dir, s.axis[0]);
+	float mDa = dot(m, s.axis[0]);
+	float a = dot(r.dir, r.dir) - dDa * dDa;
+	float b = mDa * dDa - dot(m, r.dir);
+	float c = dot(m, m) - mDa * mDa - s.radius[0] * s.radius[0];
+
+	// degenerate cases
+	if( abs(a) < 1e-6 ) {
+		if( abs(b) < 1e-6 ) {
+			return -1.0;
+		}
+		else {
+			float t = -c/b*0.5;
+			vec3 p = t * r.dir + r.origin;
+			vec3 pq = p - s.p;
+			float hval = dot(pq, s.axis[0]);
+
+			if( hval < 0 || hval > s.radius[1] ) return t;
+			else return -1.0;
+		}
+	}
+
+    float delta = b*b - a*c;
+    if (delta < 0.0)
+    {
+		return -1.0;
+    }
+    else
+    {
+		delta = sqrt(delta);        
+		float inv = 1.0 / a;
+
+		float t0 = (-b-delta)*inv;
+		float t1 = (-b+delta)*inv;
+
+		float x0 = min(t0, t1);
+		float x1 = max(t0, t1);
+        
+		const float THRES = 1e-3;
+		if( x1 < THRES ) {
+			return -1.0;
+        }
+        else
+        {
+			float t;
+			if( x0 < THRES ) t = x1;
+			else t = x0;
+
+			// hit point
+			vec3 p = t * r.dir + r.origin;
+			vec3 pq = p - s.p;
+			float hval = dot(pq, s.axis[0]);
+
+			if( hval < 0 || hval > s.radius[1] ) {
+				if( t < x1 ) {
+					// try x1
+					t = x1;
+					vec3 p = t * r.dir + r.origin;
+
+					vec3 pq = p - s.p;
+					float hval1 = dot(pq, s.axis[0]);
+					if( hval1 < 0 || hval1 > s.radius[1] ) return -1.0;
+					else return t;
+				}
+				else return -1.0;
+			}
+			else return t;	
+		}
+    }
+}
+
+float lightRayIntersectsCone(Ray r, Shape s) {
+	vec3 m = s.p - r.origin;
+	float cosTheta = cos(s.radius[2]);
+	float dDa = dot(r.dir, s.axis[0]);
+	float mDa = dot(m, s.axis[0]);
+	float a = dot(r.dir, r.dir) * cosTheta - dDa*dDa;
+	float b = dDa * mDa - dot(m, r.dir) * cosTheta;
+	float c = dot(m, m) * cosTheta - mDa * mDa;
+
+	// degenerate case
+	if( abs(a) < 1e-6 ) {
+		if( abs(b) < 1e-6 ) {
+			// impossible
+			return -1.0;
+		}
+		else {
+			float t = -c/b*0.5;
+			vec3 p = t * r.dir + r.origin;
+			vec3 pq = p - s.p;
+			float hval = dot(pq, s.axis[0]);
+
+			if( hval < 0 || hval > s.radius[1] ) return t;
+			else return -1.0;
+		}		
+	}
+
+    float delta = b*b - a*c;
+    if (delta < 0.0)
+    {
+		return -1.0;
+    }
+    else
+    {
+		delta = sqrt(delta);
+	        
+		float inv = 1.0 / a;
+
+		float t0 = (-b-delta)*inv;
+		float t1 = (-b+delta)*inv;
+
+		float x0 = min(t0, t1);
+		float x1 = max(t0, t1);
+        
+		const float THRES = 1e-3;
+		if( x1 < THRES ) {
+			return -1.0;
+        }
+        else
+        {
+			float t;
+			if( x0 < THRES ) t = x1;
+			else t = x0;
+
+			// hit point
+			vec3 p = t * r.dir + r.origin;
+			vec3 pq = p - s.p;
+			float hval = dot(pq, s.axis[0]);
+
+			if( hval < 0 || hval > s.radius[1] ) {
+				if( t < x1 ) {
+					// try x1
+					t = x1;
+					vec3 p = t * r.dir + r.origin;
+
+					vec3 pq = p - s.p;
+					float hval = dot(pq, s.axis[0]);
+					if( hval < 0 || hval > s.radius[1] ) return -1.0;
+					else return t;
+				}
+				else return -1.0;
+			}
+			else return t;
+		}
+    }
+}
+
+float lightRayIntersectsHyperboloid(Ray r, Shape s) {
+	return -1.0;
 }
 
 float lightRayIntersectsShape(Ray r, Shape s) {
     if(s.type == SPHERE) return lightRayIntersectsSphere(r, s);
     else if( s.type == PLANE ) return lightRayIntersectsPlane(r, s);
 	else if( s.type == ELLIPSOID ) return lightRayIntersectsEllipsoid(r, s);
+	else if( s.type == CONE ) return lightRayIntersectsCone(r, s);
+	else if( s.type == CYLINDER ) return lightRayIntersectsCylinder(r, s);	
+	else if( s.type == HYPERBOLOID ) return lightRayIntersectsHyperboloid(r, s);
     else return -1.0;
 }
 
@@ -315,7 +468,7 @@ vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 			else
 				L = -lights[i].dir;
 
-            vec3 E = normalize(r.origin-v);
+            vec3 E = normalize(caminfo.pos-v);
             vec3 R = normalize(-reflect(L,N));
 
 			float NdotL, RdotE;
@@ -348,10 +501,10 @@ vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 
 			if( s.hasTexture ) {
 				vec3 Itexture = texture2D (s.tex, t).rgb;
-				c = c + Itexture * (Idiff + Ispec + Iamb) * lights[i].intensity;
+				c = c + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
 			}
 			else
-	            c = c + (Idiff + Ispec + Iamb) * lights[i].intensity;
+	            c = c + ((Idiff + Ispec) + Iamb) * lights[i].intensity;
         }
         else {
 			if( s.hasTexture ) {
@@ -380,6 +533,8 @@ vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 				L = normalize(lights[i].pos - v);
 			else
 				L = -lights[i].dir;
+
+			vec3 E = normalize(caminfo.pos - v);
 
 			float NdotL;
 
@@ -427,7 +582,7 @@ vec3 goochShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 		else
 			L = -lights[i].dir;
 
-        vec3 E = normalize(r.origin - v);
+        vec3 E = normalize(caminfo.pos - v);
         vec3 R = normalize(-reflect(L,N));
         float NdotL = dot(N, L);
 
@@ -465,121 +620,109 @@ vec3 computeShading(vec3 p, vec3 n, vec2 t, Ray r, Shape s) {
 
 // ray intersection test with shading computation
 Hit rayIntersectsSphere(Ray r, Shape s) {
-    Hit h;
+	float ti = lightRayIntersectsSphere(r, s);
 
-    vec3 pq = r.origin - s.p;
-    float a = 1.0;
-    float b = dot(pq, r.dir);
-    float c = dot(pq, pq) - s.radius[0] * s.radius[0];
-
-    // solve the quadratic equation
-    float delta = b*b - a*c;
-    if( delta < 0.0 )
-    {
-        return background;
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+        // hit point
+        vec3 p = h.t * r.dir + r.origin;
+        // normal at hit point
+        vec3 n = normalize(p - s.p);
+        // hack, move the point a little bit outer
+		p = s.p + (s.radius[0] + 1e-6) * n;
+        vec2 t = spheremap(n);
+        h.color = computeShading(p, n, t, r, s);
+        return h;
     }
-    else
-    {
-        delta = sqrt(delta);
-        float x0 = -b+delta; // a = 1, no need to do the division
-        float x1 = -b-delta;
-        float THRES = 1e-3;
-
-        if( x0 < THRES ) {
-            return background;
-        }
-        else
-        {
-            if( x1 < THRES ) h.t = x0;
-            else h.t = x1;
-
-            // hit point
-            vec3 p = h.t * r.dir + r.origin;
-            // normal at hit point
-            vec3 n = normalize(p - s.p);
-
-			// hack, move the point a little bit outer
-			p = s.p + (s.radius[0] + 1e-6) * n;
-
-			vec2 t = spheremap(n);
-
-            h.color = computeShading(p, n, t, r, s);
-            return h;
-        }
-    }
+	else return background;
 }
 
 Hit rayIntersectsPlane(Ray r, Shape s) {
-    vec3 pq = s.p - r.origin;
-    float ldotn = dot(s.axis[0], r.dir);
-    if( abs(ldotn) < 1e-3 ) return background;
-    else {
-        Hit h;
-        h.t = dot(s.axis[0], pq) / ldotn;
-
-        if( h.t > 0.0 ) {
-            vec3 p = r.origin + h.t * r.dir;
-
-            // compute u, v coordinates
+	float ti = lightRayIntersectsPlane(r, s);
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+        vec3 p = r.origin + h.t * r.dir;
+        // compute u, v coordinates
             vec3 pp0 = p - s.p;
-            float u = dot(pp0, s.axis[1]);
-            float v = dot(pp0, s.axis[2]);
-            if( abs(u) > s.radius[0] || abs(v) > s.radius[1] ) return background;
-            else {
-				vec2 t = clamp((vec2(u / s.radius[0], v / s.radius[1]) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
-                h.color = computeShading(p, s.axis[0], t, r, s);
-                return h;
-            }
+        float u = dot(pp0, s.axis[1]);
+        float v = dot(pp0, s.axis[2]);
+        if( abs(u) > s.radius[0] || abs(v) > s.radius[1] ) return background;
+        else {
+            vec2 t = clamp((vec2(u / s.radius[0], v / s.radius[1]) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
+            h.color = computeShading(p, s.axis[0], t, r, s);
+            return h;
         }
-        else return background;
     }
+	else return background;
 }
 
 Hit rayIntersectsEllipsoid(Ray r, Shape s) {
-	vec3 pq = s.p - r.origin;
-	float a = dot(r.dir, s.m*r.dir);
-	float b = -dot(pq, s.m*r.dir);
-	float c = dot(pq, s.m*pq) - 1;
-
-    float delta = b*b - a*c;
-    if (delta < 0.0)
-    {
-		return background;
+	float ti = lightRayIntersectsEllipsoid(r, s);
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+		// hit point
+		vec3 p = h.t * r.dir + r.origin;
+        // normal at hit point
+		vec3 n = normalize(2.0 * s.m * (p - s.p));
+        vec2 t = spheremap(n);
+        h.color = computeShading(p, n, t, r, s);
+        return h;
     }
-    else
-    {
-		delta = sqrt(delta);        
-		float inv = 1.0 / a;
 
-		float x0 = (-b-delta)*inv;
-		float x1 = (-b+delta)*inv;
-        
-		const float THRES = 1e-3;
-		if( x1 < THRES ) {
-			return background;
-        }
-        else
-        {
-			Hit h;
-			if( x0 < THRES ) h.t = x1;
-			else h.t = x0;
+	else return background;
+}
 
-			// hit point
-			vec3 p = h.t * r.dir + r.origin;
-			// normal at hit point
-			vec3 n = normalize(2.0 * s.m * (p - s.p));
-
-			vec2 t = spheremap(n);
-            h.color = computeShading(p, n, t, r, s);
-            return h;
-		}
+Hit rayIntersectsCone( Ray r, Shape s ) {
+	float ti = lightRayIntersectsCone(r, s);
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+		vec3 p = h.t * r.dir + r.origin;
+        vec3 pq = p - s.p;
+        float hval = dot(pq, s.axis[0]);
+        // normal at hit point
+		vec3 n = normalize(cross(cross(s.axis[0], pq), s.axis[0]));
+        vec2 t = vec2(0, 0);
+        // dummy
+		h.color = computeShading(p, n, t, r, s);
+        return h;
     }
+	else return background;
+}
+
+Hit rayIntersectsCylinder(Ray r, Shape s) {
+	float ti = lightRayIntersectsCylinder(r, s);
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+        vec3 p = h.t * r.dir + r.origin;
+        vec3 pq = p - s.p;
+        float hval = dot(pq, s.axis[0]);
+        // normal at hit point
+		vec3 n = normalize(pq - hval*s.axis[0]);
+        vec2 t = vec2(0, 0);
+        // dummy
+		h.color = computeShading(p, n, t, r, s);
+        return h;
+    }
+	else return background;
+}
+
+Hit rayIntersectsHyperboloid(Ray r, Shape s) {
+	Hit h;
+	return h;
 }
 
 Hit rayIntersectsShape(Ray r, Shape s) {
     if(s.type == SPHERE) return rayIntersectsSphere(r, s);
     else if( s.type == PLANE ) return rayIntersectsPlane(r, s);
 	else if( s.type == ELLIPSOID ) return rayIntersectsEllipsoid(r, s);
+	else if( s.type == CONE ) return rayIntersectsCone(r, s);
+	else if( s.type == CYLINDER ) return rayIntersectsCylinder(r, s);	
+	else if( s.type == HYPERBOLOID ) return rayIntersectsHyperboloid(r, s);
     else return background;
 }
 
