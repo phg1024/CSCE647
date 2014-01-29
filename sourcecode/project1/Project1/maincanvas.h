@@ -20,13 +20,14 @@ protected:
     virtual void resizeGL(int w, int h);
 
     virtual void keyPressEvent(QKeyEvent *e);
-	virtual void mousePressEvent(QMouseEvent *e);
-	virtual void mouseMoveEvent(QMouseEvent *e);
+    virtual void mousePressEvent(QMouseEvent *e);
+    virtual void mouseMoveEvent(QMouseEvent *e);
 
-	void initShapes();
-	void initLights();
+    void initShapes();
+    void initLights();
+    void initVBOs();
 
-	int loadTexture(const string& filename, int texSlot);
+    int loadTexture(const string& filename, int texSlot);
 
     string buildFragmentShaderSourceCode();
     string buildVertexShaderSourceCode();
@@ -35,11 +36,13 @@ private:
     QGLShaderProgram* program;
     QGLShader* vShader, *fShader;
 
-	bool renderingEnabled;
+    bool renderingEnabled;
     int shadingMode;
-	int samples;
+    int samples;
 
-	Scene scene;
+    Scene scene;
+
+    unsigned int vbo, vao;
 };
 
 #endif // MAINCANVAS_H

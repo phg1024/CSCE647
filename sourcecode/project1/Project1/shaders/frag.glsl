@@ -3,8 +3,8 @@ out vec4 fragColor;
 void main(void)
 {
     initializeCamera();
-    initializeLights();
-    initializeShapes();
+    //initializeLights();
+    //initializeShapes();
 
     float edgeSamples = sqrt(float(AAsamples));
     float step = 1.0 / edgeSamples;

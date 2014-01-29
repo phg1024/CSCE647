@@ -11,5 +11,5 @@ uniform float camF;
 uniform Hit background;
 uniform sampler2D textures[8];
 
-Light lights[4];
-Shape shapes[8];
+//uniform Light lights[4];
+//uniform Shape shapes[8];

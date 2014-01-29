@@ -1,11 +1,11 @@
 // ray intersection test with shading computation
-Hit rayIntersectsSphere(Ray r, Shape s) {
+Hit rayIntersectsSphere(Ray r, int i) {
     Hit h;
 
-    vec3 pq = r.origin - s.p;
+    vec3 pq = r.origin - shapes[i].p;
     float a = 1.0;
     float b = dot(pq, r.dir);
-    float c = dot(pq, pq) - s.radius.x * s.radius.x;
+    float c = dot(pq, pq) - shapes[i].radius.x * shapes[i].radius.x;
 
     // solve the quadratic equation
     float delta = b*b - a*c;
@@ -31,38 +31,45 @@ Hit rayIntersectsSphere(Ray r, Shape s) {
             // hit point
             vec3 p = h.t * r.dir + r.origin;
             // normal at hit point
-            vec3 n = normalize(p - s.p);
+            vec3 n = normalize(p - shapes[i].p);
 
             // hack, move the point a little bit outer
-            p = s.p + (s.radius.x + 1e-6) * n;
+            p = shapes[i].p + (shapes[i].radius.x + 1e-6) * n;
 
             vec2 t = spheremap(n);
 
-            h.color = computeShading(p, n, t, r, s);
+            h.color = computeShading(p, n, t, r, i);
             return h;
         }
     }
 }
 
-Hit rayIntersectsPlane(Ray r, Shape s) {
-    vec3 pq = s.p - r.origin;
-    float ldotn = dot(s.axis0, r.dir);
+Hit debug() {
+    Hit hh;
+    hh.color = vec3(1, 0, 0);
+    hh.t = 1.0;
+    return hh;
+}
+
+Hit rayIntersectsPlane(Ray r, int i) {
+    vec3 pq = shapes[i].p - r.origin;
+    float ldotn = dot(shapes[i].axis0, r.dir);
     if( abs(ldotn) < 1e-3 ) return background;
     else {
         Hit h;
-        h.t = dot(s.axis0, pq) / ldotn;
+        h.t = dot(shapes[i].axis0, pq) / ldotn;
 
         if( h.t > 0.0 ) {
             vec3 p = r.origin + h.t * r.dir;
 
             // compute u, v coordinates
-            vec3 pp0 = p - s.p;
-            float u = dot(pp0, s.axis1);
-            float v = dot(pp0, s.axis2);
-            if( abs(u) > s.radius.x || abs(v) > s.radius.x ) return background;
+            vec3 pp0 = p - shapes[i].p;
+            float u = dot(pp0, shapes[i].axis1);
+            float v = dot(pp0, shapes[i].axis2);
+            if( abs(u) > shapes[i].radius.x || abs(v) > shapes[i].radius.x ) return background;
             else {
-                vec2 t = clamp((vec2(u / s.radius.x, v / s.radius.y) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
-                h.color = computeShading(p, s.axis0, t, r, s);
+                vec2 t = clamp((vec2(u / shapes[i].radius.x, v / shapes[i].radius.y) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
+                h.color = computeShading(p, shapes[i].axis0, t, r, i);
                 return h;
             }
         }
@@ -70,11 +77,11 @@ Hit rayIntersectsPlane(Ray r, Shape s) {
     }
 }
 
-Hit rayIntersectsEllipsoid(Ray r, Shape s) {
-    vec3 pq = s.p - r.origin;
-    float a = dot(r.dir, s.m*r.dir);
-    float b = -dot(pq, s.m*r.dir);
-    float c = dot(pq, s.m*pq) - 1;
+Hit rayIntersectsEllipsoid(Ray r, int i) {
+    vec3 pq = shapes[i].p - r.origin;
+    float a = dot(r.dir, shapes[i].m*r.dir);
+    float b = -dot(pq, shapes[i].m*r.dir);
+    float c = dot(pq, shapes[i].m*pq) - 1;
 
     float delta = b*b - a*c;
     if (delta < 0.0)
@@ -102,19 +109,27 @@ Hit rayIntersectsEllipsoid(Ray r, Shape s) {
             // hit point
             vec3 p = h.t * r.dir + r.origin;
             // normal at hit point
-            vec3 n = normalize(2.0 * s.m * (p - s.p));
+            vec3 n = normalize(2.0 * shapes[i].m * (p - shapes[i].p));
 
             vec2 t = spheremap(n);
-            h.color = computeShading(p, n, t, r, s);
+            h.color = computeShading(p, n, t, r, i);
             return h;
         }
     }
 }
 
-Hit rayIntersectsShape(Ray r, Shape s) {
-    if(s.type == SPHERE) return rayIntersectsSphere(r, s);
-    else if( s.type == PLANE ) return rayIntersectsPlane(r, s);
-    else if( s.type == ELLIPSOID ) return rayIntersectsEllipsoid(r, s);
+Hit rayIntersectsCylinder(Ray r, int i) {
+    Hit h;
+    return h;
+}
+
+Hit rayIntersectsShape(Ray r, int i) {
+    if(shapes[i].type == SPHERE) return rayIntersectsSphere(r, i);
+    else if( shapes[i].type == PLANE ) return rayIntersectsPlane(r, i);
+    else if( shapes[i].type == ELLIPSOID ) return rayIntersectsEllipsoid(r, i);
+    else if( shapes[i].type == CYLINDER ) return rayIntersectsCylinder(r, i);
+    else if( shapes[i].type == CONE ) return rayIntersectsCylinder(r, i);
+    else if( shapes[i].type == CYLINDER ) return rayIntersectsCylinder(r, i);
     else return background;
 }
 
@@ -125,7 +140,8 @@ Hit rayIntersectsShapes(Ray r) {
     h.color = background.color;
 
     for(int i=0;i<shapeCount;i++) {
-        Hit hit = rayIntersectsShape(r, shapes[i]);
+        Hit hit = rayIntersectsShape(r, i);
+
         if( (hit.t > 0.0) && (hit.t < h.t) ) {
             h.t = hit.t;
             h.color = hit.color;

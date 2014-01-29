@@ -13,7 +13,7 @@ const int POINT_LIGHT = 0;
 const int DIRECTIONAL_LIGHT = 1;
 const int SPOT_LIGHT = 2;
 
-struct Light {
+uniform struct Light {
     int type;	// POINT = 0, DIRECTIONAL = 1, SPOT = 2
 
     float intensity;
@@ -30,7 +30,7 @@ struct Light {
     float spotCosCutOff;
 
     vec3 attenuation;   // K0, K1, K2
-};
+} lights[4];
 
 // shape types
 const int SPHERE = 0;
@@ -51,9 +51,16 @@ struct Material {
     vec3 kwarm;
 
     float shininess;
+    float alpha, beta;
+
+    bool hasTexture;
+    int tex;
+
+    bool hasNormalMap;
+    int nTex;
 };
 
-struct Shape {
+uniform struct Shape {
     int type;           // sphere = 0, plane = 1, ellipsoid = 2
                         // cylinder = 3, cone = 4, hyperboloid = 5
 
@@ -62,8 +69,6 @@ struct Shape {
     vec3 axis0, axis1, axis2;       // axes for ellipsoid, main axis for cylinder, cone and hyperboloid
                         // normal and u, v for plane
     vec3 radius;    // radius for sphere, ellipsoid, cylinder, width and height for plane
-    float angle;        // open angle for cone
-    float height;       // for cylinder and cone
 
     mat3 m;             // for ellipsoid
 
@@ -85,7 +90,7 @@ struct Shape {
 
     bool hasNormalMap;
     int nTex;
-};
+} shapes[8];
 
 struct Ray {
     vec3 origin;
