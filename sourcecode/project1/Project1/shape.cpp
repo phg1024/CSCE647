@@ -121,18 +121,18 @@ void Shape::uploadToShader(QGLShaderProgram *program, const string& var, int idx
 
     // texture
     str = var + "[" + PhGUtils::toString(idx) + "].hasTexture";
-    cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << hasTexture << endl;
+    //cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << hasTexture << endl;
     program->setUniformValue(str.c_str(), hasTexture);
     str = var + "[" + PhGUtils::toString(idx) + "].tex";
-    cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << texId << endl;
+    //cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << texId << endl;
     program->setUniformValue(str.c_str(), texId);
 
     // normal map
     str = var + "[" + PhGUtils::toString(idx) + "].hasNormalMap";
-    cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << hasNormalMap << endl;
+    //cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << hasNormalMap << endl;
     program->setUniformValue(str.c_str(), hasNormalMap);
     str = var + "[" + PhGUtils::toString(idx) + "].nTex";
-    cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << normalTexId << endl;
+    //cout << str << " @ " << program->uniformLocation(str.c_str()) << " = " << normalTexId << endl;
     program->setUniformValue(str.c_str(), normalTexId);
 
 }

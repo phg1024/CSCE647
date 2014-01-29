@@ -18,13 +18,13 @@ float lightRayIntersectsSphere(Ray r, int i) {
         float x1 = -b-delta;
         float THRES = 1e-3;
 
-        if( x1 < THRES ) {
+        if( x0 < THRES ) {
             return -1.0;
         }
         else
         {
-            if( x0 < THRES ) return x1;
-            else return x0;
+            if( x1 < THRES ) return x0;
+            else return x1;
         }
     }
 }
