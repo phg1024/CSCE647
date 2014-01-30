@@ -36,6 +36,8 @@ void MainCanvas::initializeGL()
 
     GL3DCanvas::initializeGL();
 
+	makeCurrent();
+
 	cout << "loading shaders ..." << endl;
     program = new QGLShaderProgram(this);
     vShader = new QGLShader(QGLShader::Vertex);

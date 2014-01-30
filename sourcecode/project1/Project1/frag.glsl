@@ -1,4 +1,5 @@
-#version 120
+#version 400
+#pragma optimize(on)
 uniform vec2 windowSize;
 uniform int lightCount;
 uniform int shapeCount;
@@ -54,19 +55,6 @@ const int CYLINDER = 3;
 const int CONE = 4;
 const int HYPERBOLOID = 5;
 
-struct Material {
-    // material property
-    vec3 emission;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-
-    vec3 kcool;
-    vec3 kwarm;
-
-    float shininess;
-};
-
 struct Shape {
     int type;           // sphere = 0, plane = 1, ellipsoid = 2
                         // cylinder = 3, cone = 4, hyperboloid = 5
@@ -87,7 +75,7 @@ struct Shape {
     vec3 kcool;
     vec3 kwarm;
 
-    float shininess;
+    float shininess, alpha, beta;
 
 	bool hasTexture;
 	sampler2D tex;
@@ -156,11 +144,11 @@ Ray constructRay(vec2 pos) {
 }
 
 // light ray intersection tests
-float lightRayIntersectsSphere(Ray r, Shape s) {
-    vec3 pq = r.origin - s.p;
+float lightRayIntersectsSphere( Ray r, int sid ) {
+    vec3 pq = r.origin - shapes[sid].p;
     float a = 1.0;
     float b = dot(pq, r.dir);
-    float c = dot(pq, pq) - s.radius[0] * s.radius[0];
+    float c = dot(pq, pq) - shapes[sid].radius[0] * shapes[sid].radius[0];
 
     // solve the quadratic equation
     float delta = b*b - a*c;
@@ -186,23 +174,23 @@ float lightRayIntersectsSphere(Ray r, Shape s) {
     }
 }
 
-float lightRayIntersectsPlane(Ray r, Shape s) {
+float lightRayIntersectsPlane( Ray r, int sid ) {
     float t = 1e10;
     float THRES = 1e-3;
-    vec3 pq = s.p - r.origin;
-    float ldotn = dot(s.axis[0], r.dir);
+    vec3 pq = shapes[sid].p - r.origin;
+    float ldotn = dot(shapes[sid].axis[0], r.dir);
     if( abs(ldotn) < THRES ) return -1.0;
     else {
-        t = dot(s.axis[0], pq) / ldotn;
+        t = dot(shapes[sid].axis[0], pq) / ldotn;
 
         if( t >= THRES ) {
             vec3 p = r.origin + t * r.dir;
 
             // compute u, v coordinates
-            vec3 pp0 = p - s.p;
-            float u = dot(pp0, s.axis[1]);
-            float v = dot(pp0, s.axis[2]);
-            if( abs(u) > s.radius[0] || abs(v) > s.radius[1] ) return -1.0;
+            vec3 pp0 = p - shapes[sid].p;
+            float u = dot(pp0, shapes[sid].axis[1]);
+            float v = dot(pp0, shapes[sid].axis[2]);
+            if( abs(u) > shapes[sid].radius[0] || abs(v) > shapes[sid].radius[1] ) return -1.0;
             else {
                 return t;
             }
@@ -211,11 +199,11 @@ float lightRayIntersectsPlane(Ray r, Shape s) {
     }
 }
 
-float lightRayIntersectsEllipsoid(Ray r, Shape s) {
-	vec3 pq = s.p - r.origin;
-	float a = dot(r.dir, s.m*r.dir);
-	float b = -dot(pq, s.m*r.dir);
-	float c = dot(pq, s.m*pq) - 1;
+float lightRayIntersectsEllipsoid( Ray r, int sid ) {
+	vec3 pq = shapes[sid].p - r.origin;
+	float a = dot(r.dir, shapes[sid].m*r.dir);
+	float b = -dot(pq, shapes[sid].m*r.dir);
+	float c = dot(pq, shapes[sid].m*pq) - 1;
 
     float delta = b*b - a*c;
     if (delta < 0.0)
@@ -242,13 +230,13 @@ float lightRayIntersectsEllipsoid(Ray r, Shape s) {
     }
 }
 
-float lightRayIntersectsCylinder( Ray r, Shape s ) {
-	vec3 m = s.p - r.origin;
-	float dDa = dot(r.dir, s.axis[0]);
-	float mDa = dot(m, s.axis[0]);
+float lightRayIntersectsCylinder( Ray r, int sid ) {
+	vec3 m = shapes[sid].p - r.origin;
+	float dDa = dot(r.dir, shapes[sid].axis[0]);
+	float mDa = dot(m, shapes[sid].axis[0]);
 	float a = dot(r.dir, r.dir) - dDa * dDa;
 	float b = mDa * dDa - dot(m, r.dir);
-	float c = dot(m, m) - mDa * mDa - s.radius[0] * s.radius[0];
+	float c = dot(m, m) - mDa * mDa - shapes[sid].radius[0] * shapes[sid].radius[0];
 
 	// degenerate cases
 	if( abs(a) < 1e-6 ) {
@@ -258,10 +246,10 @@ float lightRayIntersectsCylinder( Ray r, Shape s ) {
 		else {
 			float t = -c/b*0.5;
 			vec3 p = t * r.dir + r.origin;
-			vec3 pq = p - s.p;
-			float hval = dot(pq, s.axis[0]);
+			vec3 pq = p - shapes[sid].p;
+			float hval = dot(pq, shapes[sid].axis[0]);
 
-			if( hval < 0 || hval > s.radius[1] ) return t;
+			if( hval < 0 || hval > shapes[sid].radius[1] ) return t;
 			else return -1.0;
 		}
 	}
@@ -294,18 +282,18 @@ float lightRayIntersectsCylinder( Ray r, Shape s ) {
 
 			// hit point
 			vec3 p = t * r.dir + r.origin;
-			vec3 pq = p - s.p;
-			float hval = dot(pq, s.axis[0]);
+			vec3 pq = p - shapes[sid].p;
+			float hval = dot(pq, shapes[sid].axis[0]);
 
-			if( hval < 0 || hval > s.radius[1] ) {
+			if( hval < 0 || hval > shapes[sid].radius[1] ) {
 				if( t < x1 ) {
 					// try x1
 					t = x1;
 					vec3 p = t * r.dir + r.origin;
 
-					vec3 pq = p - s.p;
-					float hval1 = dot(pq, s.axis[0]);
-					if( hval1 < 0 || hval1 > s.radius[1] ) return -1.0;
+					vec3 pq = p - shapes[sid].p;
+					float hval1 = dot(pq, shapes[sid].axis[0]);
+					if( hval1 < 0 || hval1 > shapes[sid].radius[1] ) return -1.0;
 					else return t;
 				}
 				else return -1.0;
@@ -315,11 +303,11 @@ float lightRayIntersectsCylinder( Ray r, Shape s ) {
     }
 }
 
-float lightRayIntersectsCone(Ray r, Shape s) {
-	vec3 m = s.p - r.origin;
-	float cosTheta = cos(s.radius[2]);
-	float dDa = dot(r.dir, s.axis[0]);
-	float mDa = dot(m, s.axis[0]);
+float lightRayIntersectsCone(Ray r, int sid) {
+	vec3 m = shapes[sid].p - r.origin;
+	float cosTheta = cos(shapes[sid].radius[2]);
+	float dDa = dot(r.dir, shapes[sid].axis[0]);
+	float mDa = dot(m, shapes[sid].axis[0]);
 	float a = dot(r.dir, r.dir) * cosTheta - dDa*dDa;
 	float b = dDa * mDa - dot(m, r.dir) * cosTheta;
 	float c = dot(m, m) * cosTheta - mDa * mDa;
@@ -333,10 +321,10 @@ float lightRayIntersectsCone(Ray r, Shape s) {
 		else {
 			float t = -c/b*0.5;
 			vec3 p = t * r.dir + r.origin;
-			vec3 pq = p - s.p;
-			float hval = dot(pq, s.axis[0]);
+			vec3 pq = p - shapes[sid].p;
+			float hval = dot(pq, shapes[sid].axis[0]);
 
-			if( hval < 0 || hval > s.radius[1] ) return t;
+			if( hval < 0 || hval > shapes[sid].radius[1] ) return t;
 			else return -1.0;
 		}		
 	}
@@ -370,18 +358,18 @@ float lightRayIntersectsCone(Ray r, Shape s) {
 
 			// hit point
 			vec3 p = t * r.dir + r.origin;
-			vec3 pq = p - s.p;
-			float hval = dot(pq, s.axis[0]);
+			vec3 pq = p - shapes[sid].p;
+			float hval = dot(pq, shapes[sid].axis[0]);
 
-			if( hval < 0 || hval > s.radius[1] ) {
+			if( hval < 0 || hval > shapes[sid].radius[1] ) {
 				if( t < x1 ) {
 					// try x1
 					t = x1;
 					vec3 p = t * r.dir + r.origin;
 
-					vec3 pq = p - s.p;
-					float hval = dot(pq, s.axis[0]);
-					if( hval < 0 || hval > s.radius[1] ) return -1.0;
+					vec3 pq = p - shapes[sid].p;
+					float hval = dot(pq, shapes[sid].axis[0]);
+					if( hval < 0 || hval > shapes[sid].radius[1] ) return -1.0;
 					else return t;
 				}
 				else return -1.0;
@@ -391,17 +379,18 @@ float lightRayIntersectsCone(Ray r, Shape s) {
     }
 }
 
-float lightRayIntersectsHyperboloid(Ray r, Shape s) {
+float lightRayIntersectsHyperboloid(Ray r, int sid) {
 	return -1.0;
 }
 
-float lightRayIntersectsShape(Ray r, Shape s) {
-    if(s.type == SPHERE) return lightRayIntersectsSphere(r, s);
-    else if( s.type == PLANE ) return lightRayIntersectsPlane(r, s);
-	else if( s.type == ELLIPSOID ) return lightRayIntersectsEllipsoid(r, s);
-	else if( s.type == CONE ) return lightRayIntersectsCone(r, s);
-	else if( s.type == CYLINDER ) return lightRayIntersectsCylinder(r, s);	
-	else if( s.type == HYPERBOLOID ) return lightRayIntersectsHyperboloid(r, s);
+float lightRayIntersectsShape(Ray r, int sid) {
+	int stype = shapes[sid].type;
+    if( stype == SPHERE ) return lightRayIntersectsSphere(r, sid);
+    else if( stype == PLANE ) return lightRayIntersectsPlane(r, sid);
+	else if( stype == ELLIPSOID ) return lightRayIntersectsEllipsoid(r, sid);
+	else if( stype == CONE ) return lightRayIntersectsCone(r, sid);
+	else if( stype == CYLINDER ) return lightRayIntersectsCylinder(r, sid);	
+	else if( stype == HYPERBOLOID ) return lightRayIntersectsHyperboloid(r, sid);
     else return -1.0;
 }
 
@@ -413,7 +402,7 @@ float lightRayIntersectsShapes(Ray r) {
 	float THRES = 1e-3;
 
     for(int i=0;i<shapeCount;i++) {
-        float hitT = lightRayIntersectsShape(r, shapes[i]);
+        float hitT = lightRayIntersectsShape(r, i);
         if( (hitT > -THRES) && (hitT < t) ) {
             t = hitT;
         }
@@ -424,42 +413,42 @@ float lightRayIntersectsShapes(Ray r) {
 	else return -1.0;
 }
 
-bool checkLightVisibility(vec3 p, vec3 N, Light lt) {
-	if( lt.type == POINT_LIGHT ) {
-		float dist = length(p - lt.pos);
+bool checkLightVisibility(vec3 p, vec3 N, int lid) {
+	if( lights[lid].type == POINT_LIGHT ) {
+		float dist = length(p - lights[lid].pos);
 		Ray r;
 		r.origin = p;
-		r.dir = normalize(lt.pos - p);
+		r.dir = normalize(lights[lid].pos - p);
 		float t = lightRayIntersectsShapes(r);
 
 		float THRES = 1e-3;
 		return t < THRES || t > dist;
 	}
-	else if( lt.type == SPOT_LIGHT ) {
+	else if( lights[lid].type == SPOT_LIGHT ) {
 	}
-	else if( lt.type == DIRECTIONAL_LIGHT ) {
+	else if( lights[lid].type == DIRECTIONAL_LIGHT ) {
 		Ray r;
 		r.origin = p;
-		r.dir = -lt.dir;
+		r.dir = -lights[lid].dir;
 		float t = lightRayIntersectsShapes(r);
 
 		float THRES = 1e-3;
-		return (t < THRES && (dot(N, lt.dir)<0));
+		return (t < THRES && (dot(N, lights[lid].dir)<0));
 	}
 }
 
 
-vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
+vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, int sid) {
     vec3 c = vec3(0, 0, 0);
 
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
 
         // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, N, lights[i]);
+        bool isVisible = checkLightVisibility(v, N, i);
 
         //calculate Ambient Term:
-        vec3 Iamb = s.ambient * lights[i].ambient;
+        vec3 Iamb = shapes[sid].ambient * lights[i].ambient;
 
         if( isVisible ) {
             vec3 L;
@@ -468,13 +457,13 @@ vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 			else
 				L = -lights[i].dir;
 
-            vec3 E = normalize(caminfo.pos-v);
+            vec3 E = normalize(r.origin-v);
             vec3 R = normalize(-reflect(L,N));
 
 			float NdotL, RdotE;
-			if( s.hasNormalMap ) {
+			if( shapes[sid].hasNormalMap ) {
 				// normal defined in tangent space
-				vec3 n_normalmap = normalize(texture2D(s.nTex, t).rgb * 2.0 - 1.0);
+				vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
 
 				vec3 tangent = normalize(sphere_tangent(N));
 				vec3 bitangent = cross(N, tangent);
@@ -491,24 +480,24 @@ vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 			}
 
             //calculate Diffuse Term:
-            vec3 Idiff = s.diffuse * lights[i].diffuse * max(NdotL, 0.0);
+            vec3 Idiff = shapes[sid].diffuse * lights[i].diffuse * max(NdotL, 0.0);
             Idiff = clamp(Idiff, 0.0, 1.0);
 
             // calculate Specular Term:
-            vec3 Ispec = s.specular * lights[i].specular
-                         * pow(max(RdotE,0.0),0.3*s.shininess);
+            vec3 Ispec = shapes[sid].specular * lights[i].specular
+                         * pow(max(RdotE,0.0),0.3 * shapes[sid].shininess);
             Ispec = clamp(Ispec, 0.0, 1.0);
 
-			if( s.hasTexture ) {
-				vec3 Itexture = texture2D (s.tex, t).rgb;
+			if( shapes[sid].hasTexture ) {
+				vec3 Itexture = texture2D (shapes[sid].tex, t).rgb;
 				c = c + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
 			}
 			else
 	            c = c + ((Idiff + Ispec) + Iamb) * lights[i].intensity;
         }
         else {
-			if( s.hasTexture ) {
-				vec3 Itexture = texture2D (s.tex, t).rgb;
+			if( shapes[sid].hasTexture ) {
+				vec3 Itexture = texture2D (shapes[sid].tex, t).rgb;
 				c = c + Itexture * Iamb * lights[i].intensity;
 			}
 			else
@@ -519,13 +508,13 @@ vec3 phongShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
     return c;
 }
 
-vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
+vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, int sid) {
     vec3 c = vec3(0, 0, 0);
 
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
         // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, N, lights[i]);
+        bool isVisible = checkLightVisibility(v, N, i);
 
         if( isVisible ) {
 			vec3 L;
@@ -534,14 +523,14 @@ vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 			else
 				L = -lights[i].dir;
 
-			vec3 E = normalize(caminfo.pos - v);
+			vec3 E = normalize(r.origin - v);
 
 			float NdotL;
 
 			// change the normal with normal map
-			if( s.hasNormalMap ) {
+			if( shapes[sid].hasNormalMap ) {
 				// normal defined in tangent space
-				vec3 n_normalmap = normalize(texture2D(s.nTex, t).rgb * 2.0 - 1.0);
+				vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
 
 				vec3 tangent = normalize(sphere_tangent(N));
 				vec3 bitangent = cross(N, tangent);
@@ -557,12 +546,12 @@ vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 			}
 
 			vec3 Itexture;
-			if( s.hasTexture ) {
-				Itexture = texture2D (s.tex, t).rgb;
+			if( shapes[sid].hasTexture ) {
+				Itexture = texture2D (shapes[sid].tex, t).rgb;
 			}
 			else Itexture = vec3(1, 1, 1);
 
-            vec3 Idiff = clamp(s.diffuse * lights[i].diffuse * max(NdotL, 0.0), 0.0, 1.0);
+            vec3 Idiff = clamp(shapes[sid].diffuse * lights[i].diffuse * max(NdotL, 0.0), 0.0, 1.0);
 
             c = c + Itexture * Idiff * lights[i].intensity;
         }
@@ -571,7 +560,7 @@ vec3 lambertShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
     return c;
 }
 
-vec3 goochShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
+vec3 goochShading(vec3 v, vec3 N, vec2 t, Ray r, int sid) {
 
     vec3 c = vec3(0, 0, 0);
 
@@ -582,23 +571,23 @@ vec3 goochShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
 		else
 			L = -lights[i].dir;
 
-        vec3 E = normalize(caminfo.pos - v);
+        vec3 E = normalize(r.origin - v);
         vec3 R = normalize(-reflect(L,N));
         float NdotL = dot(N, L);
 
 		vec3 diffuse;
-		if( s.hasTexture ) {
-			diffuse = texture2D (s.tex, t).rgb;
+		if( shapes[sid].hasTexture ) {
+			diffuse = texture2D (shapes[sid].tex, t).rgb;
 		}
-		else diffuse = s.diffuse;
+		else diffuse = shapes[sid].diffuse;
 
         vec3 Idiff = diffuse * NdotL;
-        vec3 kcdiff = min(s.kcool + alpha * Idiff, 1.0);
-        vec3 kwdiff = min(s.kwarm + beta * Idiff, 1.0);
+        vec3 kcdiff = min(shapes[sid].kcool + alpha * Idiff, 1.0);
+        vec3 kwdiff = min(shapes[sid].kwarm + beta * Idiff, 1.0);
         vec3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5);
         // calculate Specular Term:
-            vec3 Ispec = s.specular
-                         * pow(max(dot(R,E),0.0),0.3*s.shininess);
+            vec3 Ispec = shapes[sid].specular
+                         * pow(max(dot(R,E),0.0),0.3*shapes[sid].shininess);
         Ispec = step(vec3(0.5, 0.5, 0.5), Ispec);
         // edge effect
             float EdotN = dot(E, N);
@@ -608,19 +597,19 @@ vec3 goochShading(vec3 v, vec3 N, vec2 t, Ray r, Shape s) {
     return c;
 }
 
-vec3 computeShading(vec3 p, vec3 n, vec2 t, Ray r, Shape s) {
+vec3 computeShading(vec3 p, vec3 n, vec2 t, Ray r, int sid) {
     if( shadingMode == 1 )
-        return lambertShading(p, n, t, r, s);
+        return lambertShading(p, n, t, r, sid);
     else if( shadingMode == 2 )
-        return phongShading(p, n, t, r, s);
+        return phongShading(p, n, t, r, sid);
     else if( shadingMode == 3 )
-        if( s.type == PLANE ) return lambertShading(p, n, t, r, s);
-        else return goochShading(p, n, t, r, s);
+        if( shapes[sid].type == PLANE ) return lambertShading(p, n, t, r, sid);
+        else return goochShading(p, n, t, r, sid);
 }
 
 // ray intersection test with shading computation
-Hit rayIntersectsSphere(Ray r, Shape s) {
-	float ti = lightRayIntersectsSphere(r, s);
+Hit rayIntersectsSphere(Ray r, int sid) {
+	float ti = lightRayIntersectsSphere(r, sid);
 
 	if( ti > 0.0 ) {
 		Hit h;
@@ -628,101 +617,102 @@ Hit rayIntersectsSphere(Ray r, Shape s) {
         // hit point
         vec3 p = h.t * r.dir + r.origin;
         // normal at hit point
-        vec3 n = normalize(p - s.p);
+        vec3 n = normalize(p - shapes[sid].p);
         // hack, move the point a little bit outer
-		p = s.p + (s.radius[0] + 1e-6) * n;
+		p = shapes[sid].p + (shapes[sid].radius[0] + 1e-6) * n;
         vec2 t = spheremap(n);
-        h.color = computeShading(p, n, t, r, s);
+        h.color = computeShading(p, n, t, r, sid);
         return h;
     }
 	else return background;
 }
 
-Hit rayIntersectsPlane(Ray r, Shape s) {
-	float ti = lightRayIntersectsPlane(r, s);
+Hit rayIntersectsPlane(Ray r, int sid) {
+	float ti = lightRayIntersectsPlane(r, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
         vec3 p = r.origin + h.t * r.dir;
         // compute u, v coordinates
-            vec3 pp0 = p - s.p;
-        float u = dot(pp0, s.axis[1]);
-        float v = dot(pp0, s.axis[2]);
-        if( abs(u) > s.radius[0] || abs(v) > s.radius[1] ) return background;
+        vec3 pp0 = p - shapes[sid].p;
+        float u = dot(pp0, shapes[sid].axis[1]);
+        float v = dot(pp0, shapes[sid].axis[2]);
+        if( abs(u) > shapes[sid].radius[0] || abs(v) > shapes[sid].radius[1] ) return background;
         else {
-            vec2 t = clamp((vec2(u / s.radius[0], v / s.radius[1]) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
-            h.color = computeShading(p, s.axis[0], t, r, s);
+            vec2 t = clamp((vec2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]) + vec2(1.0, 1.0))*0.5, 0.0, 1.0);
+            h.color = computeShading(p, shapes[sid].axis[0], t, r, sid);
             return h;
         }
     }
 	else return background;
 }
 
-Hit rayIntersectsEllipsoid(Ray r, Shape s) {
-	float ti = lightRayIntersectsEllipsoid(r, s);
+Hit rayIntersectsEllipsoid(Ray r, int sid) {
+	float ti = lightRayIntersectsEllipsoid(r, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
 		// hit point
 		vec3 p = h.t * r.dir + r.origin;
         // normal at hit point
-		vec3 n = normalize(2.0 * s.m * (p - s.p));
+		vec3 n = normalize(2.0 * shapes[sid].m * (p - shapes[sid].p));
         vec2 t = spheremap(n);
-        h.color = computeShading(p, n, t, r, s);
+        h.color = computeShading(p, n, t, r, sid);
         return h;
     }
 
 	else return background;
 }
 
-Hit rayIntersectsCone( Ray r, Shape s ) {
-	float ti = lightRayIntersectsCone(r, s);
+Hit rayIntersectsCone( Ray r, int sid ) {
+	float ti = lightRayIntersectsCone(r, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
 		vec3 p = h.t * r.dir + r.origin;
-        vec3 pq = p - s.p;
-        float hval = dot(pq, s.axis[0]);
+        vec3 pq = p - shapes[sid].p;
+        float hval = dot(pq, shapes[sid].axis[0]);
         // normal at hit point
-		vec3 n = normalize(cross(cross(s.axis[0], pq), s.axis[0]));
+		vec3 n = normalize(cross(cross(shapes[sid].axis[0], pq), shapes[sid].axis[0]));
         vec2 t = vec2(0, 0);
         // dummy
-		h.color = computeShading(p, n, t, r, s);
+		h.color = computeShading(p, n, t, r, sid);
         return h;
     }
 	else return background;
 }
 
-Hit rayIntersectsCylinder(Ray r, Shape s) {
-	float ti = lightRayIntersectsCylinder(r, s);
+Hit rayIntersectsCylinder( Ray r, int sid ) {
+	float ti = lightRayIntersectsCylinder(r, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
         vec3 p = h.t * r.dir + r.origin;
-        vec3 pq = p - s.p;
-        float hval = dot(pq, s.axis[0]);
+        vec3 pq = p - shapes[sid].p;
+        float hval = dot(pq, shapes[sid].axis[0]);
         // normal at hit point
-		vec3 n = normalize(pq - hval*s.axis[0]);
+		vec3 n = normalize(pq - hval*shapes[sid].axis[0]);
         vec2 t = vec2(0, 0);
         // dummy
-		h.color = computeShading(p, n, t, r, s);
+		h.color = computeShading(p, n, t, r, sid);
         return h;
     }
 	else return background;
 }
 
-Hit rayIntersectsHyperboloid(Ray r, Shape s) {
+Hit rayIntersectsHyperboloid(Ray r, int sid) {
 	Hit h;
 	return h;
 }
 
-Hit rayIntersectsShape(Ray r, Shape s) {
-    if(s.type == SPHERE) return rayIntersectsSphere(r, s);
-    else if( s.type == PLANE ) return rayIntersectsPlane(r, s);
-	else if( s.type == ELLIPSOID ) return rayIntersectsEllipsoid(r, s);
-	else if( s.type == CONE ) return rayIntersectsCone(r, s);
-	else if( s.type == CYLINDER ) return rayIntersectsCylinder(r, s);	
-	else if( s.type == HYPERBOLOID ) return rayIntersectsHyperboloid(r, s);
+Hit rayIntersectsShape(Ray r, int sid) {
+	int stype = shapes[sid].type;
+    if( stype == SPHERE ) return rayIntersectsSphere(r, sid);
+    else if( stype == PLANE ) return rayIntersectsPlane(r, sid);
+	else if( stype == ELLIPSOID ) return rayIntersectsEllipsoid(r, sid);
+	else if( stype == CONE ) return rayIntersectsCone(r, sid);
+	else if( stype == CYLINDER ) return rayIntersectsCylinder(r, sid);	
+	else if( stype == HYPERBOLOID ) return rayIntersectsHyperboloid(r, sid);
     else return background;
 }
 
@@ -733,7 +723,7 @@ Hit rayIntersectsShapes(Ray r) {
     h.color = background.color;
 
     for(int i=0;i<shapeCount;i++) {
-        Hit hit = rayIntersectsShape(r, shapes[i]);
+        Hit hit = rayIntersectsShape(r, i);
         if( (hit.t > 0.0) && (hit.t < h.t) ) {
             h.t = hit.t;
             h.color = hit.color;
@@ -747,11 +737,11 @@ float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
+out vec4 fragColor;
+
 void main(void)
 {
     initializeCamera();
-    //initializeLights();
-    //initializeShapes();
 
     float edgeSamples = sqrt(float(AAsamples));
     float step = 1.0 / edgeSamples;
@@ -774,5 +764,6 @@ void main(void)
         color = color + vec4(hit.color, 1.0);
     }
 
-    gl_FragColor = color / AAsamples;
+    //gl_FragColor = color / AAsamples;
+	fragColor = color / AAsamples;
 }
