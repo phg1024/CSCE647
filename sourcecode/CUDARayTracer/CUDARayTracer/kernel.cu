@@ -97,7 +97,7 @@ void runCuda(struct cudaGraphicsResource **vbo_resource);
 
 void init_scene()
 {
-	// initialize the scene
+	// initialize the scene by uploading scene objects to GPU	
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -110,7 +110,9 @@ __global__ void raytrace(float3 *pos, unsigned int width, unsigned int height)
 	
 	vec3 v1((x%255) / 255.0, (y%255)/255.0, 0);
 	vec3 v2(0, (x%255) / 255.0, (y%255)/255.0);
-	vec3 v = v1.cross(v2);	
+	vec3 v(v1, v2);
+	v = v + 0.5;
+	v = 0.25 * v;
 
 	Color c( v.x, v.y, v.z, 255);
 

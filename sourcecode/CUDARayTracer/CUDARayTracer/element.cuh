@@ -10,6 +10,14 @@ public:
 		return (*this);
 	}
 
+	// cross product constructor
+	__device__ __host__ vec3(const vec3& v1, const vec3& v2) {
+		x = v1.y * v2.z - v1.z * v2.y;
+		y = v1.z * v2.x - v1.x * v2.z;
+		z = v1.x * v2.y - v1.y * v2.x;
+	}
+
+	// vector ops
 	__device__ __host__ vec3 cross(const vec3& v) {
 		return vec3(
 			y*v.z - z * v.y,
@@ -22,12 +30,33 @@ public:
 		return x * v.x + y * v.y + z * v.z;
 	}
 
+	// arithmetic ops, element wise ops
+	__device__ __host__ vec3 operator+(const vec3& v) { return vec3(x + v.x, y + v.y, z + v.z); }
+	__device__ __host__ vec3 operator-(const vec3& v) { return vec3(x - v.x, y - v.y, z - v.z); }
+	__device__ __host__ vec3 operator*(const vec3& v) { return vec3(x * v.x, y * v.y, z * v.z); }
+	__device__ __host__ vec3 operator/(const vec3& v) { return vec3(x / v.x, y / v.y, z / v.z); }
+
+	__device__ __host__ vec3 operator+(float f) { return vec3(x + f, y + f, z + f); }
+	__device__ __host__ vec3 operator-(float f) { return vec3(x - f, y - f, z - f); }
+	__device__ __host__ vec3 operator*(float f) { return vec3(x * f, y * f, z * f); }
+	__device__ __host__ vec3 operator/(float f) { return vec3(x / f, y / f, z / f); }
+
+	friend __device__ __host__ vec3 operator+(float f, const vec3& v);
+	friend __device__ __host__ vec3 operator-(float f, const vec3& v);
+	friend __device__ __host__ vec3 operator*(float f, const vec3& v);
+	friend __device__ __host__ vec3 operator/(float f, const vec3& v);
+
 	union {
-		float3 data;
+		float4 data;
 		struct {float x, y, z;};
 		struct {float r, g, b;};
 	};
 };
+
+__device__ __host__ vec3 operator+(float f, const vec3& v) { return vec3(v.x + f, v.y + f, v.z + f); }
+__device__ __host__ vec3 operator-(float f, const vec3& v) { return vec3(v.x + f, v.y + f, v.z + f); }
+__device__ __host__ vec3 operator*(float f, const vec3& v) { return vec3(v.x + f, v.y + f, v.z + f); }
+__device__ __host__ vec3 operator/(float f, const vec3& v) { return vec3(v.x + f, v.y + f, v.z + f); }
 
 class vec4 {
 	float dot(const vec4& v) {
