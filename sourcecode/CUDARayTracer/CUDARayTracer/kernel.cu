@@ -34,7 +34,12 @@ using namespace std;
 
 #include <vector_types.h>
 
-#include "element.cuh"
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+
+#include "element.h"
+#include "definitions.h"
 
 #define MAX_EPSILON_ERROR 10.0f
 #define THRESHOLD          0.30f
@@ -46,7 +51,7 @@ unsigned int window_width  = 1024;
 unsigned int window_height = 768;
 
 // vbo variables
-GLuint vbo = -1;
+GLuint vbo = 0;
 struct cudaGraphicsResource *cuda_vbo_resource;
 void *d_vbo_buffer = NULL;
 
@@ -93,41 +98,179 @@ void motion(int x, int y);
 void timerEvent(int value);
 
 // Cuda functionality
+
+extern __global__ void init_kernel(int);
+extern __global__ void raytrace(float3 *pos, Camera* cam, 
+						 int nLights, Light* lights, 
+						 int nShapes, Shape* shapes, 
+						 unsigned int width, unsigned int height,
+						 int AASamples);
+
 void runCuda(struct cudaGraphicsResource **vbo_resource);
+
+Camera cam;
+Camera* d_cam;
+thrust::host_vector<Shape> shapes;
+Shape* d_shapes;
+thrust::host_vector<Light> lights;
+Light* d_lights;
+int AASamples = 4;
+int sMode = 2;
 
 void init_scene()
 {
-	// initialize the scene by uploading scene objects to GPU	
-}
+	// initialize the camera
+	cam.pos = vec3(0, 0, -5);
+	cam.dir = vec3(0, 0, 1);
+	cam.up = vec3(0, 1, 0);
+	cam.right = vec3(1, 0, 0);
+	cam.f = 1.0;
+	cam.w = 1.0; cam.h = window_height / (float) window_width; 
 
-///////////////////////////////////////////////////////////////////////////////
-//! main entry of the ray tracing program
-///////////////////////////////////////////////////////////////////////////////
-__global__ void raytrace(float3 *pos, unsigned int width, unsigned int height)
-{
-	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-	unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+	const size_t sz = sizeof(Camera);
+	cudaMalloc((void**)&d_cam, sz);
+	cudaMemcpy(d_cam, &cam, sz, cudaMemcpyHostToDevice);
+
+	// initialize the scene by uploading scene objects to GPU
+	shapes.push_back(
+		Shape(Shape::SPHERE, 
+		vec3(0, 0, 1),	// p 
+		1.0, 0.0, 0.0,		// radius
+		vec3(),			// axis[0]
+		vec3(),			// axis[1]
+		vec3(),			// axis[2]
+		Material(
+		vec3(0.25, 0.45, 0.75),		// diffuse
+		vec3(1.0, 1.0, 1.0),		// specular
+		vec3(0.10, 0.10, 0.1),		// ambient
+		50.0f,							// shininess
+		vec3(0, 0, .4),				// kcool
+		vec3(.4, .4, 0),				// kwarm
+		0.15, 0.25))
+		);
+	shapes.push_back(
+		Shape(Shape::PLANE,
+		vec3(0, -1, 0),
+		3.0, 3.0, 0.0,
+		vec3(0, 1, 0),
+		vec3(1, 0, 0),
+		vec3(0, 0, 1),
+		Material(
+		vec3(0.75, 0.75, 0.75),
+		vec3(1, 1, 1),
+		vec3(0.05, 0.05, 0.05),
+		50.0,
+		vec3(0, 0, .4),
+		vec3(.4, .4, 0),
+		0.15, 0.25))
+		);
+	shapes.push_back(
+		Shape( Shape::SPHERE, 
+		vec3(0, 0, 1),	// p 
+		1.0, 0.0, 0.0,		// radius
+		vec3(),			// axis[0]
+		vec3(),			// axis[1]
+		vec3(),			// axis[2]
+		Material(
+		vec3(0.25, 0.5 , 1.0 ),		// diffuse
+		vec3(1.0 , 1.0 , 1.0 ),		// specular
+		vec3(0.05, 0.10, 0.15),		// ambient
+		50.0f,							// shininess
+		vec3(0, 0, .4),				// kcool
+		vec3(.4, .4, 0),				// kwarm
+		0.15, 0.25))
+		);
+	shapes.push_back(
+		Shape(Shape::SPHERE, 
+		vec3(-0.5, 0.5, -1),	// p 
+		0.25, 0.0, 0.0,		// radius
+		vec3(),			// axis[0]
+		vec3(),			// axis[1]
+		vec3(),			// axis[2]
+		Material(
+		vec3(0.75, 0.75, 0.75),		// diffuse
+		vec3(1.0 , 1.0 , 1.0),		// specular
+		vec3(0.05, 0.05, 0.05),		// ambient
+		20.0f,							// shininess
+		vec3(0, .4, 0),				// kcool
+		vec3(.4, 0, .4),				// kwarm
+		0.15, 0.25))
+		);
+	shapes.push_back(Shape( Shape::ELLIPSOID, 
+		vec3(1.0, -0.5, -0.5),	// p 
+		0.75, 0.25, 0.25,		// radius
+		vec3(1, 0, 1),			// axis[0]
+		vec3(1, 1, 0),			// axis[1]
+		vec3(0, 1, 1),			// axis[2]
+		Material(
+		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(1.0 , 1.0 , 1.0),		// specular
+		vec3(0.05, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		vec3(.9, .1, .6),				// kcool
+		vec3(.05, .45, .05)				// kwarm
+		))
+		);
 	
-	vec3 v1((x%255) / 255.0, (y%255)/255.0, 0);
-	vec3 v2(0, (x%255) / 255.0, (y%255)/255.0);
-	vec3 v(v1, v2);
-	v = v + 0.5;
-	v = 0.25 * v;
+	shapes.push_back(Shape( Shape::CYLINDER, 
+		vec3(-1.0, -0.5, 0.5),	// p 
+		0.5, 1.0, 0.25,		// radius
+		vec3(0, 1, 0),			// axis[0]
+		vec3(1, 1, 0),			// axis[1]
+		vec3(0, 1, 1),			// axis[2]
+		Material(
+		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(1.0 , 1.0 , 1.0),		// specular
+		vec3(0.05, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		vec3(.9, .1, .6),				// kcool
+		vec3(.05, .45, .05)				// kwarm
+		))
+		);
+	
+	shapes.push_back(Shape( Shape::CONE, 
+		vec3(0.5, -0.5, -1.0),	// p 
+		0.25, 1.0, 0.8,		// radius
+		vec3(0, 1, 0),			// axis[0]
+		vec3(1, 1, 0),			// axis[1]
+		vec3(0, 1, 1),			// axis[2]
+		Material(
+		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(1.0 , 1.0 , 1.0),		// specular
+		vec3(0.05, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		vec3(.9, .1, .6),				// kcool
+		vec3(.05, .45, .05)				// kwarm
+		))
+		);
 
-	Color c( v.x, v.y, v.z, 255);
+	const size_t sz_shapes = shapes.size() * sizeof(Shape);
+	cudaMalloc((void**)&d_shapes, sz_shapes);
+	cudaMemcpy(d_shapes, &(shapes[0]), sz_shapes, cudaMemcpyHostToDevice);
 
-	// write output vertex
-	pos[y*width+x] = make_float3(x, y, c.toFloat());
+	lights.push_back(Light(Light::POINT, 0.75, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10)));
+	lights.push_back(Light(Light::POINT, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10)));
+	lights.push_back(Light(Light::DIRECTIONAL, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10/sqrtf(200.f), 10/sqrtf(200.f))));
+
+	const size_t sz_lights = lights.size() * sizeof(Light);
+	cudaMalloc((void**)&d_lights, sz_lights);
+	cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
 }
-
 
 void launch_kernel(float3 *pos, unsigned int mesh_width,
-				   unsigned int mesh_height, float time)
+				   unsigned int mesh_height, int sMode)
 {
+	// update camera info
+	cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice);
+	init_kernel<<< 1, 1 >>>(sMode);
+
 	// execute the kernel
 	dim3 block(8, 8, 1);
 	dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
-	raytrace<<< grid, block>>>(pos, window_width, window_height);
+	raytrace<<< grid, block>>>(pos, d_cam, 
+		lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
+		shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+		window_width, window_height, AASamples);
 }
 
 bool checkHW(char *name, const char *gpuType, int dev)
@@ -397,7 +540,7 @@ void runCuda(struct cudaGraphicsResource **vbo_resource)
 	//    dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
 	//    kernel<<< grid, block>>>(dptr, mesh_width, mesh_height, g_fAnim);
 
-	launch_kernel(dptr, window_width, window_height, g_fAnim);
+	launch_kernel(dptr, window_width, window_height, sMode);
 
 	// unmap buffer object
 	checkCudaErrors(cudaGraphicsUnmapResources(1, vbo_resource, 0));
@@ -483,9 +626,7 @@ void display()
 	// set view matrix
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glTranslatef(0.0, 0.0, translate_z);
-	glRotatef(rotate_x, 1.0, 0.0, 0.0);
-	glRotatef(rotate_y, 0.0, 1.0, 0.0);
+	glTranslatef(0.0, 0.0, -1.0);
 
 	// render from the vbo
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -520,6 +661,10 @@ void cleanup()
 	{
 		deleteVBO(&vbo, cuda_vbo_resource);
 	}
+
+	cudaFree(d_cam);
+	cudaFree(d_shapes);
+	cudaFree(d_lights);
 }
 
 
@@ -530,6 +675,12 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 {
 	switch (key)
 	{
+	case '1':
+	case '2':
+	case '3':
+		sMode = key - '0';
+		glutPostRedisplay();
+		break;
 	case (27) :
 		exit(EXIT_SUCCESS);
 		break;
@@ -562,12 +713,12 @@ void motion(int x, int y)
 
 	if (mouse_buttons & 1)
 	{
-		rotate_x += dy * 0.2f;
-		rotate_y += dx * 0.2f;
+		cam.pos.x += dx * 0.02f;
+		cam.pos.y -= dy * 0.02f;
 	}
 	else if (mouse_buttons & 4)
 	{
-		translate_z += dy * 0.01f;
+		cam.pos.z += dy * 0.01f;
 	}
 
 	mouse_old_x = x;
