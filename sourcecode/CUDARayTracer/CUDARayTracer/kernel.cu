@@ -40,6 +40,7 @@ using namespace std;
 
 #include "element.h"
 #include "definitions.h"
+#include "trackball.h"
 
 #define MAX_EPSILON_ERROR 10.0f
 #define THRESHOLD          0.30f
@@ -47,21 +48,20 @@ using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
 // constants
-unsigned int window_width  = 1024;
-unsigned int window_height = 768;
+unsigned int window_width  = 800;
+unsigned int window_height = 600;
 
 // vbo variables
 GLuint vbo = 0;
 struct cudaGraphicsResource *cuda_vbo_resource;
 void *d_vbo_buffer = NULL;
 
-float g_fAnim = 0.0;
-
 // mouse controls
 int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
 float rotate_x = 0.0, rotate_y = 0.0;
 float translate_z = -3.0;
+TrackBall tball;
 
 StopWatchInterface *timer = NULL;
 
@@ -116,6 +116,7 @@ thrust::host_vector<Light> lights;
 Light* d_lights;
 int AASamples = 4;
 int sMode = 2;
+//TrackBall trackball;
 
 void init_scene()
 {
@@ -260,12 +261,29 @@ void init_scene()
 void launch_kernel(float3 *pos, unsigned int mesh_width,
 				   unsigned int mesh_height, int sMode)
 {
-	// update camera info
-	cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice);
+	// update camera info	
+	mat4 mat(tball.getInverseMatrix());
+	mat = mat.trans();
+
+	vec3 camPos = cam.pos;
+	vec3 camDir = cam.dir;
+	vec3 camUp = cam.up;
+
+	camPos = (mat * (camPos / tball.getScale()));
+	camDir = (mat * camDir);
+	camUp = (mat * camUp);
+
+	Camera caminfo = cam;
+	caminfo.dir = camDir;
+	caminfo.up = camUp;
+	caminfo.pos = camPos;
+	caminfo.right = -caminfo.dir.cross(caminfo.up);
+	
+	cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 	init_kernel<<< 1, 1 >>>(sMode);
 
 	// execute the kernel
-	dim3 block(8, 8, 1);
+	dim3 block(16, 16, 1);
 	dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
 	raytrace<<< grid, block>>>(pos, d_cam, 
 		lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
@@ -411,6 +429,8 @@ void showCUDAMemoryUsage() {
 
 void resize(int w, int h) 
 {
+	tball.reshape(w, h);
+
 	if( w == window_width &&  h == window_height ) return;
 
 	window_width = w, window_height = h;
@@ -463,6 +483,9 @@ bool initGL(int *argc, char **argv)
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(0, window_width, 0, window_height, 0.1, 10.0);
+
+	tball.init();
+	tball.setSceneScale(1.0);
 
 	SDK_CHECK_ERROR_GL();
 
@@ -534,11 +557,6 @@ void runCuda(struct cudaGraphicsResource **vbo_resource)
 	checkCudaErrors(cudaGraphicsResourceGetMappedPointer((void **)&dptr, &num_bytes,
 		*vbo_resource));
 	//printf("CUDA mapped VBO: May access %ld bytes\n", num_bytes);
-
-	// execute the kernel
-	//    dim3 block(8, 8, 1);
-	//    dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
-	//    kernel<<< grid, block>>>(dptr, mesh_width, mesh_height, g_fAnim);
 
 	launch_kernel(dptr, window_width, window_height, sMode);
 
@@ -641,8 +659,6 @@ void display()
 
 	glutSwapBuffers();
 
-	g_fAnim += 0.01f;
-
 	sdkStopTimer(&timer);
 	computeFPS();
 }
@@ -701,6 +717,14 @@ void mouse(int button, int state, int x, int y)
 		mouse_buttons = 0;
 	}
 
+	if (mouse_buttons & 1)
+	{
+		tball.mouse_rotate(window_width - x, window_height-y);
+	}
+	else if (mouse_buttons & 4)
+	{		
+	}
+
 	mouse_old_x = x;
 	mouse_old_y = y;
 }
@@ -713,12 +737,11 @@ void motion(int x, int y)
 
 	if (mouse_buttons & 1)
 	{
-		cam.pos.x += dx * 0.02f;
-		cam.pos.y -= dy * 0.02f;
+		tball.motion_rotate(window_width - x, window_height-y);
 	}
 	else if (mouse_buttons & 4)
 	{
-		cam.pos.z += dy * 0.01f;
+		tball.wheel( y - mouse_old_y );
 	}
 
 	mouse_old_x = x;
