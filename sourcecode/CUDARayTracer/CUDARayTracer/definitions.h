@@ -89,18 +89,21 @@ public:
 	__device__ __host__ Material(){}
 	__device__ __host__ Material(
 		vec3 diffuse, vec3 specular, vec3 ambient, float shininess,
-		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f
+		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
+		float ks = 1.0, float kr = 0.0, float kf = 0.0
 		):
 		ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess),
 		kcool(kcool), kwarm(kwarm), alpha(alpha), beta(beta)
-	{}
+	{
+		Ks = ks; Kr = kr; Kf = kf;
+		}
 	__device__ __host__ Material(const Material& m):
 		emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess),
-		kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta)
+		Ks(m.Ks), Kr(m.Kr), Kf(m.Kf), kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta)
 	{}
 	__device__ __host__ Material& operator=(const Material& m) {
 		emission = m.emission; ambient = m.ambient; diffuse = m.diffuse; specular = m.specular;
-		shininess = m.shininess; kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
+		shininess = m.shininess; Ks = m.Ks; Kr = m.Kr; Kf = m.Kf; kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
 
 		return (*this);
 	}
@@ -112,6 +115,7 @@ public:
 	vec3 diffuse;
 	vec3 specular;
 
+	float Ks, Kr, Kf;
 	float shininess;
 
 	vec3 kcool, kwarm;
@@ -125,6 +129,9 @@ struct d_Material {
 		diffuse = m.diffuse.data;
 		specular = m.specular.data;
 
+		Ks = m.Ks;
+		Kr = m.Kr;
+		Kf = m.Kf;
 		shininess = m.shininess;
 		kcool = m.kcool.data;
 		kwarm = m.kwarm.data;
@@ -138,6 +145,7 @@ struct d_Material {
 	float3 diffuse;
 	float3 specular;
 
+	float Ks, Kr, Kf;
 	float shininess;
 
 	float3 kcool, kwarm;
@@ -160,6 +168,7 @@ public:
 		  vec3 a0, vec3 a1, vec3 a2,
 		  Material mater):
 	t(t), p(p), material(mater), hasTexture(false), texId(-1), hasNormalMap(false), normalTexId(-1) {
+		a0 = a0.normalized(); a1 = a1.normalized(); a2 = a2.normalized();
 		axis[0] = a0; axis[1] = a1; axis[2] = a2;
 		radius[0] = r0; radius[1] = r1; radius[2] = r2;
 
@@ -232,12 +241,13 @@ struct d_Shape {
 	int normalTexId;
 };
 
-struct Hit {
-	float3 color;
-	float t;
-};
-
 struct Ray {
 	float3 origin;
 	float3 dir;
+	int level;
+};
+
+struct Hit {
+	float3 color;
+	float t;
 };

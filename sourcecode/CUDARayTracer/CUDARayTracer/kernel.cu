@@ -182,19 +182,20 @@ void init_scene()
 		);
 	shapes.push_back(
 		Shape( Shape::SPHERE, 
-		vec3(0, 0, 1),	// p 
-		1.0, 0.0, 0.0,		// radius
+		vec3(0, -0.5, -0.5),	// p 
+		0.5, 0.0, 0.0,		// radius
 		vec3(),			// axis[0]
 		vec3(),			// axis[1]
 		vec3(),			// axis[2]
 		Material(
-		vec3(0.25, 0.5 , 1.0 ),		// diffuse
+		vec3(0.95, 0.25 , 0.0 ),		// diffuse
 		vec3(1.0 , 1.0 , 1.0 ),		// specular
 		vec3(0.05, 0.10, 0.15),		// ambient
 		50.0f,							// shininess
 		vec3(0, 0, .4),				// kcool
 		vec3(.4, .4, 0),				// kwarm
-		0.15, 0.25))
+		0.15, 0.25,
+		0.75, 0.25, 0.0))
 		);
 	shapes.push_back(
 		Shape(Shape::SPHERE, 
@@ -213,8 +214,8 @@ void init_scene()
 		0.15, 0.25))
 		);
 	shapes.push_back(Shape( Shape::ELLIPSOID, 
-		vec3(1.0, -0.5, -0.5),	// p 
-		0.75, 0.25, 0.25,		// radius
+		vec3(1.25, -0.5, -0.5),	// p 
+		0.5, 0.45, 0.35,		// radius
 		vec3(1, 0, 1),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
@@ -223,24 +224,28 @@ void init_scene()
 		vec3(1.0 , 1.0 , 1.0),		// specular
 		vec3(0.05, 0.05, 0.05),		// ambient
 		100.0f,							// shininess
-		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05)				// kwarm
+		vec3(.2, .9, .6),				// kcool
+		vec3(.05, .35, .95),				// kwarm
+		0.25, 0.25,
+		0.05, 0.95, 0.0
 		))
 		);
 	
 	shapes.push_back(Shape( Shape::CYLINDER, 
-		vec3(-1.0, -0.5, 0.5),	// p 
+		vec3(-2.0, -0.5, -0.5),	// p 
 		0.5, 1.0, 0.25,		// radius
-		vec3(0, 1, 0),			// axis[0]
+		vec3(1, 0, 0),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
 		Material(
-		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(0.35, 0.95, 0.25),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
 		vec3(0.05, 0.05, 0.05),		// ambient
 		100.0f,							// shininess
 		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05)				// kwarm
+		vec3(.05, .45, .05),				// kwarm
+		0.25, 0.15,
+		0.5, 0.5, 0.0
 		))
 		);
 	
@@ -569,6 +574,13 @@ bool runTest(int argc, char **argv, char *ref_file)
 		cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
 	}
 
+	size_t nStack;
+	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
+	cout << "stack size = " << nStack << endl;
+	cudaDeviceSetLimit(cudaLimitStackSize, 65536);
+	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
+	cout << "stack size = " << nStack << endl;
+
 	// create VBO
 	createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
 
@@ -769,6 +781,7 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 	}
 }
 
+int AASamples_old;
 ////////////////////////////////////////////////////////////////////////////////
 //! Mouse event handlers
 ////////////////////////////////////////////////////////////////////////////////
@@ -777,10 +790,13 @@ void mouse(int button, int state, int x, int y)
 	if (state == GLUT_DOWN)
 	{
 		mouse_buttons |= 1<<button;
+		AASamples_old = AASamples;
+		AASamples = 1;
 	}
 	else if (state == GLUT_UP)
 	{
 		mouse_buttons = 0;
+		AASamples = AASamples_old;
 	}
 
 	if (mouse_buttons & 1)
@@ -793,6 +809,7 @@ void mouse(int button, int state, int x, int y)
 
 	mouse_old_x = x;
 	mouse_old_y = y;
+	glutPostRedisplay();
 }
 
 void motion(int x, int y)

@@ -469,7 +469,6 @@ __device__ float3 goochShading(float3 v, float3 N, float2 t, Ray r, d_Shape* sha
             float EdotN = dot(E, N);
         if( EdotN >= 0.2 ) c = c + fminf(kfinal + Ispec, 1.0) * lights[i].intensity;
     }
-
     return c;
 }
 
@@ -486,12 +485,13 @@ __device__ float3 computeShading(float3 p, float3 n, float2 t, Ray r, d_Shape* s
 __device__ __inline__ Hit background() {
 	Hit h;
 	h.t = -1.0;
-	h.color = make_float3(0.75, 0.75, 0.75);
+	h.color = make_float3(0.05, 0.05, 0.05);
 	return h;
 }
 
 __device__ Ray generateRay(Camera* cam, float u, float v) {
 	Ray r;
+	r.level = 0;
 	r.origin = cam->pos.data;
 
     // find the intersection point on the canvas
@@ -508,6 +508,23 @@ __device__ float rand(float x, float y){
   return val - floorf(val);
 }
 
+__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights);
+
+__device__ Hit computeReflectedHit(Ray r, float3 p, float3 n, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
+	Ray rr;
+	rr.dir = reflect(r.dir, n);
+	rr.origin = p;
+	rr.level = r.level + 1;
+	return rayIntersectsShapes(rr, nShapes, shapes, nLights, lights);
+}
+
+__device__ Hit computeRefractedHit(Ray r, float3 p, float3 n, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
+	Hit h;
+	h.color = make_float3(0, 0, 0);
+	h.t = -1.0;
+	return h;
+}
+
 // ray intersection test with shading computation
 __device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
 	float ti = lightRayIntersectsSphere(r, shapes, sid);
@@ -522,7 +539,19 @@ __device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, d_Light*
         // hack, move the point a little bit outer
 		p = shapes[sid].p + (shapes[sid].radius[0] + 1e-6) * n;
         float2 t = spheremap(n);
+		
+		// shade color
 		h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
+
+		// reflected ray
+		Hit rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		// refracted ray
+		Hit fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		h.color = mix(h.color, rh.color, fh.color, 
+			shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
+			
         return h;
     }
 	else return background();
@@ -542,6 +571,16 @@ __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, d_Light* 
         else {
             float2 t = clamp((make_float2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]) + make_float2(1.0, 1.0))*0.5, 0.0, 1.0);
             h.color = computeShading(p, shapes[sid].axis[0], t, r, shapes, nShapes, lights, nLights, sid);
+
+			// reflected ray
+			Hit rh = computeReflectedHit(r, p, shapes[sid].axis[0], nShapes, shapes, nLights, lights);
+
+			// refracted ray
+			Hit fh = computeRefractedHit(r, p, shapes[sid].axis[0], nShapes, shapes, nLights, lights);
+
+			h.color = mix(h.color, rh.color, fh.color, 
+				shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
+
             return h;
         }
     }
@@ -559,6 +598,16 @@ __device__ Hit rayIntersectsEllipsoid(Ray r, d_Shape* shapes, int nShapes, d_Lig
 		float3 n = normalize(2.0 * mul(shapes[sid].m, (p - shapes[sid].p)));
         float2 t = spheremap(n);
         h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
+
+		// reflected ray
+		Hit rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		// refracted ray
+		Hit fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		h.color = mix(h.color, rh.color, fh.color, 
+			shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
+
         return h;
     }
 
@@ -576,8 +625,18 @@ __device__ Hit rayIntersectsCone(Ray r, d_Shape* shapes, int nShapes, d_Light* l
         // normal at hit point
 		float3 n = normalize(cross(cross(shapes[sid].axis[0], pq), shapes[sid].axis[0]));
         float2 t = make_float2(0, 0);
-        // dummy
+
 		h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
+
+		// reflected ray
+		Hit rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		// refracted ray
+		Hit fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		h.color = mix(h.color, rh.color, fh.color, 
+			shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
+
         return h;
     }
 	else return background();
@@ -594,8 +653,18 @@ __device__ Hit rayIntersectsCylinder(Ray r, d_Shape* shapes, int nShapes, d_Ligh
         // normal at hit point
 		float3 n = normalize(pq - hval*shapes[sid].axis[0]);
         float2 t = make_float2(0, 0);
-        // dummy
+
 		h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
+
+		// reflected ray
+		Hit rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		// refracted ray
+		Hit fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
+
+		h.color = mix(h.color, rh.color, fh.color, 
+			shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
+
         return h;
     }
 	else return background();
@@ -619,6 +688,8 @@ __device__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, d_Light* 
 }
 
 __device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
+	if( r.level > 2 ) return background();
+
 	Hit h;
 	h.t = 1e10;
 	h.color = background().color;
@@ -685,7 +756,6 @@ __global__ void raytrace(float3 *pos, Camera* cam,
 
 		Ray r = generateRay(cam, u, v);
 
-		//Hit h = rayIntersectsShapes(r, nShapes, shapes, nLights, lights);
 		Hit h = rayIntersectsShapes(r, inShapesCount, inShapes, inLightsCount, inLights);
 
 		c.c = c.c + vec4(clamp(h.color, 0.0, 1.0), 1.0);

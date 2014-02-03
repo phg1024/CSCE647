@@ -12,7 +12,6 @@ __host__ __device__ __inline__ float3 mul(float m[9], float3 v) {
 		);
 }
 
-
 __host__ __device__ __inline__ float3 fminf(float3 v, float f) {
 	return make_float3(fminf(v.x, f), fminf(v.y, f), fminf(v.z, f));
 }
@@ -23,6 +22,10 @@ __host__ __device__ __inline__ float3 fmaxf(float3 v, float f) {
 
 __host__ __device__ __inline__ float3 mix(float3 u, float3 v, float f) {
 	return u * (1.0f-f) + v * f;
+}
+
+__host__ __device__ __inline__ float3 mix(float3 u, float3 v, float3 w, float alpha, float beta, float gamma) {
+	return alpha * u + beta * v + gamma * w;
 }
 
 __host__ __device__ __inline__ float3 step(float3 edge, float3 u) {
