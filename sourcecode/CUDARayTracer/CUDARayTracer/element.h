@@ -1,8 +1,10 @@
 #pragma once
 
+
 class vec2 {
 public:
 	__device__ __host__ vec2():x(0), y(0){}
+	__device__ __host__ vec2(const float2& v):data(v){}
 	__device__ __host__ vec2(float x, float y):x(x), y(y){}
 	__device__ __host__ vec2(const vec2& v):x(v.x),y(v.y){}
 	__device__ __host__ vec2& operator=(const vec2& v){
@@ -80,6 +82,7 @@ __device__ __host__ __inline__ vec2 operator/(float f, const vec2& v) { return v
 class vec3 {
 public:
 	__device__ __host__ vec3():x(0), y(0), z(0){}
+	__device__ __host__ vec3(const float3& v):x(v.x), y(v.y), z(v.z){}
 	__device__ __host__ vec3(float x, float y, float z):x(x), y(y), z(z){}
 	__device__ __host__ vec3(const vec3& v):x(v.x),y(v.y), z(v.z){}
 	__device__ __host__ vec3& operator=(const vec3& v){
@@ -159,8 +162,8 @@ public:
 
 	union {
 		float3 data;
-		struct {float x, y, z;};
-		struct {float r, g, b;};
+		struct {float x, y, z, w;};
+		struct {float r, g, b, a;};
 	};
 };
 
@@ -172,6 +175,7 @@ __device__ __host__ __inline__ vec3 operator/(float f, const vec3& v) { return v
 class vec4 {
 public:
 	__device__ __host__ vec4(){}
+	__device__ __host__ vec4(const float4& v):data(v){}
 	__device__ __host__ vec4(float x, float y, float z, float w):x(x), y(y), z(z), w(w){}
 	__device__ __host__ vec4(const vec4& v):x(v.x), y(v.y), z(v.z), w(v.w){}
 	__device__ __host__ vec4(const vec3& v, float a):x(v.x), y(v.y), z(v.z), w(a){}

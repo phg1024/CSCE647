@@ -52,7 +52,36 @@ public:
 	// spot light
 	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, vec3 direction, float expo, float cutoff):
 		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), dir(direction), spotExponent(expo), spotCutOff(cutoff){}
+};
 
+struct d_Light {
+	__device__ void init(const Light& m) {
+		t = m.t;
+		intensity = m.intensity;
+		pos = m.pos.data;
+		dir = m.dir.data;
+		spotExponent = m.spotExponent;
+		spotCutOff = m.spotCutOff;
+
+		ambient = m.ambient.data;
+		diffuse = m.diffuse.data;
+		specular = m.specular.data;
+		attenuation = m.attenuation.data;
+	}
+
+	Light::LightType t;
+	float intensity;
+	float3 pos;
+	float3 dir;
+
+	float spotExponent;
+	float spotCutOff;
+
+	float3 ambient;
+	float3 diffuse;
+	float3 specular;
+
+	float3 attenuation;
 };
 
 class Material {
@@ -86,6 +115,32 @@ public:
 	float shininess;
 
 	vec3 kcool, kwarm;
+	float alpha, beta;
+};
+
+struct d_Material {
+	__device__ void init(const Material& m) {
+		emission = m.emission.data;
+		ambient = m.ambient.data;
+		diffuse = m.diffuse.data;
+		specular = m.specular.data;
+
+		shininess = m.shininess;
+		kcool = m.kcool.data;
+		kwarm = m.kwarm.data;
+
+		alpha = m.alpha;
+		beta = m.beta;
+	}
+
+	float3 emission;
+	float3 ambient;
+	float3 diffuse;
+	float3 specular;
+
+	float shininess;
+
+	float3 kcool, kwarm;
 	float alpha, beta;
 };
 
@@ -140,12 +195,49 @@ public:
 	int normalTexId;
 };
 
+struct d_Shape {
+	Shape::ShapeType t;
+
+	__device__ void init(const Shape& s) {
+		t = s.t;
+		p = s.p.data;
+		axis[0] = s.axis[0].data;
+		axis[1] = s.axis[1].data;
+		axis[2] = s.axis[2].data;
+		
+		radius[0] = s.radius[0];
+		radius[1] = s.radius[1];
+		radius[2] = s.radius[2];
+
+		for(int i=0;i<9;i++) m[i] = s.m(i);
+		material.init(s.material);
+
+		hasTexture = s.hasTexture;
+		texId = s.texId;
+		hasNormalMap = s.hasNormalMap;
+		normalTexId = s.normalTexId;
+	}
+
+	// geometry
+	float3 p;
+	float3 axis[3];
+	float radius[3];
+	float m[9];
+
+	d_Material material;
+
+	bool hasTexture;
+	int texId;
+	bool hasNormalMap;
+	int normalTexId;
+};
+
 struct Hit {
-	vec3 color;
+	float3 color;
 	float t;
 };
 
 struct Ray {
-	vec3 origin;
-	vec3 dir;
+	float3 origin;
+	float3 dir;
 };

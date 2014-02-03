@@ -43,13 +43,14 @@ using namespace std;
 #include "trackball.h"
 
 #define MAX_EPSILON_ERROR 10.0f
-#define THRESHOLD          0.30f
-#define REFRESH_DELAY     10 //ms
+#define THRESHOLD         0.30f
+#define REFRESH_DELAY     25 //ms
 
 ////////////////////////////////////////////////////////////////////////////////
 // constants
-unsigned int window_width  = 800;
-unsigned int window_height = 600;
+unsigned int edgeX = 8, edgeY = 8;
+unsigned int window_width  = 768 + edgeX;
+unsigned int window_height = 512 + edgeY;
 
 // vbo variables
 GLuint vbo = 0;
@@ -99,12 +100,26 @@ void timerEvent(int value);
 
 // Cuda functionality
 
-extern __global__ void init_kernel(int);
 extern __global__ void raytrace(float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
 						 unsigned int width, unsigned int height,
-						 int AASamples);
+						 int sMode, int AASamples);
+
+extern __global__ void raytrace2(float3 *pos, Camera* cam, 
+						 int nLights, Light* lights, 
+						 int nShapes, Shape* shapes, 
+						 unsigned int width, unsigned int height,
+						 int sMode, int AASamples, 
+						 int gx, int gy, int gmx, int gmy);
+
+extern __global__ void initCurrentBlock(int v);
+extern __global__ void raytrace3(float3 *pos, Camera* cam, 
+						 int nLights, Light* lights, 
+						 int nShapes, Shape* shapes, 
+						 unsigned int width, unsigned int height,
+						 int sMode, int AASamples, 
+						 int bmx, int bmy, int tlb);
 
 void runCuda(struct cudaGraphicsResource **vbo_resource);
 
@@ -116,7 +131,7 @@ thrust::host_vector<Light> lights;
 Light* d_lights;
 int AASamples = 4;
 int sMode = 2;
-//TrackBall trackball;
+int kernelIdx = 0;
 
 void init_scene()
 {
@@ -279,16 +294,50 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	caminfo.pos = camPos;
 	caminfo.right = -caminfo.dir.cross(caminfo.up);
 	
-	cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
-	init_kernel<<< 1, 1 >>>(sMode);
+	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
-	// execute the kernel
-	dim3 block(16, 16, 1);
-	dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
-	raytrace<<< grid, block>>>(pos, d_cam, 
-		lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
-		shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
-		window_width, window_height, AASamples);
+	switch( kernelIdx ) {
+	case 0:{
+		// execute the kernel
+		dim3 block(8, 8, 1);
+		dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
+		raytrace<<< grid, block >>>(pos, d_cam,
+			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
+			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+			window_width, window_height, sMode, AASamples);
+		break;
+		   }
+	case 1:{
+		dim3 block(8, 8, 1);
+		dim3 group(32, 32, 1);
+		dim3 grid(group.x, group.y, 1);
+		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
+
+		raytrace2<<< grid, block >>>(pos, d_cam,
+			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
+			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+			window_width, window_height, sMode, AASamples, 
+			group.x, group.y, groupCount.x, groupCount.y);
+		break;
+		   }
+	case 2:{
+		dim3 block(8, 8, 1);
+		dim3 grid(8, 8, 1);
+
+		dim3 blockCount(ceil(window_width/(float)block.x), ceil(window_height/(float)block.y ), 1);
+
+		unsigned totalBlocks = blockCount.x*blockCount.y;
+		//cout << "total blocks = " << totalBlocks << endl;
+
+		initCurrentBlock<<<1, 1>>>(0);
+		raytrace3<<< grid, block >>>(pos, d_cam,
+			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
+			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+			window_width, window_height, sMode, AASamples, 
+			blockCount.x, blockCount.y, totalBlocks);
+		break;
+		   }
+	}
 }
 
 bool checkHW(char *name, const char *gpuType, int dev)
@@ -386,10 +435,7 @@ int main(int argc, char **argv)
 	printf("\n");
 
 	runTest(argc, argv, ref_file);
-
-	cudaDeviceReset();
-	printf("program completed, returned %s\n", (g_TotalErrors == 0) ? "OK" : "ERROR!");
-	exit(g_TotalErrors == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	return 0;
 }
 
 void computeFPS()
@@ -434,6 +480,8 @@ void resize(int w, int h)
 	if( w == window_width &&  h == window_height ) return;
 
 	window_width = w, window_height = h;
+	// camera
+	cam.h = h / (float) w;
 
 	createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
 
@@ -454,13 +502,13 @@ void resize(int w, int h)
 bool initGL(int *argc, char **argv)
 {
 	glutInit(argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE );
 	glutInitWindowSize(window_width, window_height);
 	glutCreateWindow("CUDA Ray Tracer");
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 	glutMotionFunc(motion);
-	glutTimerFunc(REFRESH_DELAY, timerEvent,0);
+	//glutTimerFunc(REFRESH_DELAY, timerEvent,0);
 
 	// initialize necessary OpenGL extensions
 	glewInit();
@@ -598,6 +646,7 @@ void createVBO(GLuint *vbo, struct cudaGraphicsResource **vbo_res,
 		glGenBuffers(1, vbo);
 	}
 	else {
+		cout << "unregister vbo ..." << endl;
 		cudaGraphicsUnregisterResource(*vbo_res);
 	}
 	glBindBuffer(GL_ARRAY_BUFFER, *vbo);
@@ -657,7 +706,8 @@ void display()
 	glDrawArrays(GL_POINTS, 0, window_width * window_height);
 	glDisableClientState(GL_VERTEX_ARRAY);
 
-	glutSwapBuffers();
+	//glutSwapBuffers();
+	glFlush();
 
 	sdkStopTimer(&timer);
 	computeFPS();
@@ -681,6 +731,10 @@ void cleanup()
 	cudaFree(d_cam);
 	cudaFree(d_shapes);
 	cudaFree(d_lights);
+
+	cudaDeviceReset();
+	printf("program completed, returned %s\n", (g_TotalErrors == 0) ? "OK" : "ERROR!");
+	exit(g_TotalErrors == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 
@@ -697,8 +751,20 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 		sMode = key - '0';
 		glutPostRedisplay();
 		break;
+	case 's':
+	case 'S':
+		cout << "Please input number of samples:" << endl;
+		cin >> AASamples;
+		glutPostRedisplay();
+		break;
+	case 'k':
+	case 'K':
+		kernelIdx = (kernelIdx + 1) % 3;
+		glutPostRedisplay();
+		break;
 	case (27) :
-		exit(EXIT_SUCCESS);
+		cleanup();
+		glutLeaveMainLoop();
 		break;
 	}
 }
@@ -746,4 +812,6 @@ void motion(int x, int y)
 
 	mouse_old_x = x;
 	mouse_old_y = y;
+
+	glutPostRedisplay();
 }
