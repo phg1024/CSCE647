@@ -273,7 +273,12 @@ public:
 		return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 	}
 
-	__device__ __host__ mat3 operator+(const mat3& m) {
+	__device__ __host__ mat3 operator-() const {
+		return mat3(-elem[0], -elem[1], -elem[2], -elem[3], -elem[4], -elem[5], 
+			-elem[6], -elem[7], -elem[8]);
+	}
+
+	__device__ __host__ mat3 operator+(const mat3& m) const {
 		return mat3(
 			elem[0]+m(0), elem[1]+m(1), elem[2]+m(2),
 			elem[3]+m(3), elem[4]+m(4), elem[5]+m(5),
@@ -283,9 +288,9 @@ public:
 
 	__device__ __host__ mat3 operator-(const mat3& m) {
 		return mat3(
-			elem[0]+m(0), elem[1]+m(1), elem[2]+m(2),
-			elem[3]+m(3), elem[4]+m(4), elem[5]+m(5),
-			elem[6]+m(6), elem[7]+m(7), elem[8]+m(8)
+			elem[0]-m(0), elem[1]-m(1), elem[2]-m(2),
+			elem[3]-m(3), elem[4]-m(4), elem[5]-m(5),
+			elem[6]-m(6), elem[7]-m(7), elem[8]-m(8)
 			);
 	}
 

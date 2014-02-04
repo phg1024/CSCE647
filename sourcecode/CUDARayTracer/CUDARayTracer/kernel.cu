@@ -147,6 +147,7 @@ void init_scene()
 	cudaMalloc((void**)&d_cam, sz);
 	cudaMemcpy(d_cam, &cam, sz, cudaMemcpyHostToDevice);
 
+	
 	// initialize the scene by uploading scene objects to GPU
 	shapes.push_back(
 		Shape(Shape::SPHERE, 
@@ -249,19 +250,58 @@ void init_scene()
 		))
 		);
 	
+	
 	shapes.push_back(Shape( Shape::CONE, 
-		vec3(0.5, -0.5, -1.0),	// p 
-		0.25, 1.0, 0.8,		// radius
+		vec3(0.5, -0.5, -1.5),	// p 
+		0.25, 0.75, 0.3,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
 		Material(
 		vec3(0.75, 0.75, 0.25),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.05, 0.05, 0.05),		// ambient
+		vec3(0.075, 0.05, 0.05),		// ambient
 		100.0f,							// shininess
 		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05)				// kwarm
+		vec3(.05, .45, .05),				// kwarm
+		0.25, 0.15,
+		0.8, 0.2
+		))
+		);
+
+	shapes.push_back(Shape( Shape::HYPERBOLOID, 
+		vec3(-0.5, 0.5, -2.0),	// p 
+		0.2, 0.1, 0.1,		// radius
+		vec3(0, 1, 0),			// axis[0]
+		vec3(1, 0, 0),			// axis[1]
+		vec3(0, 0, 1),			// axis[2]
+		Material(
+		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(1.0 , 1.0 , 1.0),		// specular
+		vec3(0.075, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		vec3(.9, .1, .6),				// kcool
+		vec3(.05, .45, .05),				// kwarm
+		0.25, 0.15,
+		0.8, 0.2
+		))
+		);
+
+	shapes.push_back(Shape( Shape::HYPERBOLOID2, 
+		vec3(1.5, 0.5, -2.0),	// p 
+		0.125, 0.1, 0.1,		// radius
+		vec3(0, 1, 0),			// axis[0]
+		vec3(1, 0, 0),			// axis[1]
+		vec3(0, 0, 1),			// axis[2]
+		Material(
+		vec3(0.25, 0.75, 0.75),		// diffuse
+		vec3(1.0 , 1.0 , 1.0),		// specular
+		vec3(0.075, 0.05, 0.05),		// ambient
+		100.0f,							// shininess
+		vec3(.9, .1, .6),				// kcool
+		vec3(.05, .45, .05),				// kwarm
+		0.25, 0.15,
+		0.8, 0.2
 		))
 		);
 

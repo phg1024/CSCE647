@@ -28,8 +28,17 @@ __host__ __device__ __inline__ float3 mix(float3 u, float3 v, float3 w, float al
 	return alpha * u + beta * v + gamma * w;
 }
 
+__host__ __device__ __inline__ float step(float edge, float v) {
+	return (v > edge)?1.0f:0.0;
+}
+
 __host__ __device__ __inline__ float3 step(float3 edge, float3 u) {
 	return make_float3(u.x>edge.x?1.0f:0.0, u.y>edge.y?1.0f:0.0, u.z>edge.z?1.0f:0.0);
+}
+
+__host__ __device__ __inline__ float toonify(float v, int steps) {
+	float s = 1.0 / steps;
+	return floor(v / s) * s;
 }
 
 __host__ __device__ __inline__ mat3 outerProduct(const vec3& u, const vec3& v) {

@@ -161,6 +161,7 @@ public:
 		CYLINDER,
 		CONE,
 		HYPERBOLOID,
+		HYPERBOLOID2,
 		TRIANGLE_MESH
 	};
     __device__ __host__ Shape(){}
@@ -175,7 +176,14 @@ public:
 		vec3 ratio0 = a0/r0;
 		vec3 ratio1 = a1/r1;
 		vec3 ratio2 = a2/r2;
-		m = outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
+		
+		if( t == ELLIPSOID ) m = outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
+		else if(t == HYPERBOLOID) {
+			m = -outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);		
+		}
+		else if( t == HYPERBOLOID2 ) {
+			m = outerProduct(ratio0, ratio0) - outerProduct(ratio1, ratio1) - outerProduct(ratio2, ratio2);		
+		}
 	}
 
 	__device__ __host__ Shape(const Shape& s):t(s.t), p(s.p), m(s.m), 
