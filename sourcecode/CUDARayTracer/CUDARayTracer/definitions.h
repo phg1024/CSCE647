@@ -18,7 +18,8 @@ public:
 	enum LightType {
 		POINT = 0,
 		DIRECTIONAL,
-		SPOT
+		SPOT,
+		DISK
 	};
 
 	LightType t;
@@ -55,6 +56,20 @@ public:
 };
 
 struct d_Light {
+	__device__ void init(const d_Light& m) {
+		t = m.t;
+		intensity = m.intensity;
+		pos = m.pos;
+		dir = m.dir;
+		spotExponent = m.spotExponent;
+		spotCutOff = m.spotCutOff;
+
+		ambient = m.ambient;
+		diffuse = m.diffuse;
+		specular = m.specular;
+		attenuation = m.attenuation;
+	}
+
 	__device__ void init(const Light& m) {
 		t = m.t;
 		intensity = m.intensity;

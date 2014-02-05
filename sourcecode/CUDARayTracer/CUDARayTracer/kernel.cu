@@ -20,6 +20,8 @@ using namespace std;
 #include <GL/freeglut.h>
 #endif
 
+#include "FreeImage.h"
+
 // includes, cuda
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
@@ -31,12 +33,16 @@ using namespace std;
 // CUDA helper functions
 #include <helper_cuda.h>         // helper functions for CUDA error check
 #include <helper_cuda_gl.h>      // helper functions for CUDA/GL interop
+#include <cuda_texture_types.h>
 
 #include <vector_types.h>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 #include "element.h"
 #include "definitions.h"
@@ -99,7 +105,7 @@ void motion(int x, int y);
 void timerEvent(int value);
 
 // Cuda functionality
-
+extern __global__ void bindTexture(uchar4**, int2* );
 extern __global__ void raytrace(float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
@@ -127,11 +133,40 @@ Camera cam;
 Camera* d_cam;
 thrust::host_vector<Shape> shapes;
 Shape* d_shapes;
+int textureCount = 0;
+float* texAddr[32];
+uchar4** d_texAddr;
+int2 texSize[32];
+int2* d_texSize;
+//texture<float, cudaTextureType2D, cudaReadModeElementType> texObjs[32];
 thrust::host_vector<Light> lights;
 Light* d_lights;
 int AASamples = 4;
 int sMode = 2;
 int kernelIdx = 0;
+
+int loadTexture(const char* filename) {
+	cv::Mat image = cv::imread(filename); 
+
+	//cv::imshow("texture", image);
+
+	cout << image.cols << "x" << image.rows << endl;
+	int width = image.cols, height = image.rows;
+	vector<uchar4> buffer(width*height);
+	for(int i=0;i<height;i++) {
+		for(int j=0;j<width;j++) {
+			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
+			buffer[i*width+j] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
+		}
+	}
+
+	texSize[textureCount] = make_int2(width, height);
+	const size_t sz_tex = width * height * sizeof(uchar4);
+	cudaMalloc((void**)&(texAddr[textureCount]), sz_tex);
+	cudaMemcpy(texAddr[textureCount], &buffer[0], sz_tex, cudaMemcpyHostToDevice);
+
+	return textureCount++;
+}
 
 void init_scene()
 {
@@ -165,10 +200,10 @@ void init_scene()
 		vec3(.4, .4, 0),				// kwarm
 		0.15, 0.25))
 		);
-	shapes.push_back(
-		Shape(Shape::PLANE,
+
+	Shape sp = Shape(Shape::PLANE,
 		vec3(0, -1, 0),
-		3.0, 3.0, 0.0,
+		50.0, 50.0, 0.0,
 		vec3(0, 1, 0),
 		vec3(1, 0, 0),
 		vec3(0, 0, 1),
@@ -179,8 +214,13 @@ void init_scene()
 		50.0,
 		vec3(0, 0, .4),
 		vec3(.4, .4, 0),
-		0.15, 0.25))
-		);
+		0.15, 0.25,
+		0.85, 0.15, 0.0));
+	sp.hasTexture = true;
+	sp.texId = loadTexture("./textures/chessboard.png");
+	//sp.texId = loadTexture("./textures/gabby.jpg");
+	cout << "tex id = " << sp.texId << endl;
+	shapes.push_back( sp );
 	shapes.push_back(
 		Shape( Shape::SPHERE, 
 		vec3(0, -0.5, -0.5),	// p 
@@ -252,7 +292,7 @@ void init_scene()
 	
 	
 	shapes.push_back(Shape( Shape::CONE, 
-		vec3(0.5, -0.5, -1.5),	// p 
+		vec3(0.0, -0.5, -0.5),	// p 
 		0.25, 0.75, 0.3,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
@@ -269,8 +309,9 @@ void init_scene()
 		))
 		);
 
+	
 	shapes.push_back(Shape( Shape::HYPERBOLOID, 
-		vec3(-0.5, 0.5, -2.0),	// p 
+		vec3(-1.5, 0.5, -2.0),	// p 
 		0.2, 0.1, 0.1,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
@@ -288,7 +329,7 @@ void init_scene()
 		);
 
 	shapes.push_back(Shape( Shape::HYPERBOLOID2, 
-		vec3(1.5, 0.5, -2.0),	// p 
+		vec3(2.5, 0.5, -2.0),	// p 
 		0.125, 0.1, 0.1,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
@@ -304,18 +345,28 @@ void init_scene()
 		0.8, 0.2
 		))
 		);
+	
 
 	const size_t sz_shapes = shapes.size() * sizeof(Shape);
 	cudaMalloc((void**)&d_shapes, sz_shapes);
 	cudaMemcpy(d_shapes, &(shapes[0]), sz_shapes, cudaMemcpyHostToDevice);
 
-	lights.push_back(Light(Light::POINT, 0.75, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10)));
+	lights.push_back(Light(Light::DISK, 0.5, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10)));
 	lights.push_back(Light(Light::POINT, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10)));
-	lights.push_back(Light(Light::DIRECTIONAL, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10/sqrtf(200.f), 10/sqrtf(200.f))));
+	lights.push_back(Light(Light::POINT, 0.1, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(1000, 1000, -1000)));
+	lights.push_back(Light(Light::DIRECTIONAL, 0.15, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10/sqrtf(200.f), 10/sqrtf(200.f))));
 
 	const size_t sz_lights = lights.size() * sizeof(Light);
 	cudaMalloc((void**)&d_lights, sz_lights);
 	cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
+
+	const size_t sz_texAddr = sizeof(uchar4*)*32;
+	cudaMalloc((void**)&d_texAddr, sz_texAddr);
+	cudaMemcpy(d_texAddr, &(texAddr[0]), sz_texAddr, cudaMemcpyHostToDevice);
+
+	const size_t sz_texSize = sizeof(int2)*32;
+	cudaMalloc((void**)&d_texSize, sz_texSize);
+	cudaMemcpy(d_texSize, &(texSize[0]), sz_texSize, cudaMemcpyHostToDevice);
 }
 
 void launch_kernel(float3 *pos, unsigned int mesh_width,
@@ -341,6 +392,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	
 	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
+	bindTexture<<< 1, 1 >>>(d_texAddr, d_texSize);
 	switch( kernelIdx ) {
 	case 0:{
 		// execute the kernel
@@ -360,14 +412,14 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 
 		raytrace2<<< grid, block >>>(pos, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
-			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]),
 			window_width, window_height, sMode, AASamples, 
 			group.x, group.y, groupCount.x, groupCount.y);
 		break;
 		   }
 	case 2:{
-		dim3 block(8, 8, 1);
-		dim3 grid(8, 8, 1);
+		dim3 block(16, 16, 1);
+		dim3 grid(16, 16, 1);
 
 		dim3 blockCount(ceil(window_width/(float)block.x), ceil(window_height/(float)block.y ), 1);
 
@@ -383,6 +435,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		break;
 		   }
 	}
+	cudaThreadSynchronize();
 }
 
 bool checkHW(char *name, const char *gpuType, int dev)
@@ -461,6 +514,7 @@ int findGraphicsGPU(char *name)
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
+	FreeImage_Initialise();
 	char *ref_file = NULL;
 
 	pArgc = &argc;

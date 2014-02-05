@@ -1,15 +1,28 @@
 #include <thrust/random.h>
+#include <cuda_runtime.h>
+#include <cuda_texture_types.h>
 #include <helper_math.h>    // includes cuda.h and cuda_runtime_api.h
 
 #include "definitions.h"
 #include "utils.h"
+#include "randvec.h"
 
 __device__ int shadingMode;
 __device__ bool circularSpecular = false;
 __device__ bool rectangularSpecular = false;
-__device__ bool rampedSpecular = true;
-__device__ bool hasReflection = false;
+__device__ bool rampedSpecular = false;
+__device__ bool cartoonShading = false;
+__device__ bool hasReflection = true;
 __device__ bool hasRefraction = false;
+__device__ uchar4* textures[32];
+__device__ int2 textureSize[32];
+
+__global__ void bindTexture(uchar4** intex, int2* texSize) {
+	for(int i=0;i<32;i++){
+		textures[i] = intex[i];
+		textureSize[i] = texSize[i];
+	}
+}
 
 // light ray intersection tests
 __device__ float lightRayIntersectsSphere( Ray r, d_Shape* shapes, int sid ) {
@@ -361,27 +374,27 @@ __device__ float lightRayIntersectsShapes(Ray r, d_Shape* shapes, int shapeCount
 	else return -1.0;
 }
 
-__device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nShapes, d_Light* lights, int lid) {
-	if( lights[lid].t == Light::POINT ) {
-		float dist = length(p - lights[lid].pos);
+__device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nShapes, d_Light* lights) {
+	if( lights->t == Light::POINT || lights->t == Light::DISK ) {
+		float dist = length(p - lights->pos);
 		Ray r;
 		r.origin = p;
-		r.dir = normalize(lights[lid].pos - p);
+		r.dir = normalize(lights->pos - p);
 		float t = lightRayIntersectsShapes(r, shapes, nShapes);
 
 		float THRES = 1e-3;
 		return t < THRES || t > dist;
 	}
-	else if( lights[lid].t == Light::SPOT ) {
+	else if( lights->t == Light::SPOT ) {
 	}
-	else if( lights[lid].t == Light::DIRECTIONAL ) {
+	else if( lights->t == Light::DIRECTIONAL ) {
 		Ray r;
 		r.origin = p;
-		r.dir = -lights[lid].dir;
+		r.dir = -lights->dir;
 		float t = lightRayIntersectsShapes(r, shapes, nShapes);
 
 		float THRES = 1e-3;
-		return (t < THRES && (dot(N, lights[lid].dir)<0));
+		return (t < THRES && (dot(N, lights->dir)<0));
 	}
 }
 
@@ -392,7 +405,7 @@ __device__ float3 phongShading(float3 v, float3 N, float2 t, Ray r, d_Shape* sha
     for(int i=0;i<lightCount;i++) {
 
         // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, N, shapes, nShapes, lights, i);
+        bool isVisible = checkLightVisibility(v, N, shapes, nShapes, lights+i);
 
         //calculate Ambient Term:
 		float3 Iamb = shapes[sid].material.ambient * lights[i].ambient;
@@ -437,29 +450,40 @@ __device__ float3 phongShading(float3 v, float3 N, float2 t, Ray r, d_Shape* sha
 			float specFactor = pow(max(RdotE,0.0),0.3 * shapes[sid].material.shininess);
 			if( circularSpecular ) specFactor = step(0.8, specFactor);
 			if( rampedSpecular ) specFactor = toonify(specFactor, 4);
+			if( rectangularSpecular ) {
+				float3 pq = lights[i].pos - shapes[sid].p;
+				float3 uvec = normalize(cross(pq, N));
+				float3 vvec = normalize(cross(uvec, N));
+
+				float ufac = fabsf(dot(R-E, uvec));
+				float vfac = fabsf(dot(R-E, vvec));
+
+				specFactor = filter(ufac, 0.0, 0.25) * filter(vfac, 0.0, 0.25) * specFactor;
+			}
 
             float3 Ispec = shapes[sid].material.specular * lights[i].specular
                          * specFactor;
             Ispec = clamp(Ispec, 0.0, 1.0);
 
 			if( shapes[sid].hasTexture ) {
-				/*
-				vec3 Itexture = texture2D (shapes[sid].tex, t).rgb;
+				float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
 				c = c + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
-				*/
 			}
-			else
-	            c = c + ((Idiff + Ispec) + Iamb) * lights[i].intensity;
+			else{
+				if( cartoonShading )
+					c = c + toonify((Idiff + Ispec) + Iamb, 8) * lights[i].intensity;
+				else 
+					c = c + ((Idiff + Ispec) + Iamb) * lights[i].intensity;
+			}
         }
         else {
 			if( shapes[sid].hasTexture ) {
-				/*
-				vec3 Itexture = texture2D (shapes[sid].tex, t).rgb;
+				float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
 				c = c + Itexture * Iamb * lights[i].intensity;
-				*/
 			}
-			else
+			else{
 	            c = c + Iamb * lights[i].intensity;
+			}
         }
     }
 
@@ -471,52 +495,116 @@ __device__ float3 lambertShading(float3 v, float3 N, float2 t, Ray r, d_Shape* s
 
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
-        // determine if this light is visible
-        bool isVisible = checkLightVisibility(v, N, shapes, nShapes, lights, i);
+		if( lights[i].t == Light::DISK ) {
+			const int lightSamples = 64;
+			float3 contribution = make_float3(0, 0, 0);
+			d_Light tmpLt;
+			tmpLt.init(lights[i]);
+			float3 opos = tmpLt.pos;
+			for(int j=0;j<lightSamples;j++) {
+				float3 offset = make_float3(randArray92[j*3], randArray92[j*3+1], randArray92[j*3+2])*0.5;
+				tmpLt.pos = opos + offset * 0.75;
+				// determine if this light is visible
+				bool isVisible = checkLightVisibility(v, N, shapes, nShapes, &tmpLt);
+				if( isVisible ) {
+					float3 L;
+					if( lights[i].t != Light::DIRECTIONAL)
+						L = normalize(lights[i].pos - v);
+					else
+						L = -lights[i].dir;
 
-        if( isVisible ) {
-			float3 L;
-			if( lights[i].t != Light::DIRECTIONAL)
-				L = normalize(lights[i].pos - v);
-			else
-				L = -lights[i].dir;
+					float3 E = normalize(r.origin - v);
 
-			float3 E = normalize(r.origin - v);
+					float NdotL;
 
-			float NdotL;
+					// change the normal with normal map
+					if( shapes[sid].hasNormalMap ) {
+						/*
+						// normal defined in tangent space
+						vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
 
-			// change the normal with normal map
-			if( shapes[sid].hasNormalMap ) {
-				/*
-				// normal defined in tangent space
-				vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
+						vec3 tangent = normalize(sphere_tangent(N));
+						vec3 bitangent = cross(N, tangent);
 
-				vec3 tangent = normalize(sphere_tangent(N));
-				vec3 bitangent = cross(N, tangent);
+						// find the mapping from tangent space to camera space
+						mat3 m_t = transpose(mat3(tangent, bitangent, N));
 
-				// find the mapping from tangent space to camera space
-				mat3 m_t = transpose(mat3(tangent, bitangent, N));
+						// convert the normal to to camera space
+						NdotL = dot(n_normalmap, normalize(m_t*L));
+						*/
+					}
+					else {
+						NdotL = dot(N, L);
+					}
 
-				// convert the normal to to camera space
-				NdotL = dot(n_normalmap, normalize(m_t*L));
-				*/
+					float3 Itexture;
+					if( shapes[sid].hasTexture ) {
+						Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					}
+					else Itexture = make_float3(1.0);
+
+					float diffuseFactor = max(NdotL, 0.0);
+					if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
+
+					float3 Idiff = clamp(shapes[sid].material.diffuse * tmpLt.diffuse * diffuseFactor, 0.0, 1.0);
+
+					contribution = contribution + Itexture * Idiff * tmpLt.intensity;
+				}
 			}
-			else {
-				NdotL = dot(N, L);
+			c = c + contribution / (float)lightSamples;
+
+			// restore position
+			lights[i].pos = opos;
+		}
+		else {
+			// determine if this light is visible
+			bool isVisible = checkLightVisibility(v, N, shapes, nShapes, lights+i);
+
+			if( isVisible ) {
+				float3 L;
+				if( lights[i].t != Light::DIRECTIONAL)
+					L = normalize(lights[i].pos - v);
+				else
+					L = -lights[i].dir;
+
+				float3 E = normalize(r.origin - v);
+
+				float NdotL;
+
+				// change the normal with normal map
+				if( shapes[sid].hasNormalMap ) {
+					/*
+					// normal defined in tangent space
+					vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
+
+					vec3 tangent = normalize(sphere_tangent(N));
+					vec3 bitangent = cross(N, tangent);
+
+					// find the mapping from tangent space to camera space
+					mat3 m_t = transpose(mat3(tangent, bitangent, N));
+
+					// convert the normal to to camera space
+					NdotL = dot(n_normalmap, normalize(m_t*L));
+					*/
+				}
+				else {
+					NdotL = dot(N, L);
+				}
+
+				float3 Itexture;
+				if( shapes[sid].hasTexture ) {
+					Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+				}
+				else Itexture = make_float3(1, 1, 1);
+
+				float diffuseFactor = max(NdotL, 0.0);
+				if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
+
+				float3 Idiff = clamp(shapes[sid].material.diffuse * lights[i].diffuse * diffuseFactor, 0.0, 1.0);
+
+				c = c + Itexture * Idiff * lights[i].intensity;
 			}
-
-			float3 Itexture;
-			if( shapes[sid].hasTexture ) {
-				/*
-				Itexture = texture2D (shapes[sid].tex, t).rgb;
-				*/
-			}
-			else Itexture = make_float3(1, 1, 1);
-
-            float3 Idiff = clamp(shapes[sid].material.diffuse * lights[i].diffuse * max(NdotL, 0.0), 0.0, 1.0);
-
-            c = c + Itexture * Idiff * lights[i].intensity;
-        }
+		}
     }
 
     return c;
@@ -566,8 +654,7 @@ __device__ float3 computeShading(float3 p, float3 n, float2 t, Ray r, d_Shape* s
     else if( shadingMode == 2 )
         return phongShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
     else if( shadingMode == 3 )
-        if( shapes[sid].t == Shape::PLANE ) return lambertShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
-        else return goochShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
+        return goochShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
 }
 
 __device__ __inline__ Hit background() {
@@ -661,6 +748,9 @@ __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, d_Light* 
         if( abs(u) > shapes[sid].radius[0] || abs(v) > shapes[sid].radius[1] ) return background();
         else {
             float2 t = clamp((make_float2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]) + make_float2(1.0, 1.0))*0.5, 0.0, 1.0);
+			float scale = 0.5 * (shapes[sid].radius[0]/5.0 + shapes[sid].radius[1]/5.0);
+			t = t * scale;
+
             h.color = computeShading(p, shapes[sid].axis[0], t, r, shapes, nShapes, lights, nLights, sid);
 
 			float3 n = shapes[sid].axis[0];
@@ -857,7 +947,8 @@ __device__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, d_Light* 
 }
 
 __device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
-	if( r.level > 4 ) return background();
+	const int maxLevels = 5;
+	if( r.level > maxLevels ) return background();
 
 	Hit h;
 	h.t = 1e10;
@@ -897,8 +988,6 @@ __global__ void raytrace(float3 *pos, Camera* cam,
 	int tid = tidy * blockDim.x + tidx;
 	if( tid < nLights )	inLights[tid].init(lights[tid]);
 	if( tid < nShapes )	inShapes[tid].init(shapes[tid]);
-
-	//__threadfence_block();
 	__syncthreads();
 
 	unsigned int x = blockIdx.x*blockDim.x + tidx;
@@ -1021,7 +1110,6 @@ __global__ void raytrace2(float3 *pos, Camera* cam,
 
 
 __device__ int curb;
-
 __global__ void initCurrentBlock(int v) {
 	curb = v;
 }
@@ -1031,7 +1119,7 @@ __global__ void initCurrentBlock(int v) {
 ///////////////////////////////////////////////////////////////////////////////
 __global__ void raytrace3(float3 *pos, Camera* cam, 
 						  int nLights, Light* lights, 
-						  int nShapes, Shape* shapes, 
+						  int nShapes, Shape* shapes,
 						  unsigned int width, unsigned int height,
 						  int sMode, int AASamples, int bmx, int bmy, int ttlb)
 {
