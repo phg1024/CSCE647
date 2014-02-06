@@ -48,7 +48,7 @@ public:
 
 	// directional light
 	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, vec3 direction):
-		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), dir(direction){}
+		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), dir(direction.normalized()){}
 
 	// spot light
 	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, vec3 direction, float expo, float cutoff):
@@ -170,9 +170,8 @@ struct d_Material {
 class Shape {
 public:
 	enum ShapeType {
-		SPHERE = 0,
-		PLANE = 1,
-		ELLIPSOID = 2,
+		PLANE = 0,
+		ELLIPSOID = 1,
 		CYLINDER,
 		CONE,
 		HYPERBOLOID,
@@ -211,6 +210,19 @@ public:
 	}
 	__device__ __host__ ~Shape(){}
 
+	static Shape createSphere(vec3 center, float radius, Material mater){
+		return Shape(ELLIPSOID, center, radius, radius, radius, vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1),
+			mater);
+	}
+
+	static Shape createEllipsoid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater ) {
+		return Shape(ELLIPSOID, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
+	}
+
+	static Shape createPlane(vec3 center, float w, float h, vec3 normal, vec3 u, vec3 v, Material mater) {
+		return Shape(PLANE, center, w, h, 0.0, normal, u, v, mater);
+	}
+
 	ShapeType t;
 
 	// geometry
@@ -248,6 +260,8 @@ struct d_Shape {
 		texId = s.texId;
 		hasNormalMap = s.hasNormalMap;
 		normalTexId = s.normalTexId;
+
+		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
 	}
 
 	// geometry
@@ -255,6 +269,7 @@ struct d_Shape {
 	float3 axis[3];
 	float radius[3];
 	float m[9];
+	float constant;
 
 	d_Material material;
 

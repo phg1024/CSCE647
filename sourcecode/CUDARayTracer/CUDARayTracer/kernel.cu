@@ -55,8 +55,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 // constants
 unsigned int edgeX = 8, edgeY = 8;
-unsigned int window_width  = 768 + edgeX;
-unsigned int window_height = 512 + edgeY;
+unsigned int window_width  = 1024 + edgeX;
+unsigned int window_height = 768 + edgeY;
 
 // vbo variables
 GLuint vbo = 0;
@@ -106,6 +106,10 @@ void timerEvent(int value);
 
 // Cuda functionality
 extern __global__ void bindTexture(uchar4**, int2* );
+
+extern __global__ void initScene(int nLights, Light* lights, 
+								 int nShapes, Shape* shapes);
+
 extern __global__ void raytrace(float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
@@ -120,6 +124,7 @@ extern __global__ void raytrace2(float3 *pos, Camera* cam,
 						 int gx, int gy, int gmx, int gmy);
 
 extern __global__ void initCurrentBlock(int v);
+
 extern __global__ void raytrace3(float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
@@ -148,15 +153,16 @@ int kernelIdx = 0;
 int loadTexture(const char* filename) {
 	cv::Mat image = cv::imread(filename); 
 
-	//cv::imshow("texture", image);
+	cv::imshow("texture", image);
 
 	cout << image.cols << "x" << image.rows << endl;
 	int width = image.cols, height = image.rows;
-	vector<uchar4> buffer(width*height);
+	vector<uchar4> buffer(width*height*3);
 	for(int i=0;i<height;i++) {
 		for(int j=0;j<width;j++) {
 			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
-			buffer[i*width+j] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
+			int idx = (i*width+j);
+			buffer[idx] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
 		}
 	}
 
@@ -171,9 +177,9 @@ int loadTexture(const char* filename) {
 void init_scene()
 {
 	// initialize the camera
-	cam.pos = vec3(0, 0, -5);
-	cam.dir = vec3(0, 0, 1);
-	cam.up = vec3(0, 1, 0);
+	cam.pos = vec3(1, 1, -5);
+	cam.dir = vec3(-0.5, -1.5, 5).normalized();
+	cam.up = vec3(0, 5, 1.5).normalized();
 	cam.right = vec3(1, 0, 0);
 	cam.f = 1.0;
 	cam.w = 1.0; cam.h = window_height / (float) window_width; 
@@ -182,28 +188,86 @@ void init_scene()
 	cudaMalloc((void**)&d_cam, sz);
 	cudaMemcpy(d_cam, &cam, sz, cudaMemcpyHostToDevice);
 
-	
+	/*
+	int scount = 7;
 	// initialize the scene by uploading scene objects to GPU
-	shapes.push_back(
-		Shape(Shape::SPHERE, 
-		vec3(0, 0, 1),	// p 
-		1.0, 0.0, 0.0,		// radius
-		vec3(),			// axis[0]
-		vec3(),			// axis[1]
-		vec3(),			// axis[2]
+	for(int i=0;i<scount;i++)
+		for(int j=0;j<scount;j++)
+		{
+			vec3 pos(i*4-scount*2, 0.0, j*4-scount*2);
+			shapes.push_back(
+				Shape::createSphere(pos, 1.0, Material(
+				random3(i*13+j),		// diffuse
+				vec3(1.0, 1.0, 1.0),		// specular
+				vec3(0.10, 0.10, 0.1),		// ambient
+				50.0f,							// shininess
+				vec3(0, 0, .4),				// kcool
+				vec3(.4, .4, 0),				// kwarm
+				0.15, 0.25,
+				0.75, 0.25, 0.0))
+				);
+		}
+		*/
+
+	// make a box
+	// left
+	shapes.push_back(Shape::createPlane(
+		vec3(-3, 3, 1),
+		4.0, 4.0,
+		vec3(1, 0, 0),
+		vec3(0, 0, 1),
+		vec3(0, 1, 0),
 		Material(
-		vec3(0.25, 0.45, 0.75),		// diffuse
-		vec3(1.0, 1.0, 1.0),		// specular
-		vec3(0.10, 0.10, 0.1),		// ambient
-		50.0f,							// shininess
-		vec3(0, 0, .4),				// kcool
-		vec3(.4, .4, 0),				// kwarm
-		0.15, 0.25))
-		);
+		vec3(0.95, 0.25, 0.25),
+		vec3(1, 1, 1),
+		vec3(0.05, 0.05, 0.05),
+		50.0,
+		vec3(0, 0, .4),
+		vec3(.4, .4, 0),
+		0.15, 0.25,
+		0.95, 0.05, 0.0
+		)
+		));
+	// right
+	shapes.push_back(Shape::createPlane(
+		vec3(3, 3, 1),
+		4.0, 4.0,
+		vec3(-1, 0, 0),
+		vec3(0, 0, 1),
+		vec3(0, 1, 0),
+		Material(
+		vec3(0.25, 0.95, 0.25),
+		vec3(1, 1, 1),
+		vec3(0.05, 0.05, 0.05),
+		50.0,
+		vec3(0, 0, .4),
+		vec3(.4, .4, 0),
+		0.15, 0.25,
+		0.95, 0.05, 0.0
+		)
+		));
+	// back
+	shapes.push_back(Shape::createPlane(
+		vec3(0, 3, 5),
+		4.0, 4.0,
+		vec3(0, 0, -1),
+		vec3(1, 0, 0),
+		vec3(0, 1, 0),
+		Material(
+		vec3(0.75, 0.75, 0.75),
+		vec3(1, 1, 1),
+		vec3(0.05, 0.05, 0.05),
+		50.0,
+		vec3(0, 0, .4),
+		vec3(.4, .4, 0),
+		0.15, 0.25,
+		0.95, 0.05, 0.0
+		)
+		));
 
 	Shape sp = Shape(Shape::PLANE,
 		vec3(0, -1, 0),
-		50.0, 50.0, 0.0,
+		500.0, 500.0, 0.0,
 		vec3(0, 1, 0),
 		vec3(1, 0, 0),
 		vec3(0, 0, 1),
@@ -215,19 +279,15 @@ void init_scene()
 		vec3(0, 0, .4),
 		vec3(.4, .4, 0),
 		0.15, 0.25,
-		0.85, 0.15, 0.0));
+		0.75, 0.25, 0.0));
 	sp.hasTexture = true;
 	sp.texId = loadTexture("./textures/chessboard.png");
-	//sp.texId = loadTexture("./textures/gabby.jpg");
+	//sp.texId = loadTexture("./textures/wood-texture.jpg");
 	cout << "tex id = " << sp.texId << endl;
 	shapes.push_back( sp );
-	shapes.push_back(
-		Shape( Shape::SPHERE, 
-		vec3(0, -0.5, -0.5),	// p 
-		0.5, 0.0, 0.0,		// radius
-		vec3(),			// axis[0]
-		vec3(),			// axis[1]
-		vec3(),			// axis[2]
+	
+	shapes.push_back( Shape::createSphere(
+		vec3(0, -0.5, -0.5), 0.5, 
 		Material(
 		vec3(0.95, 0.25 , 0.0 ),		// diffuse
 		vec3(1.0 , 1.0 , 1.0 ),		// specular
@@ -238,21 +298,18 @@ void init_scene()
 		0.15, 0.25,
 		0.75, 0.25, 0.0))
 		);
-	shapes.push_back(
-		Shape(Shape::SPHERE, 
-		vec3(-0.5, 0.5, -1),	// p 
-		0.25, 0.0, 0.0,		// radius
-		vec3(),			// axis[0]
-		vec3(),			// axis[1]
-		vec3(),			// axis[2]
+	shapes.push_back( Shape::createSphere(
+		vec3(0.5, -0.75, -1),	// p 
+		0.25,
 		Material(
-		vec3(0.75, 0.75, 0.75),		// diffuse
+		vec3(0.25, 0.25, 0.95),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
 		vec3(0.05, 0.05, 0.05),		// ambient
 		20.0f,							// shininess
 		vec3(0, .4, 0),				// kcool
 		vec3(.4, 0, .4),				// kwarm
-		0.15, 0.25))
+		0.15, 0.25,
+		0.5, 0.5, 0.0))
 		);
 	shapes.push_back(Shape( Shape::ELLIPSOID, 
 		vec3(1.25, -0.5, -0.5),	// p 
@@ -273,9 +330,9 @@ void init_scene()
 		);
 	
 	shapes.push_back(Shape( Shape::CYLINDER, 
-		vec3(-2.0, -0.5, -0.5),	// p 
-		0.5, 1.0, 0.25,		// radius
-		vec3(1, 0, 0),			// axis[0]
+		vec3(0.5, -1.0, 0.75),	// p 
+		0.5, 2.0, 0.25,		// radius
+		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
 		Material(
@@ -292,9 +349,9 @@ void init_scene()
 	
 	
 	shapes.push_back(Shape( Shape::CONE, 
-		vec3(0.0, -0.5, -0.5),	// p 
+		vec3(0.4, -1.0, -1.25),	// p 
 		0.25, 0.75, 0.3,		// radius
-		vec3(0, 1, 0),			// axis[0]
+		vec3(-1.0, atan(0.3), 0),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
 		Material(
@@ -311,7 +368,7 @@ void init_scene()
 
 	
 	shapes.push_back(Shape( Shape::HYPERBOLOID, 
-		vec3(-1.5, 0.5, -2.0),	// p 
+		vec3(-1.5, 0.25, 2.0),	// p 
 		0.2, 0.1, 0.1,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
@@ -329,7 +386,7 @@ void init_scene()
 		);
 
 	shapes.push_back(Shape( Shape::HYPERBOLOID2, 
-		vec3(2.5, 0.5, -2.0),	// p 
+		vec3(2.5, 0.25, 2.0),	// p 
 		0.125, 0.1, 0.1,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
@@ -345,16 +402,15 @@ void init_scene()
 		0.8, 0.2
 		))
 		);
-	
 
 	const size_t sz_shapes = shapes.size() * sizeof(Shape);
 	cudaMalloc((void**)&d_shapes, sz_shapes);
 	cudaMemcpy(d_shapes, &(shapes[0]), sz_shapes, cudaMemcpyHostToDevice);
 
-	lights.push_back(Light(Light::DISK, 0.5, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10)));
-	lights.push_back(Light(Light::POINT, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10)));
-	lights.push_back(Light(Light::POINT, 0.1, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(1000, 1000, -1000)));
-	lights.push_back(Light(Light::DIRECTIONAL, 0.15, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10/sqrtf(200.f), 10/sqrtf(200.f))));
+	lights.push_back(Light(Light::DISK, 0.5, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10), vec3(2, -4, 10)));
+	lights.push_back(Light(Light::DISK, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10)));
+	lights.push_back(Light(Light::DISK, 0.1, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(1000, 1000, -1000)));
+	lights.push_back(Light(Light::DIRECTIONAL, 0.15, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10, 10)));
 
 	const size_t sz_lights = lights.size() * sizeof(Light);
 	cudaMalloc((void**)&d_lights, sz_lights);
@@ -367,6 +423,8 @@ void init_scene()
 	const size_t sz_texSize = sizeof(int2)*32;
 	cudaMalloc((void**)&d_texSize, sz_texSize);
 	cudaMemcpy(d_texSize, &(texSize[0]), sz_texSize, cudaMemcpyHostToDevice);
+
+	cout << "scene initialized." << endl;
 }
 
 void launch_kernel(float3 *pos, unsigned int mesh_width,
@@ -393,10 +451,13 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
 	bindTexture<<< 1, 1 >>>(d_texAddr, d_texSize);
+	initScene<<<1, dim3(8,8,1)>>>(lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
+								  shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]));
+
 	switch( kernelIdx ) {
 	case 0:{
 		// execute the kernel
-		dim3 block(8, 8, 1);
+		dim3 block(4, 32, 1);
 		dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
 		raytrace<<< grid, block >>>(pos, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
@@ -405,8 +466,8 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		break;
 		   }
 	case 1:{
-		dim3 block(8, 8, 1);
-		dim3 group(32, 32, 1);
+		dim3 block(16, 16, 1);
+		dim3 group(16, 16, 1);
 		dim3 grid(group.x, group.y, 1);
 		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
 
@@ -419,7 +480,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		   }
 	case 2:{
 		dim3 block(16, 16, 1);
-		dim3 grid(16, 16, 1);
+		dim3 grid(10, 10, 1);
 
 		dim3 blockCount(ceil(window_width/(float)block.x), ceil(window_height/(float)block.y ), 1);
 
@@ -866,6 +927,7 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 	case 'k':
 	case 'K':
 		kernelIdx = (kernelIdx + 1) % 3;
+		cout << "using kernel #" << kernelIdx << endl;
 		glutPostRedisplay();
 		break;
 	case (27) :
