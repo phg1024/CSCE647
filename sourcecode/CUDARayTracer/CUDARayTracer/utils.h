@@ -51,12 +51,25 @@ __host__ __device__ __forceinline__ float3 random3(int idx) {
 	return make_float3(float(u01(rng))-0.5f, float(u01(rng))-0.5f, float(u01(rng))-0.5f);
 }
 
+__host__ __device__ __forceinline__ float3 pow(float3 v, float p) {
+	return make_float3(powf(v.x, p), powf(v.y, p), powf(v.z, p));
+}
+
 __host__ __device__ __forceinline__ float3 mul(float m[9], float3 v) {
 	return make_float3(
 		m[0] * v.x + m[1] * v.y + m[2] * v.z,
 		m[3] * v.x + m[4] * v.y + m[5] * v.z,
 		m[6] * v.x + m[7] * v.y + m[8] * v.z
 		);
+}
+
+__host__ __device__ __forceinline__ float3 refract(float3 i, float3 n, float eta) {
+	float nDi = dot(n, i);
+	float k = 1.0 - eta * eta * (1.0 - nDi * nDi);
+	if (k < 0.0)
+		return make_float3(0.0f);
+	else
+		return normalize(eta * i - (eta * nDi + sqrtf(k)) * n);
 }
 
 __host__ __device__ __forceinline__ float3 fminf(float3 v, float f) {

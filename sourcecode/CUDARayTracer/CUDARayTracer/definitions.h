@@ -105,20 +105,21 @@ public:
 	__device__ __host__ Material(
 		vec3 diffuse, vec3 specular, vec3 ambient, float shininess,
 		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
-		float ks = 1.0, float kr = 0.0, float kf = 0.0
+		float ks = 1.0, float kr = 0.0, float kf = 0.0, float eta = 1.1
 		):
-		ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess),
+		ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess), eta(eta),
 		kcool(kcool), kwarm(kwarm), alpha(alpha), beta(beta)
 	{
 		Ks = ks; Kr = kr; Kf = kf;
 		}
 	__device__ __host__ Material(const Material& m):
-		emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess),
+		emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess), eta(m.eta),
 		Ks(m.Ks), Kr(m.Kr), Kf(m.Kf), kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta)
 	{}
 	__device__ __host__ Material& operator=(const Material& m) {
 		emission = m.emission; ambient = m.ambient; diffuse = m.diffuse; specular = m.specular;
-		shininess = m.shininess; Ks = m.Ks; Kr = m.Kr; Kf = m.Kf; kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
+		shininess = m.shininess; eta = m.eta; Ks = m.Ks; Kr = m.Kr; Kf = m.Kf; 
+		kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
 
 		return (*this);
 	}
@@ -132,6 +133,7 @@ public:
 
 	float Ks, Kr, Kf;
 	float shininess;
+	float eta;
 
 	vec3 kcool, kwarm;
 	float alpha, beta;
@@ -148,6 +150,7 @@ struct d_Material {
 		Kr = m.Kr;
 		Kf = m.Kf;
 		shininess = m.shininess;
+		eta = m.eta;
 		kcool = m.kcool.data;
 		kwarm = m.kwarm.data;
 
@@ -162,6 +165,7 @@ struct d_Material {
 
 	float Ks, Kr, Kf;
 	float shininess;
+	float eta;
 
 	float3 kcool, kwarm;
 	float alpha, beta;
@@ -192,7 +196,8 @@ public:
 		vec3 ratio2 = a2/r2;
 		
 		if( t == ELLIPSOID ) m = outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
-		else if(t == HYPERBOLOID) {
+		else if( t == CYLINDER ) m = outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
+		else if(t == HYPERBOLOID  || t == CONE) {
 			m = -outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);		
 		}
 		else if( t == HYPERBOLOID2 ) {
@@ -262,6 +267,7 @@ struct d_Shape {
 		normalTexId = s.normalTexId;
 
 		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
+		constant2 = (t==Shape::CONE)?0.0:1.0;
 	}
 
 	// geometry
@@ -270,6 +276,7 @@ struct d_Shape {
 	float radius[3];
 	float m[9];
 	float constant;
+	float constant2;
 
 	d_Material material;
 
@@ -282,10 +289,12 @@ struct d_Shape {
 struct Ray {
 	float3 origin;
 	float3 dir;
-	int level;
 };
 
 struct Hit {
-	float3 color;
 	float t;
+	float3 p;		// hit point
+	float3 n;		// normal vector
+	float2 tex;		// texture coordinates
+	int objIdx;		// hit object index
 };

@@ -12,10 +12,51 @@ __device__ bool circularSpecular = false;
 __device__ bool rectangularSpecular = false;
 __device__ bool rampedSpecular = false;
 __device__ bool cartoonShading = false;
-__device__ bool hasReflection = true;
+__device__ bool hasReflection = false;
 __device__ bool hasRefraction = false;
 __device__ uchar4* textures[32];
 __device__ int2 textureSize[32];
+
+__global__ void setParams(int specType, int tracingType) {
+	circularSpecular = false;
+	rectangularSpecular = false;
+	rampedSpecular = false;
+	cartoonShading = false;
+	hasReflection = false;
+	hasRefraction = false;
+
+	switch( specType ) {
+	case 1:
+		circularSpecular = true;
+		break;
+	case 2:
+		rectangularSpecular = true;
+		break;
+	case 3:
+		rampedSpecular = true;
+		break;
+	case 4:
+		cartoonShading = true;
+		break;
+	default:
+		break;
+	}
+
+	switch( tracingType ) {
+	case 1:
+		hasReflection = true;
+		break;
+	case 2:
+		hasRefraction = true;
+		break;
+	case 3:
+		hasReflection = true;
+		hasRefraction = true;
+		break;
+	default:
+		break;
+	}
+}
 
 __global__ void bindTexture(uchar4** intex, int2* texSize) {
 	for(int i=0;i<32;i++){
@@ -255,7 +296,7 @@ __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int 
 	float3 pq = shapes[sid].p - r.origin;
 	float a = dot(r.dir, mul(shapes[sid].m, r.dir));
 	float b = -dot(pq, mul(shapes[sid].m, r.dir));
-	float c = dot(pq, mul(shapes[sid].m, pq)) - 1;
+	float c = dot(pq, mul(shapes[sid].m, pq)) - shapes[sid].constant2;
 
     float delta = b*b - a*c;
     if (delta < 0.0)
@@ -280,18 +321,19 @@ __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int 
 }
 
 __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes, int sid) {
-	int stype = shapes[sid].t;
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
 		return lightRayIntersectsPlane(r, shapes, sid);
 	case Shape::ELLIPSOID:
 	case Shape::HYPERBOLOID:
 	case Shape::HYPERBOLOID2:
-		return lightRayIntersectsQuadraticSurface(r, shapes, sid);
-	case Shape::CONE:
-		return lightRayIntersectsCone(r, shapes, sid);
 	case Shape::CYLINDER:
-		return lightRayIntersectsCylinder(r, shapes, sid);	
+	case Shape::CONE:
+		return lightRayIntersectsQuadraticSurface(r, shapes, sid);
+	//case Shape::CONE:
+	//	return lightRayIntersectsCone(r, shapes, sid);
+	//case Shape::CYLINDER:
+	//	return lightRayIntersectsCylinder(r, shapes, sid);	
 	default:
 		return -1.0;
 	}
@@ -305,8 +347,10 @@ __device__ float lightRayIntersectsShapes(Ray r, d_Shape* shapes, int shapeCount
 	float THRES = 1e-3;
 
     for(int i=0;i<shapeCount;i++) {
+		// hack
+		if( hasRefraction && shapes[i].material.Kf != 0.0 ) continue;
         float hitT = lightRayIntersectsShape(r, shapes, i);
-        if( (hitT > -THRES) && (hitT < t) ) {
+		if( (hitT > -THRES) && (hitT < t) ) {
             t = hitT;
         }
     }
@@ -341,7 +385,7 @@ __device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nS
 		return (t < THRES && (dot(N, lights->dir)<0));
 	}
 	default:
-		break;
+		return false;
 	}
 }
 
@@ -443,7 +487,7 @@ __device__ float3 lambertShading(float3 v, float3 N, float2 t, Ray r, d_Shape* s
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
 		if( lights[i].t == Light::DISK ) {
-			const int lightSamples = 64;
+			const int lightSamples = 32;
 			float3 contribution = make_float3(0, 0, 0);
 			d_Light tmpLt;
 			tmpLt.init(lights[i]);
@@ -597,7 +641,7 @@ __device__ float3 goochShading(float3 v, float3 N, float2 t, Ray r, d_Shape* sha
 __device__ __forceinline__ Hit background() {
 	Hit h;
 	h.t = -1.0;
-	h.color = make_float3(0.05, 0.05, 0.05);
+	h.objIdx = -1;
 	return h;
 }
 
@@ -616,7 +660,6 @@ __device__ float3 computeShading(float3 p, float3 n, float2 t, Ray r, d_Shape* s
 
 __device__ __forceinline__ Ray generateRay(Camera* cam, float u, float v) {
 	Ray r;
-	r.level = 0;
 	r.origin = cam->pos.data;
 
     // find the intersection point on the canvas
@@ -633,23 +676,6 @@ __device__ __forceinline__ float rand(float x, float y){
   return val - floorf(val);
 }
 
-__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights);
-
-__device__ __forceinline__ Hit computeReflectedHit(Ray r, float3 p, float3 n, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
-	Ray rr;
-	rr.dir = reflect(r.dir, n);
-	rr.origin = p;
-	rr.level = r.level + 1;
-	return rayIntersectsShapes(rr, nShapes, shapes, nLights, lights);
-}
-
-__device__ __forceinline__ Hit computeRefractedHit(Ray r, float3 p, float3 n, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
-	Hit h;
-	h.color = make_float3(0, 0, 0);
-	h.t = -1.0;
-	return h;
-}
-
 // ray intersection test with shading computation
 __device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
 	float ti = lightRayIntersectsSphere(r, shapes, sid);
@@ -658,206 +684,223 @@ __device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, d_Light*
 		Hit h;
 		h.t = ti;
         // hit point
-        float3 p = h.t * r.dir + r.origin;
+        h.p = h.t * r.dir + r.origin;
         // normal at hit point
-		float3 n = normalize(p - shapes[sid].p);
+		h.n = normalize(h.p - shapes[sid].p);
         // hack, move the point a little bit outer
-		p = shapes[sid].p + (shapes[sid].radius[0] + 1e-6) * n;
-        float2 t = spheremap(n);
-		
-		// shade color
-		h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
-
-		Hit rh, fh;
-		if( hasReflection )
-		// reflected ray
-			rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasRefraction )
-		// refracted ray
-			fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasReflection || hasRefraction )
-			h.color = mix(h.color, rh.color, fh.color, shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
-			
+		h.p = shapes[sid].p + (shapes[sid].radius[0] + 1e-6) * h.n;
+        h.tex = spheremap(h.n);
+		h.objIdx = sid;
         return h;
     }
 	else return background();
 }
 
-__device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	float ti = lightRayIntersectsPlane(r, shapes, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
-        float3 p = r.origin + h.t * r.dir;
+        h.p = r.origin + h.t * r.dir;
         // compute u, v coordinates
-        float3 pp0 = p - shapes[sid].p;
+        float3 pp0 = h.p - shapes[sid].p;
         float u = dot(pp0, shapes[sid].axis[1]);
         float v = dot(pp0, shapes[sid].axis[2]);
         if( abs(u) > shapes[sid].radius[0] || abs(v) > shapes[sid].radius[1] ) return background();
         else {
             float2 t = clamp((make_float2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]) + make_float2(1.0, 1.0))*0.5, 0.0, 1.0);
 			float scale = 0.5 * (shapes[sid].radius[0]/5.0 + shapes[sid].radius[1]/5.0);
-			t = t * scale;
+			h.tex = t * scale;
+			h.n = shapes[sid].axis[0];
+			h.objIdx = sid;
 
-            h.color = computeShading(p, shapes[sid].axis[0], t, r, shapes, nShapes, lights, nLights, sid);
-
-			float3 n = shapes[sid].axis[0];
-
-			Hit rh, fh;
-			if( hasReflection )
-			// reflected ray
-				rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-			if( hasRefraction )
-			// refracted ray
-				fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-			if( hasReflection || hasRefraction )
-				h.color = mix(h.color, rh.color, fh.color, shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
-
-            return h;
+			return h;
         }
     }
 	else return background();
 }
 
-__device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	float ti = lightRayIntersectsQuadraticSurface(r, shapes, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
 		// hit point
-		float3 p = h.t * r.dir + r.origin;
+		h.p = h.t * r.dir + r.origin;
         // normal at hit point
-		float3 n = normalize(2.0 * mul(shapes[sid].m, (p - shapes[sid].p)) * shapes[sid].constant);
-        float2 t = spheremap(n);
-        h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
-
-		Hit rh, fh;
-		if( hasReflection )
-			// reflected ray
-				rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasRefraction )
-			// refracted ray
-				fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasReflection || hasRefraction )
-			h.color = mix(h.color, rh.color, fh.color, shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
-
+		h.n = normalize(2.0 * mul(shapes[sid].m, (h.p - shapes[sid].p)) * shapes[sid].constant);
+        h.tex = spheremap(h.n);
+		h.objIdx = sid;
         return h;
     }
 
 	else return background();
 }
 
-__device__ Hit rayIntersectsCone(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ Hit rayIntersectsCone(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	float ti = lightRayIntersectsCone(r, shapes, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
-		float3 p = h.t * r.dir + r.origin;
-        float3 pq = p - shapes[sid].p;
+		h.p = h.t * r.dir + r.origin;
+        float3 pq = h.p - shapes[sid].p;
         float hval = dot(pq, shapes[sid].axis[0]);
         // normal at hit point
-		float3 n;
 		if(fabsf(hval - shapes[sid].radius[1])<1e-4) 
-			n = shapes[sid].axis[0];
+			h.n = shapes[sid].axis[0];
 		else 
-			n = normalize(cross(cross(shapes[sid].axis[0], pq), shapes[sid].axis[0]));
+			h.n = normalize(cross(cross(shapes[sid].axis[0], pq), shapes[sid].axis[0]));
 
-        float2 t = make_float2(0, 0);
-
-		h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
-
-		Hit rh, fh;
-		if( hasReflection )
-			// reflected ray
-				rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasRefraction )
-			// refracted ray
-				fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasReflection || hasRefraction )
-			h.color = mix(h.color, rh.color, fh.color, shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
-		
+        h.tex = make_float2(0, 0);
+		h.objIdx = sid;
 
         return h;
     }
 	else return background();
 }
 
-__device__ Hit rayIntersectsCylinder(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ Hit rayIntersectsCylinder(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	float ti = lightRayIntersectsCylinder(r, shapes, sid);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
-        float3 p = h.t * r.dir + r.origin;
-        float3 pq = p - shapes[sid].p;
+        h.p = h.t * r.dir + r.origin;
+        float3 pq = h.p - shapes[sid].p;
         float hval = dot(pq, shapes[sid].axis[0]);
         // normal at hit point
-		float3 n = normalize(pq - hval*shapes[sid].axis[0]);
-		if( fabsf(hval) < 1e-3 ) n = -shapes[sid].axis[0];
-		else if( fabsf(hval - shapes[sid].radius[1]) < 1e-3 ) n = shapes[sid].axis[0];
-        float2 t = make_float2(0, 0);
-
-		h.color = computeShading(p, n, t, r, shapes, nShapes, lights, nLights, sid);
-
-		Hit rh, fh;
-		if( hasReflection )
-			// reflected ray
-				rh = computeReflectedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasRefraction )
-			// refracted ray
-				fh = computeRefractedHit(r, p, n, nShapes, shapes, nLights, lights);
-
-		if( hasReflection || hasRefraction )
-			h.color = mix(h.color, rh.color, fh.color, shapes[sid].material.Ks, shapes[sid].material.Kr, shapes[sid].material.Kf);
+		h.n = normalize(pq - hval*shapes[sid].axis[0]);
+		if( fabsf(hval) < 1e-3 ) h.n = -shapes[sid].axis[0];
+		else if( fabsf(hval - shapes[sid].radius[1]) < 1e-3 ) h.n = shapes[sid].axis[0];
+        h.tex = make_float2(0, 0);
+		h.objIdx = sid;
 
         return h;
     }
 	else return background();
 }
 
-__device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
-		return rayIntersectsPlane(r, shapes, nShapes, lights, nLights, sid);
+		return rayIntersectsPlane(r, shapes, nShapes, sid);
 	case Shape::ELLIPSOID:
 	case Shape::HYPERBOLOID:
 	case Shape::HYPERBOLOID2:
-		//return rayIntersectsSphere(r, shapes, nShapes, lights, nLights, sid);
-		return rayIntersectsQuadraticSurface(r, shapes, nShapes, lights, nLights, sid);
-	case Shape::CONE:
-		return rayIntersectsCone(r, shapes, nShapes, lights, nLights, sid);
 	case Shape::CYLINDER:
-		return rayIntersectsCylinder(r, shapes, nShapes, lights, nLights, sid);	
+	case Shape::CONE:
+		return rayIntersectsQuadraticSurface(r, shapes, nShapes, sid);
+	//case Shape::CONE:
+	//	return rayIntersectsCone(r, shapes, nShapes, sid);
+	//case Shape::CYLINDER:
+	//	return rayIntersectsCylinder(r, shapes, nShapes, sid);	
 	default:
 		return background();
 	}
 }
 
-__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
-	const int maxLevels = 3;
-	if( r.level > maxLevels ) return background();
-
+__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes) {
 	Hit h;
 	h.t = 1e10;
-	h.color = background().color;
+	h.objIdx = -1;
 
     for(int i=0;i<nShapes;i++) {
-        Hit hit = rayIntersectsShape(r, shapes, nShapes, lights, nLights, i);
+        Hit hit = rayIntersectsShape(r, shapes, nShapes, i);
         if( (hit.t > 0.0) && (hit.t < h.t) ) {
-            h.t = hit.t;
-            h.color = hit.color;
+            h = hit;
         }
     }
 
 	return h;
+}
+
+__device__ float3 traceRay_simple(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
+	Hit h = rayIntersectsShapes(r, nShapes, shapes);
+
+	if( h.objIdx == -1 ) {
+		// no hit
+		return make_float3(0, 0, 0);
+	}
+	else {
+		return computeShading(h.p, h.n, h.tex, r, shapes, nShapes, lights, nLights, h.objIdx);// * shapes[h.objIdx].material.Ks;
+	}	
+}
+
+__device__ float3 traceRay_reflection(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
+	const int maxBounces = 5;
+	float3 accumulatedColor = make_float3(0.0);
+	float3 colormask = make_float3(1.0);
+
+	Ray ray = r;
+	for(int bounces=0;bounces<maxBounces;bounces++) {
+
+		Hit h = rayIntersectsShapes(ray, nShapes, shapes);
+		
+		float3 color;
+
+		if( h.objIdx == -1 ) {
+			// no hit
+			color = make_float3(0, 0, 0);
+			accumulatedColor += color * colormask;
+			break;
+		}
+		else {
+			color = clamp(computeShading(h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx), 0.0, 1.0);
+
+			accumulatedColor += color * colormask;// * shapes[h.objIdx].material.Ks;
+			float Kr = shapes[h.objIdx].material.Kr;
+			if( Kr == 0 ) break;
+			colormask *= Kr;
+		}
+
+		// get the reflected ray
+		ray.origin = h.p;
+		ray.dir = reflect(ray.dir, h.n);
+	}
+
+	return accumulatedColor;
+}
+
+__device__ float3 traceRay_refraction(Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
+	const int maxBounces = 5;
+	float3 accumulatedColor = make_float3(0.0);
+	float3 colormask = make_float3(1.0);
+
+	Ray ray = r;
+	for(int bounces=0;bounces<maxBounces;bounces++) {
+		Hit h = rayIntersectsShapes(ray, nShapes, shapes);
+		
+		float3 color;
+
+		if( h.objIdx == -1 ) {
+			// no hit
+			color = make_float3(0, 0, 0);
+			accumulatedColor += color * colormask;
+			break;
+		}
+		else {
+			color = clamp(computeShading(h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx), 0.0, 1.0);
+
+			accumulatedColor += color * colormask;// * shapes[h.objIdx].material.Ks;
+			float Kf = shapes[h.objIdx].material.Kf;
+			if( Kf == 0.0 ) break;
+			colormask *= Kf;
+		}
+
+		// get the reflected ray
+		ray.origin = h.p;
+
+		if( dot(ray.dir, h.n) < 0 ) {
+			// enter ray
+			ray.dir = refract(ray.dir, h.n, 1.0/shapes[h.objIdx].material.eta);
+		}
+		else 
+		{
+			// leaving ray
+			ray.dir = refract(ray.dir, -h.n, shapes[h.objIdx].material.eta);
+		}
+	}
+
+	return accumulatedColor;
 }
 
 __device__ d_Light dev_lights[16];
@@ -887,7 +930,7 @@ __global__ void raytrace(float3 *pos, Camera* cam,
 
 	// load scene information into block
 	shadingMode = sMode;
-	/*
+	
 	__shared__ int inLightsCount;
 	__shared__ int inShapesCount;
 	__shared__ d_Shape inShapes[64];
@@ -895,21 +938,19 @@ __global__ void raytrace(float3 *pos, Camera* cam,
 	
 	inLightsCount = nLights;
 	inShapesCount = nShapes;
-	int tidx = threadIdx.x;
-	int tidy = threadIdx.y;
 	int tid = tidy * blockDim.x + tidx;
 	if( tid < nLights )	inLights[tid].init(lights[tid]);
 	if( tid < nShapes )	inShapes[tid].init(shapes[tid]);
 	
 	__syncthreads();
-	*/
+
 
 	unsigned int x = blockIdx.x*blockDim.x + tidx;
 	unsigned int y = blockIdx.y*blockDim.y + tidy;
 
 	if( x > width - 1 || y > height - 1 ) return;
 	
-	Color c(0.0f, 0.0f, 0.0f, 0.0f);
+	float3 c;
 	int edgeSamples = sqrtf(AASamples);
 	float step = 1.0 / edgeSamples;
 
@@ -928,16 +969,32 @@ __global__ void raytrace(float3 *pos, Camera* cam,
 
 		Ray r = generateRay(cam, u, v);
 
-		//Hit h = rayIntersectsShapes(r, inShapesCount, inShapes, inLightsCount, inLights);
-		Hit h = rayIntersectsShapes(r, nShapes, dev_shapes, nLights, dev_lights);
-
-		c.c = c.c + vec4(clamp(h.color, 0.0, 1.0), 1.0);
+		if( hasReflection && !hasRefraction ) {
+			c += traceRay_reflection(r, inShapesCount, inShapes, inLightsCount, inLights);
+		}
+		else if ( !hasReflection && hasRefraction ) {
+			c += traceRay_refraction(r, inShapesCount, inShapes, inLightsCount, inLights);
+		}
+		else if( hasReflection && hasRefraction ) {
+			c += (
+				traceRay_reflection(r, inShapesCount, inShapes, inLightsCount, inLights) + 
+				traceRay_refraction(r, inShapesCount, inShapes, inLightsCount, inLights)
+				) * 0.5;
+		}
+		else c += traceRay_simple(r, inShapesCount, inShapes, inLightsCount, inLights);
 	}
 
-	c.c = c.c / (float)AASamples;
+	c /= (float)AASamples;
+	c = clamp(c, 0.0f, 1.0f);
+
+	float gamma = 1.2;
+	c = pow(c, 1.0/gamma);
+
+	Color outc;
+	outc.c.data = make_float4(c, 1.0);
 
 	// write output vertex
-	pos[y*width+x] = make_float3(x, y, c.toFloat());
+	pos[y*width+x] = make_float3(x, y, outc.toFloat());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -954,7 +1011,7 @@ __global__ void raytrace2(float3 *pos, Camera* cam,
 
 	// load scene information into block
 	shadingMode = sMode;
-	/*
+	
 	__shared__ int inLightsCount;
 	__shared__ int inShapesCount;
 	__shared__ d_Shape inShapes[64];
@@ -966,7 +1023,7 @@ __global__ void raytrace2(float3 *pos, Camera* cam,
 	if( tid < nLights )	inLights[tid].init(lights[tid]);
 	if( tid < nShapes )	inShapes[tid].init(shapes[tid]);
 	__syncthreads();
-	*/
+	
 
 	for(int gi=0;gi<gmy;gi++) {
 		for(int gj=0;gj<gmx;gj++) {
@@ -979,7 +1036,7 @@ __global__ void raytrace2(float3 *pos, Camera* cam,
 
 			if( x > width - 1 || y > height - 1 ) return;
 
-			Color c(0.0f, 0.0f, 0.0f, 0.0f);
+			float3 c = make_float3(0, 0, 0);
 			int edgeSamples = sqrtf(AASamples);
 			float step = 1.0 / edgeSamples;
 
@@ -997,32 +1054,45 @@ __global__ void raytrace2(float3 *pos, Camera* cam,
 				v = v / (float) height - 0.5;
 
 				Ray r = generateRay(cam, u, v);
-
-				Hit h = rayIntersectsShapes(r, nShapes, dev_shapes, nLights, dev_lights);
-				//Hit h = rayIntersectsShapes(r, inShapesCount, inShapes, inLightsCount, inLights);
-
-				c.c = c.c + vec4(clamp(h.color, 0.0, 1.0), 1.0);
+				if( hasReflection && !hasRefraction ) {
+					c += traceRay_reflection(r, inShapesCount, inShapes, inLightsCount, inLights);
+				}
+				else if ( !hasReflection && hasRefraction ) {
+					c += traceRay_refraction(r, inShapesCount, inShapes, inLightsCount, inLights);
+				}
+				else if( hasReflection && hasRefraction ) {
+					c += (
+						traceRay_reflection(r, inShapesCount, inShapes, inLightsCount, inLights) + 
+						traceRay_refraction(r, inShapesCount, inShapes, inLightsCount, inLights)
+						) * 0.5;
+				}
+				else c += traceRay_simple(r, inShapesCount, inShapes, inLightsCount, inLights);
 			}
 
-			c.c = c.c / (float)AASamples;
+			c /= (float)AASamples;
+			c = clamp(c, 0.0f, 1.0f);
+
+			float gamma = 1.2;
+			c = pow(c, 1.0/gamma);
 
 #define SHOW_AFFINITY 0
 #if SHOW_AFFINITY
-			/*
-			c.c.r = blockIdx.x / (float)gx;
-			c.c.g = blockIdx.y / (float)gy;
-			c.c.b = 0.0;
-			*/
 			
+			c.x = blockIdx.x / (float)gx;
+			c.y = blockIdx.y / (float)gy;
+			c.z = 0.0;
+			
+			/*
 			c.c.r = threadIdx.x / (float)blockDim.x;
 			c.c.g = threadIdx.y / (float)blockDim.y;
 			c.c.b = 0.0;
-			
+			*/			
 #endif
+			Color outc;
+			outc.c.data = make_float4(c, 1.0);
 
 			// write output vertex
-			pos[y*width+x] = make_float3(x, y, c.toFloat());
-
+			pos[y*width+x] = make_float3(x, y, outc.toFloat());
 			__syncthreads();
 		}
 	}
@@ -1049,7 +1119,7 @@ __global__ void raytrace3(float3 *pos, Camera* cam,
 
 	// load scene information into block
 	shadingMode = sMode;
-	/*
+	
 	__shared__ int inLightsCount;
 	__shared__ int inShapesCount;
 	__shared__ d_Shape inShapes[64];
@@ -1062,14 +1132,14 @@ __global__ void raytrace3(float3 *pos, Camera* cam,
 	if( tid < nShapes )	inShapes[tid].init(shapes[tid]);
 
 	__syncthreads();
-	*/
 
 	__shared__ int currentBlock;
 	if( tid == 0 ){
 		currentBlock = curb;
 	}
-	__threadfence_system();
-	//__threadfence_block();
+	//__threadfence_system();
+	__threadfence();
+	__syncthreads();
 
 	// total number of blocks, current block
 	do {
@@ -1084,7 +1154,7 @@ __global__ void raytrace3(float3 *pos, Camera* cam,
 
 		if( x > width - 1 || y > height - 1 ) return;
 
-		Color c(0.0f, 0.0f, 0.0f, 0.0f);
+		float3 c = make_float3(0, 0, 0);
 		int edgeSamples = sqrtf(AASamples);
 		float step = 1.0 / edgeSamples;
 
@@ -1102,20 +1172,35 @@ __global__ void raytrace3(float3 *pos, Camera* cam,
 			v = v / (float) height - 0.5;
 
 			Ray r = generateRay(cam, u, v);
-
-			Hit h = rayIntersectsShapes(r, nShapes, dev_shapes, nLights, dev_lights);
-			//Hit h = rayIntersectsShapes(r, inShapesCount, inShapes, inLightsCount, inLights);
-
-			c.c = c.c + vec4(clamp(h.color, 0.0, 1.0), 1.0);
+			if( hasReflection && !hasRefraction ) {
+				c += traceRay_reflection(r, inShapesCount, inShapes, inLightsCount, inLights);
+			}
+			else if ( !hasReflection && hasRefraction ) {
+				c += traceRay_refraction(r, inShapesCount, inShapes, inLightsCount, inLights);
+			}
+			else if( hasReflection && hasRefraction ) {
+				c += (
+					traceRay_reflection(r, inShapesCount, inShapes, inLightsCount, inLights) + 
+					traceRay_refraction(r, inShapesCount, inShapes, inLightsCount, inLights)
+					) * 0.5;
+			}
+			else c += traceRay_simple(r, inShapesCount, inShapes, inLightsCount, inLights);
 		}
 
-		c.c = c.c / (float)AASamples;
+		c /= (float)AASamples;
+		c = clamp(c, 0.0f, 1.0f);
 
-#define SHOW_AFFINITY 0
+		float gamma = 1.2;
+		c = pow(c, 1.0/gamma);
+
+		Color outc;
+		outc.c.data = make_float4(c, 1.0);
+
+#define SHOW_AFFINITY 1
 #if SHOW_AFFINITY
-		c.c.r = blockIdx.x / (float)gridDim.x;
-		c.c.g = blockIdx.y / (float)gridDim.y;
-		c.c.b = 1.0 - c.c.r;
+		c.x = blockIdx.x / (float)gridDim.x;
+		c.y = blockIdx.y / (float)gridDim.y;
+		c.z = 1.0 - c.x;
 
 		/*
 		c.c.r = threadIdx.x / (float)blockDim.x;
@@ -1123,16 +1208,16 @@ __global__ void raytrace3(float3 *pos, Camera* cam,
 		c.c.b = 0.0;
 		*/
 #endif
-
+		//__syncthreads();
 		// write output vertex
-		pos[y*width+x] = make_float3(x, y, c.toFloat());		
+		pos[y*width+x] = make_float3(x, y, outc.toFloat());		
 		__syncthreads();
 		//__threadfence_block();
 
 		if( tid == 0 ){
 			currentBlock = atomicAdd(&curb, 1);
 		}
-		__threadfence_block();
+		__threadfence();
 
 
 	}while(currentBlock < ttlb);

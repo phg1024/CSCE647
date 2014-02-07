@@ -105,6 +105,7 @@ void motion(int x, int y);
 void timerEvent(int value);
 
 // Cuda functionality
+extern __global__ void setParams(int, int);
 extern __global__ void bindTexture(uchar4**, int2* );
 
 extern __global__ void initScene(int nLights, Light* lights, 
@@ -149,6 +150,8 @@ Light* d_lights;
 int AASamples = 4;
 int sMode = 2;
 int kernelIdx = 0;
+int specType = 0;
+int tracingType = 0;
 
 int loadTexture(const char* filename) {
 	cv::Mat image = cv::imread(filename); 
@@ -296,7 +299,7 @@ void init_scene()
 		vec3(0, 0, .4),				// kcool
 		vec3(.4, .4, 0),				// kwarm
 		0.15, 0.25,
-		0.75, 0.25, 0.0))
+		0.15, 0.05, 0.8))
 		);
 	shapes.push_back( Shape::createSphere(
 		vec3(0.5, -0.75, -1),	// p 
@@ -309,7 +312,7 @@ void init_scene()
 		vec3(0, .4, 0),				// kcool
 		vec3(.4, 0, .4),				// kwarm
 		0.15, 0.25,
-		0.5, 0.5, 0.0))
+		0.5, 0.3, 0.2))
 		);
 	shapes.push_back(Shape( Shape::ELLIPSOID, 
 		vec3(1.25, -0.5, -0.5),	// p 
@@ -331,10 +334,10 @@ void init_scene()
 	
 	shapes.push_back(Shape( Shape::CYLINDER, 
 		vec3(0.5, -1.0, 0.75),	// p 
-		0.5, 2.0, 0.25,		// radius
+		0.5, 0.25, 0.25,		// radius
 		vec3(0, 1, 0),			// axis[0]
-		vec3(1, 1, 0),			// axis[1]
-		vec3(0, 1, 1),			// axis[2]
+		vec3(1, 0, 0),			// axis[1]
+		vec3(0, 0, 1),			// axis[2]
 		Material(
 		vec3(0.35, 0.95, 0.25),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
@@ -350,10 +353,10 @@ void init_scene()
 	
 	shapes.push_back(Shape( Shape::CONE, 
 		vec3(0.4, -1.0, -1.25),	// p 
-		0.25, 0.75, 0.3,		// radius
+		0.25, 0.05, 0.05,		// radius
 		vec3(-1.0, atan(0.3), 0),			// axis[0]
-		vec3(1, 1, 0),			// axis[1]
-		vec3(0, 1, 1),			// axis[2]
+		vec3(atan(0.3), 1.0, 0),			// axis[1]
+		vec3(0, 0, 1),			// axis[2]
 		Material(
 		vec3(0.75, 0.75, 0.25),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
@@ -362,7 +365,7 @@ void init_scene()
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.8, 0.2
+		0.15, 0.1, 0.75
 		))
 		);
 
@@ -381,7 +384,7 @@ void init_scene()
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.8, 0.2
+		0.8, 0.2, 0.0
 		))
 		);
 
@@ -399,7 +402,7 @@ void init_scene()
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.8, 0.2
+		0.1, 0.1, 0.8
 		))
 		);
 
@@ -451,13 +454,16 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
 	bindTexture<<< 1, 1 >>>(d_texAddr, d_texSize);
+	setParams<<<1, 1>>>(specType, tracingType);
+	/*
 	initScene<<<1, dim3(8,8,1)>>>(lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 								  shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]));
+	*/
 
 	switch( kernelIdx ) {
 	case 0:{
 		// execute the kernel
-		dim3 block(4, 32, 1);
+		dim3 block(32, 32, 1);
 		dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
 		raytrace<<< grid, block >>>(pos, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
@@ -466,8 +472,8 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		break;
 		   }
 	case 1:{
-		dim3 block(16, 16, 1);
-		dim3 group(16, 16, 1);
+		dim3 block(32, 32, 1);
+		dim3 group(4, 4, 1);
 		dim3 grid(group.x, group.y, 1);
 		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
 
@@ -479,8 +485,8 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		break;
 		   }
 	case 2:{
-		dim3 block(16, 16, 1);
-		dim3 grid(10, 10, 1);
+		dim3 block(32, 32, 1);
+		dim3 grid(2, 2, 1);
 
 		dim3 blockCount(ceil(window_width/(float)block.x), ceil(window_height/(float)block.y ), 1);
 
@@ -729,12 +735,14 @@ bool runTest(int argc, char **argv, char *ref_file)
 		cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
 	}
 
+	
 	size_t nStack;
 	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
 	cout << "stack size = " << nStack << endl;
 	cudaDeviceSetLimit(cudaLimitStackSize, 65536);
 	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
 	cout << "stack size = " << nStack << endl;
+	
 
 	// create VBO
 	createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
@@ -928,6 +936,12 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 	case 'K':
 		kernelIdx = (kernelIdx + 1) % 3;
 		cout << "using kernel #" << kernelIdx << endl;
+		glutPostRedisplay();
+		break;
+	case 't':
+	case 'T':
+		tracingType = (tracingType + 1) % 4;
+		cout << "tracing type = " << tracingType << endl;
 		glutPostRedisplay();
 		break;
 	case (27) :
