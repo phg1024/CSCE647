@@ -45,6 +45,95 @@ __host__ __device__ __forceinline__ float3 texel_supersample(uchar4* tex, int2 s
 	return clamp((c1+c2+c3+c4)*0.25, 0.0f, 1.0f);
 }
 
+__host__ __device__ __forceinline__ unsigned int myhash(unsigned int a){
+	a = (a+0x7ed55d16) + (a<<12);
+	a = (a^0xc761c23c) ^ (a>>19);
+	a = (a+0x165667b1) + (a<<5);
+	a = (a+0xd3a2646c) ^ (a<<9);
+	a = (a+0xfd7046c5) + (a<<3);
+	a = (a^0xb55a4f09) ^ (a>>16);
+	return a;
+}
+
+__host__ __device__ __forceinline__ float2 generateRandomNumberFromThread2(int2 resolution, float time, int x, int y){
+	int index = time + x + (y * resolution.x);
+
+	thrust::default_random_engine rng(myhash(index*time));
+	thrust::uniform_real_distribution<float> u01(0,1);
+
+	return make_float2((float) u01(rng), (float) u01(rng));
+}
+
+__host__ __device__ __forceinline__ float2 generateRandomOffsetFromThread2(int2 resolution, float time, int x, int y){
+	int index = x + (y * resolution.x);
+
+	thrust::default_random_engine rng(myhash(index*time));
+	thrust::uniform_real_distribution<float> u01(-0.5,0.5);
+
+	return make_float2((float) u01(rng), (float) u01(rng));
+}
+
+__host__ __device__ __forceinline__ float3 generateRandomNumberFromThread(int2 resolution, float time, int x, int y){
+	int index = x + (y * resolution.x);
+
+	thrust::default_random_engine rng(myhash(index*time));
+	thrust::uniform_real_distribution<float> u01(0,1);
+
+	return make_float3((float) u01(rng), (float) u01(rng), (float) u01(rng));
+}
+
+__host__ __device__ __forceinline__ float3 generateRandomOffsetFromThread(int2 resolution, float time, int x, int y){
+	int index = x + (y * resolution.x);
+
+	thrust::default_random_engine rng(myhash(index*time));
+	thrust::uniform_real_distribution<float> u01(-0.5,0.5);
+
+	return make_float3((float) u01(rng), (float) u01(rng), (float) u01(rng));
+}
+
+/*
+
+'   float angle = 6.283185307179586 * v;' +
+	// compute basis from normal
+	'   vec3 sdir, tdir;' +
+	'   if (abs(normal.x)<.5) {' +
+	'     sdir = cross(normal, vec3(1,0,0));' +
+	'   } else {' +
+	'     sdir = cross(normal, vec3(0,1,0));' +
+	'   }' +
+	'   tdir = cross(normal, sdir);' +
+	'   return r*cos(angle)*sdir + r*sin(angle)*tdir + sqrt(1.-u)*normal;'
+	*/
+
+
+//LOOK: This function demonstrates cosine weighted random direction generation in a sphere!
+__host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(float3 normal, float xi1, float xi2) {
+
+	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!
+	const float TWO_PI = 2.0 * 3.14159265;
+	float up = sqrt(xi1); // cos(theta)
+	float over = sqrt(1 - up * up); // sin(theta)
+	float around = xi2 * TWO_PI;
+
+	//Find a direction that is not the normal based off of whether or not the normal's components are all equal to sqrt(1/3) or whether or not at least one component is less than sqrt(1/3). Learned this trick from Peter Kutz.
+	const float SQRT_OF_ONE_THIRD = sqrtf(1.0/3.0);
+	float3 directionNotNormal;
+	
+	if (fabsf(normal.x) < SQRT_OF_ONE_THIRD) {
+		directionNotNormal = make_float3(1, 0, 0);
+	} else if (fabsf(normal.y) < SQRT_OF_ONE_THIRD) {
+		directionNotNormal = make_float3(0, 1, 0);
+	} else {
+		directionNotNormal = make_float3(0, 0, 1);
+	}
+
+	//Use not-normal direction to generate two perpendicular directions
+	float3 perpendicularDirection1 = normalize(cross(normal, directionNotNormal));
+	float3 perpendicularDirection2 = normalize(cross(normal, perpendicularDirection1));
+
+	return ( up * normal ) + ( cos(around) * over * perpendicularDirection1 ) + ( sin(around) * over * perpendicularDirection2 );
+}
+
 __host__ __device__ __forceinline__ float3 random3(int idx) {
 	thrust::default_random_engine rng(idx);
 	thrust::uniform_real_distribution<float> u01(0,1);	

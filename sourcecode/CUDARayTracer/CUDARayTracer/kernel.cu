@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <ctime>
 #include <iostream>
 using namespace std;
 
@@ -55,8 +56,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 // constants
 unsigned int edgeX = 8, edgeY = 8;
-unsigned int window_width  = 1024 + edgeX;
-unsigned int window_height = 768 + edgeY;
+unsigned int window_width  = 800 + edgeX;
+unsigned int window_height = 600 + edgeY;
 
 // vbo variables
 GLuint vbo = 0;
@@ -108,16 +109,19 @@ void timerEvent(int value);
 extern __global__ void setParams(int, int);
 extern __global__ void bindTexture(uchar4**, int2* );
 
+extern __global__ void copy2pbo(float3*, float3*, int, int, int);
+extern __global__ void clearCumulatedColor(float3*, int, int);
+
 extern __global__ void initScene(int nLights, Light* lights, 
 								 int nShapes, Shape* shapes);
 
-extern __global__ void raytrace(float3 *pos, Camera* cam, 
+extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
 						 unsigned int width, unsigned int height,
 						 int sMode, int AASamples);
 
-extern __global__ void raytrace2(float3 *pos, Camera* cam, 
+extern __global__ void raytrace2(float time, float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
 						 unsigned int width, unsigned int height,
@@ -126,7 +130,7 @@ extern __global__ void raytrace2(float3 *pos, Camera* cam,
 
 extern __global__ void initCurrentBlock(int v);
 
-extern __global__ void raytrace3(float3 *pos, Camera* cam, 
+extern __global__ void raytrace3(float time, float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
 						 int nShapes, Shape* shapes, 
 						 unsigned int width, unsigned int height,
@@ -147,11 +151,13 @@ int2* d_texSize;
 //texture<float, cudaTextureType2D, cudaReadModeElementType> texObjs[32];
 thrust::host_vector<Light> lights;
 Light* d_lights;
-int AASamples = 4;
+float3* cumulatedColor = 0;
+int AASamples = 1;
 int sMode = 2;
 int kernelIdx = 0;
 int specType = 0;
 int tracingType = 0;
+int iterations = 0;
 
 int loadTexture(const char* filename) {
 	cv::Mat image = cv::imread(filename); 
@@ -212,6 +218,7 @@ void init_scene()
 		}
 		*/
 
+	
 	// make a box
 	// left
 	shapes.push_back(Shape::createPlane(
@@ -228,7 +235,7 @@ void init_scene()
 		vec3(0, 0, .4),
 		vec3(.4, .4, 0),
 		0.15, 0.25,
-		0.95, 0.05, 0.0
+		1.0, 1.0, 0.0
 		)
 		));
 	// right
@@ -246,7 +253,7 @@ void init_scene()
 		vec3(0, 0, .4),
 		vec3(.4, .4, 0),
 		0.15, 0.25,
-		0.95, 0.05, 0.0
+		1.0, 1.0, 0.0
 		)
 		));
 	// back
@@ -264,9 +271,10 @@ void init_scene()
 		vec3(0, 0, .4),
 		vec3(.4, .4, 0),
 		0.15, 0.25,
-		0.95, 0.05, 0.0
+		1.0, 1.0, 0.0
 		)
 		));
+	
 
 	Shape sp = Shape(Shape::PLANE,
 		vec3(0, -1, 0),
@@ -282,37 +290,39 @@ void init_scene()
 		vec3(0, 0, .4),
 		vec3(.4, .4, 0),
 		0.15, 0.25,
-		0.75, 0.25, 0.0));
+		1.0, 0.75, 0.0));
 	sp.hasTexture = true;
 	sp.texId = loadTexture("./textures/chessboard.png");
 	//sp.texId = loadTexture("./textures/wood-texture.jpg");
 	cout << "tex id = " << sp.texId << endl;
 	shapes.push_back( sp );
-	
+
 	shapes.push_back( Shape::createSphere(
 		vec3(0, -0.5, -0.5), 0.5, 
 		Material(
-		vec3(0.95, 0.25 , 0.0 ),		// diffuse
+		vec3(1.0, 0.05 , 0.025 ),		// diffuse
 		vec3(1.0 , 1.0 , 1.0 ),		// specular
 		vec3(0.05, 0.10, 0.15),		// ambient
+		vec3(0.5, 0.25, 0.25),
 		50.0f,							// shininess
 		vec3(0, 0, .4),				// kcool
 		vec3(.4, .4, 0),				// kwarm
 		0.15, 0.25,
-		0.15, 0.05, 0.8))
+		1.0, 0.75, 0.8))
 		);
 	shapes.push_back( Shape::createSphere(
 		vec3(0.5, -0.75, -1),	// p 
 		0.25,
 		Material(
-		vec3(0.25, 0.25, 0.95),		// diffuse
+		vec3(0.5, 0.6, 1.0),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
 		vec3(0.05, 0.05, 0.05),		// ambient
+		vec3(0.0, 0.0, 0.0),
 		20.0f,							// shininess
 		vec3(0, .4, 0),				// kcool
 		vec3(.4, 0, .4),				// kwarm
 		0.15, 0.25,
-		0.5, 0.3, 0.2))
+		1.0, 0.75, 0.2))
 		);
 	shapes.push_back(Shape( Shape::ELLIPSOID, 
 		vec3(1.25, -0.5, -0.5),	// p 
@@ -321,14 +331,14 @@ void init_scene()
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
 		Material(
-		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(1.0, 1.0, 1.0),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
 		vec3(0.05, 0.05, 0.05),		// ambient
 		100.0f,							// shininess
 		vec3(.2, .9, .6),				// kcool
 		vec3(.05, .35, .95),				// kwarm
 		0.25, 0.25,
-		0.05, 0.95, 0.0
+		1.0, 0.95, 0.0
 		))
 		);
 	
@@ -346,32 +356,32 @@ void init_scene()
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.5, 0.5, 0.0
+		1.0, 0.75, 0.0
 		))
 		);
 	
 	
 	shapes.push_back(Shape( Shape::CONE, 
-		vec3(0.4, -1.0, -1.25),	// p 
+		vec3(0.4, -1.0, 1.25),	// p 
 		0.25, 0.05, 0.05,		// radius
 		vec3(-1.0, atan(0.3), 0),			// axis[0]
 		vec3(atan(0.3), 1.0, 0),			// axis[1]
 		vec3(0, 0, 1),			// axis[2]
 		Material(
-		vec3(0.75, 0.75, 0.25),		// diffuse
+		vec3(0.75, 0.75, 0.75),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
 		vec3(0.075, 0.05, 0.05),		// ambient
 		100.0f,							// shininess
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.15, 0.1, 0.75
+		1.0, 0.75, 0.75
 		))
 		);
 
 	
 	shapes.push_back(Shape( Shape::HYPERBOLOID, 
-		vec3(-1.5, 0.25, 2.0),	// p 
+		vec3(-0.5, 0.25, 2.0),	// p 
 		0.2, 0.1, 0.1,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
@@ -384,7 +394,7 @@ void init_scene()
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.8, 0.2, 0.0
+		1.0, 0.75, 0.0
 		))
 		);
 
@@ -402,7 +412,7 @@ void init_scene()
 		vec3(.9, .1, .6),				// kcool
 		vec3(.05, .45, .05),				// kwarm
 		0.25, 0.15,
-		0.1, 0.1, 0.8
+		1.0, 0.75, 0.8
 		))
 		);
 
@@ -410,10 +420,10 @@ void init_scene()
 	cudaMalloc((void**)&d_shapes, sz_shapes);
 	cudaMemcpy(d_shapes, &(shapes[0]), sz_shapes, cudaMemcpyHostToDevice);
 
-	lights.push_back(Light(Light::DISK, 0.5, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10), vec3(2, -4, 10)));
-	lights.push_back(Light(Light::DISK, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10)));
-	lights.push_back(Light(Light::DISK, 0.1, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(1000, 1000, -1000)));
-	lights.push_back(Light(Light::DIRECTIONAL, 0.15, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10, 10)));
+	lights.push_back(Light(Light::SPHERE, 0.5, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10), vec3(2, -4, 10)));
+	lights.push_back(Light(Light::SPHERE, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10), 0.5));
+	//lights.push_back(Light(Light::POINT, 0.1, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(1000, 1000, -1000)));
+	//lights.push_back(Light(Light::DIRECTIONAL, 0.15, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10, 10)));
 
 	const size_t sz_lights = lights.size() * sizeof(Light);
 	cudaMalloc((void**)&d_lights, sz_lights);
@@ -465,7 +475,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		// execute the kernel
 		dim3 block(32, 32, 1);
 		dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
-		raytrace<<< grid, block >>>(pos, d_cam,
+		raytrace<<< grid, block >>>(iterations+1, cumulatedColor, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
 			window_width, window_height, sMode, AASamples);
@@ -477,7 +487,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		dim3 grid(group.x, group.y, 1);
 		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
 
-		raytrace2<<< grid, block >>>(pos, d_cam,
+		raytrace2<<< grid, block >>>(iterations+1, cumulatedColor, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]),
 			window_width, window_height, sMode, AASamples, 
@@ -494,7 +504,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		//cout << "total blocks = " << totalBlocks << endl;
 
 		initCurrentBlock<<<1, 1>>>(0);
-		raytrace3<<< grid, block >>>(pos, d_cam,
+		raytrace3<<< grid, block >>>(iterations+1, cumulatedColor, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
 			window_width, window_height, sMode, AASamples, 
@@ -502,6 +512,15 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		break;
 		   }
 	}
+	cudaThreadSynchronize();
+
+	iterations++;
+	cout << iterations << endl;
+
+	// copy to pbo
+	dim3 block(32, 32, 1);
+	dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
+	copy2pbo<<<grid,block>>>(cumulatedColor, pos, iterations, window_width, window_height);
 	cudaThreadSynchronize();
 }
 
@@ -642,6 +661,8 @@ void showCUDAMemoryUsage() {
 void resize(int w, int h) 
 {
 	tball.reshape(w, h);
+	//return;
+	cout << w << "x" << h << " vs " << window_width << "x" << window_height << endl;
 
 	if( w == window_width &&  h == window_height ) return;
 
@@ -706,6 +727,10 @@ bool initGL(int *argc, char **argv)
 	return true;
 }
 
+void refresh() {
+	glutPostRedisplay();
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Run a simple test for CUDA
@@ -736,12 +761,12 @@ bool runTest(int argc, char **argv, char *ref_file)
 	}
 
 	
-	size_t nStack;
-	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
-	cout << "stack size = " << nStack << endl;
-	cudaDeviceSetLimit(cudaLimitStackSize, 65536);
-	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
-	cout << "stack size = " << nStack << endl;
+	//size_t nStack;
+	//cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
+	//cout << "stack size = " << nStack << endl;
+	//cudaDeviceSetLimit(cudaLimitStackSize, 65536);
+	//cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
+	//cout << "stack size = " << nStack << endl;
 	
 
 	// create VBO
@@ -750,13 +775,15 @@ bool runTest(int argc, char **argv, char *ref_file)
 	// initialize the scene on CUDA kernels
 	init_scene();
 
+	
 	// register callbacks
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 	glutMouseFunc(mouse);
-	glutMotionFunc(motion);
+	glutMotionFunc(motion);	
 
 	glutReshapeFunc(resize);
+	glutIdleFunc(refresh);
 
 	// run the cuda part
 	runCuda(&cuda_vbo_resource);
@@ -836,6 +863,12 @@ void createVBO(GLuint *vbo, struct cudaGraphicsResource **vbo_res,
 	checkCudaErrors(cudaGraphicsGLRegisterBuffer(vbo_res, *vbo, vbo_res_flags));
 
 	SDK_CHECK_ERROR_GL();
+
+	// allocate memory
+	if( cumulatedColor ) cudaFree(cumulatedColor);
+	int sz = window_width * window_height * sizeof(float3);
+	cudaMalloc((void**)&cumulatedColor, sz);
+	cudaMemset(cumulatedColor, 0, sz);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -888,10 +921,12 @@ void display()
 	computeFPS();
 }
 
-void timerEvent(int value)
-{
-	glutPostRedisplay();
-	glutTimerFunc(REFRESH_DELAY, timerEvent,0);
+void clearColor() {
+	dim3 block(32, 32, 1);
+	dim3 grid(window_width / block.x, window_height / block.y, 1);
+	clearCumulatedColor<<<grid,block>>>(cumulatedColor, window_width, window_height);
+	iterations = 0;
+	cudaThreadSynchronize();
 }
 
 void cleanup()
@@ -942,6 +977,7 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 	case 'T':
 		tracingType = (tracingType + 1) % 4;
 		cout << "tracing type = " << tracingType << endl;
+		clearColor();
 		glutPostRedisplay();
 		break;
 	case (27) :
@@ -977,6 +1013,8 @@ void mouse(int button, int state, int x, int y)
 	{		
 	}
 
+	clearColor();
+
 	mouse_old_x = x;
 	mouse_old_y = y;
 	glutPostRedisplay();
@@ -1000,5 +1038,6 @@ void motion(int x, int y)
 	mouse_old_x = x;
 	mouse_old_y = y;
 
+	clearColor();
 	glutPostRedisplay();
 }

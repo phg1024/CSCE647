@@ -19,13 +19,14 @@ public:
 		POINT = 0,
 		DIRECTIONAL,
 		SPOT,
-		DISK
+		SPHERE
 	};
 
 	LightType t;
 	float intensity;
 	vec3 pos;
 	vec3 dir;
+	float radius;
 
 	float spotExponent;
 	float spotCutOff;
@@ -39,12 +40,16 @@ public:
 	__device__ __host__ Light(){}
 	__device__ __host__ Light(const Light& lt):
 		t(lt.t), intensity(lt.intensity), ambient(lt.ambient), diffuse(lt.diffuse), specular(lt.specular), 
-		pos(lt.pos), dir(lt.dir), spotExponent(lt.spotExponent), spotCutOff(lt.spotCutOff), attenuation(lt.attenuation){}
+		pos(lt.pos), dir(lt.dir), radius(lt.radius), spotExponent(lt.spotExponent), spotCutOff(lt.spotCutOff), attenuation(lt.attenuation){}
 	__device__ __host__ ~Light(){}
 
 	// point light
 	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position):
 		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position){}
+
+	// sphere light
+	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, float r = 1.0):
+		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), radius(r){}
 
 	// directional light
 	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, vec3 direction):
@@ -61,6 +66,7 @@ struct d_Light {
 		intensity = m.intensity;
 		pos = m.pos;
 		dir = m.dir;
+		radius = m.radius;
 		spotExponent = m.spotExponent;
 		spotCutOff = m.spotCutOff;
 
@@ -75,6 +81,7 @@ struct d_Light {
 		intensity = m.intensity;
 		pos = m.pos.data;
 		dir = m.dir.data;
+		radius = m.radius;
 		spotExponent = m.spotExponent;
 		spotCutOff = m.spotCutOff;
 
@@ -88,6 +95,7 @@ struct d_Light {
 	float intensity;
 	float3 pos;
 	float3 dir;
+	float radius;
 
 	float spotExponent;
 	float spotCutOff;
@@ -107,10 +115,20 @@ public:
 		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
 		float ks = 1.0, float kr = 0.0, float kf = 0.0, float eta = 1.1
 		):
-		ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess), eta(eta),
+		emission(vec3(0, 0, 0)), ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess), eta(eta),
 		kcool(kcool), kwarm(kwarm), alpha(alpha), beta(beta)
 	{
 		Ks = ks; Kr = kr; Kf = kf;
+		}
+		__device__ __host__ Material(
+			vec3 diffuse, vec3 specular, vec3 ambient, vec3 emission, float shininess,
+			vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
+			float ks = 1.0, float kr = 0.0, float kf = 0.0, float eta = 1.1
+			):
+		emission(emission), ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess), eta(eta),
+			kcool(kcool), kwarm(kwarm), alpha(alpha), beta(beta)
+		{
+			Ks = ks; Kr = kr; Kf = kf;
 		}
 	__device__ __host__ Material(const Material& m):
 		emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess), eta(m.eta),
