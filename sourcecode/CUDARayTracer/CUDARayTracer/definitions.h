@@ -157,7 +157,7 @@ public:
 		m.t = Refractive;
 		return m;
 	}
-	__device__ __host__ Material(){}
+	__device__ __host__ Material():diffuse(vec3(1, 1, 1)), specular(vec3(1, 1, 1)), ambient(vec3(0.05, 0.05, 0.05)){}
 	__device__ __host__ Material(
 		vec3 diffuse, vec3 specular, vec3 ambient, float shininess,
 		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,

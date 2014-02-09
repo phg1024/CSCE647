@@ -119,6 +119,15 @@ __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere_
 
 __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(float3 normal, float xi1, float xi2) {
 
+	//return calculateRandomDirectionInHemisphere_uniform(normal, xi1, xi2);
+	/*
+	double r1=2*3.1415926535897932384626433832795*xi1, r2=xi2, r2s=sqrt(r2);
+	float3 w = normal;
+	float3 u = normalize(cross((fabs(w.x)>.1?make_float3(0, 1, 0):make_float3(1.0)), w));
+	float3 v = normalize(cross(w, u));
+	return normalize(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2));
+	*/
+
 	
 	float  theta = acos(sqrt(1.0-xi1));
 	float  phi = 2.0 * 3.1415926535897932384626433832795 * xi2;
@@ -130,25 +139,21 @@ __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(
 	float3 y = normal;
 
 	
-	//float3 h = y;
-	//if (fabs(h.x)<=fabs(h.y) && fabs(h.x)<=fabs(h.z))
-	//	h.x = fmaxf(h.x, 1e-6);
-	//else if (fabs(h.y)<=fabs(h.x) && fabs(h.y)<=fabs(h.z))
-	//	h.y = fmaxf(h.y, 1e-6);
-	//else
-	//	h.z = fmaxf(h.z, 1e-6);
-	
-	//float3 h = make_float3(y.x + y.y, y.x + y.z, y.y + y.z);
-	
-	//float3 h = make_float3(xs, ys, zs);
+	float3 h = y;
+	if (fabs(h.x)<=fabs(h.y) && fabs(h.x)<=fabs(h.z))
+		h.x = fmaxf(h.x, 1e-6);
+	else if (fabs(h.y)<=fabs(h.x) && fabs(h.y)<=fabs(h.z))
+		h.y = fmaxf(h.y, 1e-6);
+	else
+		h.z = fmaxf(h.z, 1e-6);
 
-	float3 h = make_float3(1.3725793, 2.017367, 3.172733);
+	//float3 h = make_float3(0.1537, 0.2793, 0.17391);
 
 	float3 x = normalize(cross(h, y));
 	float3 z = normalize(cross(y, x));
 
 	return normalize(xs * x + ys * y + zs * z);
-	
+		
 
 	/*
 	const float r = sqrtf(xi1);
@@ -160,6 +165,7 @@ __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(
 	return make_float3(x, y, sqrtf(fmaxf(0.0f, 1 - xi1)));
 	*/
 
+	/*
 	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!
 	const float TWO_PI = 2.0 * 3.14159265;
 	float up = sqrt(xi1); // cos(theta)
@@ -183,6 +189,7 @@ __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(
 	float3 perpendicularDirection2 = normalize(cross(normal, perpendicularDirection1));
 
 	return ( up * normal ) + ( cos(around) * over * perpendicularDirection1 ) + ( sin(around) * over * perpendicularDirection2 );
+	*/
 }
 
 __host__ __device__ __forceinline__ float3 random3(int idx) {

@@ -186,8 +186,9 @@ int loadTexture(const char* filename) {
 
 void init_scene()
 {
+#define CONBOX 1
 	// initialize the camera
-#if 1
+#if CONBOX
 	cam.pos = vec3(0, 1, 12);
 	cam.dir = vec3(0, -0.5, -12).normalized();
 	cam.up = vec3(0, 5, 1.5).normalized();
@@ -226,7 +227,7 @@ void init_scene()
 
 	
 	// make a bounding box
-#if 1
+#if CONBOX
 	// left
 	shapes.push_back(Shape::createPlane(
 		vec3(-3, 3, -1),
@@ -265,12 +266,12 @@ void init_scene()
 		));
 	// top light
 	shapes.push_back(Shape::createPlane(
-		vec3(0, 4.9, -1),
-		4.0, 4.0,
+		vec3(1.0, 4.0, 4),
+		0.5, 0.5,
 		vec3(0, -1, 0),
 		vec3(0, 0, 1),
 		vec3(1, 0, 0),
-		Material::makeEmissive(vec3(8, 8, 8))
+		Material::makeEmissive(vec3(1.0, 1.0, 1.0))
 		));
 	// back
 	shapes.push_back(Shape::createPlane(
@@ -401,7 +402,7 @@ void init_scene()
 	
 	shapes.push_back(Shape( Shape::CYLINDER, 
 		vec3(0.5, -1.0, -0.75),	// p 
-		0.5, 0.25, 0.25,		// radius
+		0.5, 0.5, 0.5,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
 		vec3(0, 0, 1),			// axis[2]
@@ -424,35 +425,17 @@ void init_scene()
 		vec3(-1.0, atan(0.3), 0),			// axis[0]
 		vec3(atan(0.3), 1.0, 0),			// axis[1]
 		vec3(0, 0, 1),			// axis[2]
-		Material(
-		vec3(0.75, 0.75, 0.75),		// diffuse
-		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.075, 0.05, 0.05),		// ambient
-		100.0f,							// shininess
-		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05),				// kwarm
-		0.25, 0.15,
-		1.0, 0.05, 0.75, 1.1, Material::DiffuseScatter
-		))
-		);
+		Material::makeGlossy(vec3(0.95, 0.75, 0.75), 0.5)
+		));
 
 	
 	shapes.push_back(Shape( Shape::HYPERBOLOID, 
-		vec3(-2.5, 0.5, -2.0),	// p 
+		vec3(-1.0, 1.0, -2.0),	// p 
 		0.2, 0.1, 0.1,		// radius
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
 		vec3(0, 0, 1),			// axis[2]
-		Material(
-		vec3(1.0, 1.0, 0.5),		// diffuse
-		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.075, 0.05, 0.05),		// ambient
-		100.0f,							// shininess
-		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05),				// kwarm
-		0.25, 0.15,
-		1.0, 0.75, 0.0
-		))
+		Material::makeRefractive(vec3(1,1,0.75)))
 		);
 
 	shapes.push_back(Shape( Shape::HYPERBOLOID2, 
@@ -461,20 +444,11 @@ void init_scene()
 		vec3(0, 1, 0),			// axis[0]
 		vec3(1, 0, 0),			// axis[1]
 		vec3(0, 0, 1),			// axis[2]
-		Material(
-		vec3(0.25, 0.75, 0.75),		// diffuse
-		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.075, 0.05, 0.05),		// ambient
-		100.0f,							// shininess
-		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05),				// kwarm
-		0.25, 0.15,
-		1.0, 0.75, 0.8
-		))
+		Material::makeDiffuse(vec3(0.35, 0.45, 0.65)))
 		);
 #else
 	shapes.push_back(Shape::createPlane(vec3(-50, 0.0, 0.0), 50.0, 50.0, vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(0.75, 0.25, 0.25))));
-	shapes.push_back(Shape::createPlane(vec3(50, 0.0, 0.0), 50.0, 50.0, vec3(-1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(.25,.75,.25))));
+	shapes.push_back(Shape::createPlane(vec3(50, 0.0, 0.0), 50.0, 50.0, vec3(-1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(.25, .25, .75))));
 	
 	shapes.push_back(Shape::createPlane(vec3(0.0, -50, 0.0), 50.0, 50.0, vec3(0, 1, 0), vec3(1, 0, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(.75,.75,.75))));
 	shapes.push_back(Shape::createPlane(vec3(0.0, 50, 0.0), 50.0, 50.0, vec3(0, -1, 0), vec3(1, 0, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(0.75, 0.75, 0.75))));
@@ -482,10 +456,10 @@ void init_scene()
 	shapes.push_back(Shape::createPlane(vec3(0.0, 0.0, -50.0), 50.0, 50.0, vec3(0, 0, 1), vec3(1, 0, 0), vec3(0, 1, 0), Material::makeDiffuse(vec3(0.75, 0.75, 0.75))));
 	//shapes.push_back(Shape::createPlane(vec3(50.0, 50.0, 100.0), 50.0, 50.0, vec3(0, 0, -1), vec3(1, 0, 0), vec3(0, 1, 0), Material::makeDiffuse(vec3())));
 	
-	shapes.push_back(Shape::createSphere(vec3(-15.0, 15.5, 10.0), 10.0, Material::makeDiffuseScatter(vec3(.999, .999, .999), 0.25)));
-	shapes.push_back(Shape::createSphere(vec3(-27, -33.5, -30), 16.5, Material::makeSpecular(vec3(1.0, 1.0, 1.0))));
-	shapes.push_back(Shape::createSphere(vec3(23, -33.5, 28), 16.5, Material::makeRefractive(vec3(.888, .950, .999))));
-	shapes.push_back(Shape::createSphere(vec3(0, 550.0-0.25, 0.0), 500.0, Material::makeEmissive(vec3(2.0, 2.0, 2.0))));
+	//shapes.push_back(Shape::createSphere(vec3(-15.0, 15.5, 10.0), 10.0, Material::makeDiffuseScatter(vec3(.999, .999, .999), 0.25)));
+	shapes.push_back(Shape::createSphere(vec3(-27, -33.5, -30), 16.5, Material::makeSpecular(vec3(.999, .999, .999))));
+	shapes.push_back(Shape::createSphere(vec3(23, -33.5, 15), 16.5, Material::makeRefractive(vec3(1., 1., 1.))));
+	shapes.push_back(Shape::createSphere(vec3(0, 50.0, 0.0), 10.0, Material::makeEmissive(vec3(12.0, 12.0, 12.0))));
 #endif
 
 
@@ -548,7 +522,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		// execute the kernel
 		dim3 block(32, 32, 1);
 		dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
-		raytrace<<< grid, block >>>((iterations+clock()%1024), cumulatedColor, d_cam,
+		raytrace<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
 			window_width, window_height, sMode, AASamples);
@@ -560,7 +534,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		dim3 grid(group.x, group.y, 1);
 		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
 
-		raytrace2<<< grid, block >>>((iterations+clock()%1024), cumulatedColor, d_cam,
+		raytrace2<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]),
 			window_width, window_height, sMode, AASamples, 
@@ -577,7 +551,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		//cout << "total blocks = " << totalBlocks << endl;
 
 		initCurrentBlock<<<1, 1>>>(0);
-		raytrace3<<< grid, block >>>((iterations+clock()%1024), cumulatedColor, d_cam,
+		raytrace3<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
 			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
 			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
 			window_width, window_height, sMode, AASamples, 
