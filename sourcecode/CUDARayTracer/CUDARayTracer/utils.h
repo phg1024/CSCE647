@@ -55,8 +55,17 @@ __host__ __device__ __forceinline__ unsigned int myhash(unsigned int a){
 	return a;
 }
 
+__host__ __device__ __forceinline__ float generateRandomNumberFromThread1(int2 resolution, float time, int x, int y){
+	int index = x + (y * resolution.x);
+
+	thrust::default_random_engine rng(myhash(index*time));
+	thrust::uniform_real_distribution<float> u01(0,1);
+
+	return (float) u01(rng);
+}
+
 __host__ __device__ __forceinline__ float2 generateRandomNumberFromThread2(int2 resolution, float time, int x, int y){
-	int index = time + x + (y * resolution.x);
+	int index = x + (y * resolution.x);
 
 	thrust::default_random_engine rng(myhash(index*time));
 	thrust::uniform_real_distribution<float> u01(0,1);
@@ -65,7 +74,7 @@ __host__ __device__ __forceinline__ float2 generateRandomNumberFromThread2(int2 
 }
 
 __host__ __device__ __forceinline__ float2 generateRandomOffsetFromThread2(int2 resolution, float time, int x, int y){
-	int index = x + (y * resolution.x);
+	int index = resolution.y + x + (y * resolution.x);
 
 	thrust::default_random_engine rng(myhash(index*time));
 	thrust::uniform_real_distribution<float> u01(-0.5,0.5);
@@ -91,23 +100,65 @@ __host__ __device__ __forceinline__ float3 generateRandomOffsetFromThread(int2 r
 	return make_float3((float) u01(rng), (float) u01(rng), (float) u01(rng));
 }
 
-/*
+__host__ __device__ __forceinline__ float3 calculateRandomDirectionInSphere(float xi1, float xi2) {
 
-'   float angle = 6.283185307179586 * v;' +
-	// compute basis from normal
-	'   vec3 sdir, tdir;' +
-	'   if (abs(normal.x)<.5) {' +
-	'     sdir = cross(normal, vec3(1,0,0));' +
-	'   } else {' +
-	'     sdir = cross(normal, vec3(0,1,0));' +
-	'   }' +
-	'   tdir = cross(normal, sdir);' +
-	'   return r*cos(angle)*sdir + r*sin(angle)*tdir + sqrt(1.-u)*normal;'
-	*/
+	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!
+	const float TWO_PI = 2.0 * 3.14159265;
+	float up = sqrt(xi1); // cos(theta)
+	float over = sqrt(1 - up * up); // sin(theta)
+	float around = xi2 * TWO_PI;
 
+	return make_float3(up * sinf(around), over * sinf(around), cos(around));
+}
 
-//LOOK: This function demonstrates cosine weighted random direction generation in a sphere!
+__host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere_uniform(float3 normal, float xi1, float xi2) {
+	float3 v = calculateRandomDirectionInSphere(xi1, xi2);
+	if( dot(v, normal) < 0 ) return -v;
+	else return v;
+}
+
 __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(float3 normal, float xi1, float xi2) {
+
+	
+	float  theta = acos(sqrt(1.0-xi1));
+	float  phi = 2.0 * 3.1415926535897932384626433832795 * xi2;
+
+	float xs = sinf(theta) * cosf(phi);
+	float ys = cosf(theta);
+	float zs = sinf(theta) * sinf(phi);
+
+	float3 y = normal;
+
+	
+	//float3 h = y;
+	//if (fabs(h.x)<=fabs(h.y) && fabs(h.x)<=fabs(h.z))
+	//	h.x = fmaxf(h.x, 1e-6);
+	//else if (fabs(h.y)<=fabs(h.x) && fabs(h.y)<=fabs(h.z))
+	//	h.y = fmaxf(h.y, 1e-6);
+	//else
+	//	h.z = fmaxf(h.z, 1e-6);
+	
+	//float3 h = make_float3(y.x + y.y, y.x + y.z, y.y + y.z);
+	
+	//float3 h = make_float3(xs, ys, zs);
+
+	float3 h = make_float3(1.3725793, 2.017367, 3.172733);
+
+	float3 x = normalize(cross(h, y));
+	float3 z = normalize(cross(y, x));
+
+	return normalize(xs * x + ys * y + zs * z);
+	
+
+	/*
+	const float r = sqrtf(xi1);
+	const float theta = 2 * 3.14195265 * xi2;
+
+	const float x = r * cosf(theta);
+	const float y = r * sinf(theta);
+
+	return make_float3(x, y, sqrtf(fmaxf(0.0f, 1 - xi1)));
+	*/
 
 	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!
 	const float TWO_PI = 2.0 * 3.14159265;

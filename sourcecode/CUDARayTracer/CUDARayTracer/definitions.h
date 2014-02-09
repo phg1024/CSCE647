@@ -19,7 +19,8 @@ public:
 		POINT = 0,
 		DIRECTIONAL,
 		SPOT,
-		SPHERE
+		SPHERE,
+		AREA
 	};
 
 	LightType t;
@@ -109,33 +110,83 @@ struct d_Light {
 
 class Material {
 public:
+	enum MaterialType {
+		Emissive,
+		Diffuse,
+		Specular,
+		Refractive,
+		DiffuseScatter,
+		Glossy
+	};
+	static Material makeDiffuseScatter(vec3 diffuse, float r) {
+		Material m;
+		m.diffuse = diffuse;
+		m.t = DiffuseScatter;
+		m.Kr = r;
+		return m;
+	}
+	static Material makeGlossy(vec3 v, float r) {
+		Material m;
+		m.diffuse = v;
+		m.t = Glossy;
+		m.Kr = r;
+		return m;
+	}
+	static Material makeDiffuse(vec3 v) {
+		Material m;
+		m.diffuse = v;
+		m.t = Diffuse;
+		return m;
+	}
+	static Material makeSpecular(vec3 v) {
+		Material m;
+		m.diffuse = v;
+		m.t = Specular;
+		return m;
+	}
+	static Material makeEmissive(vec3 v) {
+		Material m;
+		m.emission = v;
+		m.t = Emissive;
+		return m;
+	}
+	static Material makeRefractive(vec3 v) {
+		Material m;
+		m.diffuse = v;
+		m.eta = 1.5;
+		m.t = Refractive;
+		return m;
+	}
 	__device__ __host__ Material(){}
 	__device__ __host__ Material(
 		vec3 diffuse, vec3 specular, vec3 ambient, float shininess,
 		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
-		float ks = 1.0, float kr = 0.0, float kf = 0.0, float eta = 1.1
+		float ks = 1.0, float kr = 0.0, float kf = 0.0, float eta = 1.1,
+		MaterialType t = Diffuse
 		):
+		t(t),
 		emission(vec3(0, 0, 0)), ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess), eta(eta),
 		kcool(kcool), kwarm(kwarm), alpha(alpha), beta(beta)
 	{
 		Ks = ks; Kr = kr; Kf = kf;
 		}
-		__device__ __host__ Material(
+	__device__ __host__ Material(
 			vec3 diffuse, vec3 specular, vec3 ambient, vec3 emission, float shininess,
 			vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
 			float ks = 1.0, float kr = 0.0, float kf = 0.0, float eta = 1.1
 			):
+		t(Emissive),
 		emission(emission), ambient(ambient), diffuse(diffuse), specular(specular), shininess(shininess), eta(eta),
 			kcool(kcool), kwarm(kwarm), alpha(alpha), beta(beta)
 		{
 			Ks = ks; Kr = kr; Kf = kf;
 		}
 	__device__ __host__ Material(const Material& m):
-		emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess), eta(m.eta),
+		t(m.t), emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess), eta(m.eta),
 		Ks(m.Ks), Kr(m.Kr), Kf(m.Kf), kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta)
 	{}
 	__device__ __host__ Material& operator=(const Material& m) {
-		emission = m.emission; ambient = m.ambient; diffuse = m.diffuse; specular = m.specular;
+		t = m.t; emission = m.emission; ambient = m.ambient; diffuse = m.diffuse; specular = m.specular;
 		shininess = m.shininess; eta = m.eta; Ks = m.Ks; Kr = m.Kr; Kf = m.Kf; 
 		kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
 
@@ -144,6 +195,7 @@ public:
 
 	__device__ __host__ ~Material(){}
 
+	MaterialType t;
 	vec3 emission;
 	vec3 ambient;
 	vec3 diffuse;
@@ -159,6 +211,7 @@ public:
 
 struct d_Material {
 	__device__ void init(const Material& m) {
+		t = m.t;
 		emission = m.emission.data;
 		ambient = m.ambient.data;
 		diffuse = m.diffuse.data;
@@ -176,6 +229,7 @@ struct d_Material {
 		beta = m.beta;
 	}
 
+	Material::MaterialType t;
 	float3 emission;
 	float3 ambient;
 	float3 diffuse;
@@ -246,6 +300,22 @@ public:
 		return Shape(PLANE, center, w, h, 0.0, normal, u, v, mater);
 	}
 
+	static Shape createCylinder(){
+
+	}
+
+	static Shape createCone() {
+
+	}
+
+	static Shape createHyperboloid() {
+
+	}
+
+	static Shape createHyperboloid2() {
+
+	}
+
 	ShapeType t;
 
 	// geometry
@@ -286,6 +356,24 @@ struct d_Shape {
 
 		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
 		constant2 = (t==Shape::CONE)?0.0:1.0;
+	}
+
+	__device__ float3 randomPointOnSurface(int2 res, float time, int x, int y) const {
+		switch( t ) {
+		case Shape::ELLIPSOID: 
+			{
+				float2 uv = generateRandomNumberFromThread2(res, time, x, y);
+				float3 sp = calculateRandomDirectionInSphere(uv.x, uv.y);
+				return (sp.x * axis[0] * radius[0] + sp.y * axis[1] * radius[1] + sp.z * axis[2] * radius[2]) + p;
+			}
+		case Shape::PLANE:
+			{
+				float2 uv = generateRandomOffsetFromThread2(res, time, x, y);
+				return uv.x * axis[1] + uv.y * axis[2] + p + 1e-3 * axis[0];
+			}
+		default:
+			return p;
+		}
 	}
 
 	// geometry
