@@ -157,7 +157,8 @@ public:
 		m.t = Refractive;
 		return m;
 	}
-	__device__ __host__ Material():diffuse(vec3(1, 1, 1)), specular(vec3(1, 1, 1)), ambient(vec3(0.05, 0.05, 0.05)){}
+	__device__ __host__ Material():diffuse(vec3(1, 1, 1)), specular(vec3(1, 1, 1)), ambient(vec3(0.05, 0.05, 0.05)), shininess(50.0),
+	kcool(vec3(0, 0, 0.75)), kwarm(vec3(0.75, 0.75, 0)), alpha(0.15f), beta(0.25f), Ks(1.0), Kr(0.0), Kf(0.0), eta(1.0){}
 	__device__ __host__ Material(
 		vec3 diffuse, vec3 specular, vec3 ambient, float shininess,
 		vec3 kcool, vec3 kwarm, float alpha = 0.15f, float beta = 0.25f,
@@ -292,7 +293,7 @@ public:
 			mater);
 	}
 
-	static Shape createEllipsoid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater ) {
+	static Shape createEllipsoid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
 		return Shape(ELLIPSOID, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
@@ -300,20 +301,20 @@ public:
 		return Shape(PLANE, center, w, h, 0.0, normal, u, v, mater);
 	}
 
-	static Shape createCylinder(){
-
+	static Shape createCylinder(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater){
+		return Shape(CYLINDER, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createCone() {
-
+	static Shape createCone(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+		return Shape(CONE, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createHyperboloid() {
-
+	static Shape createHyperboloid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+		return Shape(HYPERBOLOID, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createHyperboloid2() {
-
+	static Shape createHyperboloid2(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+		return Shape(HYPERBOLOID2, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
 	ShapeType t;

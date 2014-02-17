@@ -44,9 +44,11 @@ using namespace std;
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include "element.h"
 #include "definitions.h"
+#include "Scene.h"
 #include "trackball.h"
 
 #define MAX_EPSILON_ERROR 10.0f
@@ -56,8 +58,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 // constants
 unsigned int edgeX = 8, edgeY = 8;
-unsigned int window_width  = 512 + edgeX;
-unsigned int window_height = 512 + edgeY;
+unsigned int window_width  = 1024 + edgeX;
+unsigned int window_height = 768 + edgeY;
 
 // vbo variables
 GLuint vbo = 0;
@@ -266,7 +268,7 @@ void init_scene()
 		));
 	// top light
 	shapes.push_back(Shape::createPlane(
-		vec3(1.0, 4.0, 4),
+		vec3(2.5, 4.0, 4.0),
 		0.5, 0.5,
 		vec3(0, -1, 0),
 		vec3(0, 0, 1),
@@ -360,9 +362,9 @@ void init_scene()
 	shapes.push_back( Shape::createSphere(
 		vec3(0, -0.5, 0.5), 0.5, 
 		Material(
-		vec3(1.0, 1.0, 1.0),		// diffuse
+		vec3(0.75, 0.75, 0.75),		// diffuse
 		vec3(1.0 , 1.0 , 1.0 ),		// specular
-		vec3(0.05, 0.10, 0.15),		// ambient
+		vec3(0.01, 0.02, 0.03),		// ambient
 		50.0f,							// shininess
 		vec3(0, 0, .4),				// kcool
 		vec3(.4, .4, 0),				// kwarm
@@ -384,16 +386,16 @@ void init_scene()
 		);
 	shapes.push_back(Shape( Shape::ELLIPSOID, 
 		vec3(1.25, -0.25, 0.5),	// p 
-		0.5, 0.5, 0.5,		// radius
+		0.75, 0.5, 0.5,		// radius
 		vec3(1, 0, 1),			// axis[0]
 		vec3(1, 1, 0),			// axis[1]
 		vec3(0, 1, 1),			// axis[2]
 		Material(
-		vec3(0.85, 0.85, 0.85),		// diffuse
+		vec3(0.75, 0.95, 0.75),		// diffuse
 		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.05, 0.05, 0.05),		// ambient
+		vec3(0.05, 0.025, 0.015),		// ambient
 		100.0f,							// shininess
-		vec3(.2, .9, .6),				// kcool
+		vec3(.0, .9, .3),				// kcool
 		vec3(.05, .35, .95),				// kwarm
 		0.25, 0.25,
 		1.0, 0.95, 0.0, 1.01, Material::Specular
@@ -417,8 +419,7 @@ void init_scene()
 		1.0, 0.15, 0.0, 1.0, Material::DiffuseScatter
 		))
 		);
-	
-	
+		
 	shapes.push_back(Shape( Shape::CONE, 
 		vec3(0.4, -1.0, -1.25),	// p 
 		0.25, 0.05, 0.05,		// radius
@@ -427,8 +428,7 @@ void init_scene()
 		vec3(0, 0, 1),			// axis[2]
 		Material::makeGlossy(vec3(0.95, 0.75, 0.75), 0.5)
 		));
-
-	
+		
 	shapes.push_back(Shape( Shape::HYPERBOLOID, 
 		vec3(-1.0, 1.0, -2.0),	// p 
 		0.2, 0.1, 0.1,		// radius
@@ -995,6 +995,19 @@ void cleanup()
 	exit(g_TotalErrors == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
+void screenshot() {
+	// Make the BYTE array, factor of 3 because it's RBG.
+	int width = window_width - edgeX;
+	int height = window_height - edgeX;
+	BYTE* pixels = new BYTE[ 3 * width * height];
+	glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+
+	cv::Mat m( height, width, CV_8UC3, pixels );
+	cv::cvtColor(m, m, CV_RGB2BGR);
+	cv::flip(m, m, 0);
+	cv::imwrite("screenshot.png", m);
+	delete[] pixels;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Keyboard events handler
@@ -1015,8 +1028,8 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 		cin >> gamma;
 		glutPostRedisplay();
 		break;
-	case 's':
-	case 'S':
+	case 'a':
+	case 'A':
 		cout << "Please input number of samples:" << endl;
 		cin >> AASamples;
 		glutPostRedisplay();
@@ -1029,10 +1042,19 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 		break;
 	case 't':
 	case 'T':
-		tracingType = (tracingType + 1) % 4;
+		tracingType = (tracingType + 1) % 3;
 		cout << "tracing type = " << tracingType << endl;
 		clearColor();
 		glutPostRedisplay();
+		break;
+	case 's':
+	case 'S':
+		specType = (specType + 1) % 5;
+		glutPostRedisplay();
+		break;
+	case 'c':
+	case 'C':
+		screenshot();
 		break;
 	case (27) :
 		cleanup();
