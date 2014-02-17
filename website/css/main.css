@@ -354,3 +354,8 @@ margin: 0;
     text-decoration: none;
     text-shadow: 1px 1px 1px rgba(255, 255, 255, 1.0);
 }
+
+.note {
+    color: #ff3322;
+    text-shadow: 1px 1px 1px rgba(255, 255, 255, 1.0);
+}
