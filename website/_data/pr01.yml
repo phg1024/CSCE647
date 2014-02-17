@@ -1,0 +1,31 @@
+- name: lambert.png
+  des: Lambert Shading
+  id: "1"
+
+- name: phong.png
+  des: Phong Shading
+  id: "2"
+
+- name: gooch.png
+  des: Gooch Shading
+  id: "3"
+
+- name: lambert_AA.png
+  des: Lambert Shading with Antialiasing
+  id: "4"
+
+- name: phong_AA.png
+  des: Phong Shading with Antialiasing
+  id: "5"
+
+- name: gooch_AA.png
+  des: Gooch Shading with Antialiasing
+  id: "6"
+
+- name: circular_spec.png
+  des: Circular Sharp Specular Highlight
+  id: "7"
+
+- name: rect_spec.png
+  des: Rectangular Specular Highlight
+  id: "8"

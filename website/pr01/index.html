@@ -6,9 +6,19 @@ title: Project 01 - Basic Ray Tracing
 <article>
 <div class="maincontent">
     <h2>{{ page.title }}</h2>
-	<div class="underconstruction">
-		<image src="../images/raytracing.png"/>
-		<h2>Coming soon...</h2>
-	</div>
+    <div class="projectbrief">
+        <p>
+            For this project, I have implemented all tasks. The 
+        </p>
+    </div>
+    <div class="results">
+        {% for item in site.data.pr01 %}
+        <div class="resultentry">
+            <a class="fbox" href="./images/{{item.name}}"><img class="resultimage"  src="./images/{{item.name}}" title="{{item.des}}"></image></a>
+            <p class="resultdes">Image {{item.id}}: {{ item.des }}</p>
+        </div>
+        {% endfor %}
+
+    </div>
 </div>
 </article>

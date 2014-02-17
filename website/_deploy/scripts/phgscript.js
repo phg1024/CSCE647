@@ -5,3 +5,13 @@ function writeEmailAddress() {
     var addr = name + at + domainname;
     document.write('<a href=mailto:' + addr + '>' + addr + '</a>');
 }
+
+$(document).ready(function(){
+    $('.fbox').fancybox({
+        helpers: {
+            title : {
+                type : 'float'
+            }
+        }
+    });
+});
