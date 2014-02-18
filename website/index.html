@@ -8,7 +8,7 @@ title: Peihong's CSCE 647 Projects
     {% for project in site.data.projects %}
 	<div class="projectentry">
 		<a class="hidden" href="./pr{{ project.id }}/index.html"><image class="projectimg"  src="./pr{{ project.id }}/thumbnail.png"></image></a>
-		<a class="projectdes" href="./pr{{ project.id }}/index.html">Project {{project.id}}: {{ project.name }}</a>
+		<a class="projectdes mylink" href="./pr{{ project.id }}/index.html">Project {{project.id}}: {{ project.name }}</a>
 	</div>
     {% endfor %}
   </div>

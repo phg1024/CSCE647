@@ -3,7 +3,7 @@ function writeEmailAddress() {
     var at = '@';
     var domainname = 'tamu.edu';
     var addr = name + at + domainname;
-    document.write('<a href=mailto:' + addr + '>' + addr + '</a>');
+    document.write('<a class="mylink" href=mailto:' + addr + '>' + addr + '</a>');
 }
 
 $(document).ready(function(){
