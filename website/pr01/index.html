@@ -8,13 +8,23 @@ title: Project 01 - Basic Ray Tracing
     <h2>{{ page.title }}</h2>
     <div class="projectbrief">
         <p>
-            For this project, I have implemented all tasks. The 
+            For this project, I have done all the tasks. I put all the shapes into a single scene and rendered the scene with
+            different shading methods. For antialiasing, I used jittered uniform sampling. The raytracer is implemented in CUDA
+            and runs at about 90 fps. I have also included a video below to show the results.
         </p>
     </div>
     <div class="results">
+        <h2>Video</h2>
+        <div id="div_video">
+            <video width="640" height="480" controls preload="auto">
+                <source src="videos/video.mp4" type="video/mp4" />
+            </video>
+        </div>
+        <h2>Images</h2>
+        <p class="note">Click on the images to view full size version.</p>
         {% for item in site.data.pr01 %}
         <div class="resultentry">
-            <a class="fbox" href="./images/{{item.name}}"><img class="resultimage"  src="./images/{{item.name}}" title="{{item.des}}"></image></a>
+            <a class="fbox" href="./images/{{item.name}}" title="{{item.des}}"><img class="resultimage"  src="./images/{{item.name}}"></a>
             <p class="resultdes">Image {{item.id}}: {{ item.des }}</p>
         </div>
         {% endfor %}

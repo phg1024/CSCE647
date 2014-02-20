@@ -29,3 +29,7 @@
 - name: rect_spec.png
   des: Rectangular Specular Highlight
   id: "8"
+
+- name: cartoon.png
+  des: Cartoon Shading
+  id: "9"
