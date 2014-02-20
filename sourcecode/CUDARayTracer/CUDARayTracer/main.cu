@@ -143,7 +143,7 @@ void runCuda(struct cudaGraphicsResource **vbo_resource);
 
 Camera cam;
 Camera* d_cam;
-thrust::host_vector<Shape> shapes;
+vector<Shape> shapes;
 Shape* d_shapes;
 int textureCount = 0;
 float* texAddr[32];
@@ -151,7 +151,7 @@ uchar4** d_texAddr;
 int2 texSize[32];
 int2* d_texSize;
 //texture<float, cudaTextureType2D, cudaReadModeElementType> texObjs[32];
-thrust::host_vector<Light> lights;
+vector<Light> lights;
 Light* d_lights;
 float3* cumulatedColor = 0;
 int AASamples = 1;
@@ -461,6 +461,13 @@ void init_scene()
 	shapes.push_back(Shape::createSphere(vec3(23, -33.5, 15), 16.5, Material::makeRefractive(vec3(1., 1., 1.))));
 	shapes.push_back(Shape::createSphere(vec3(0, 50.0, 0.0), 10.0, Material::makeEmissive(vec3(12.0, 12.0, 12.0))));
 #endif
+
+	Scene scene;
+	if(!scene.load("scene0.txt")) cout << "scene file loading failed!" << endl;
+	else {
+		shapes = scene.getShapes();
+		cout << "scene loaded. " << shapes.size() << " shapes in total." << endl;
+	}
 
 
 	const size_t sz_shapes = shapes.size() * sizeof(Shape);
@@ -1042,7 +1049,7 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 		break;
 	case 't':
 	case 'T':
-		tracingType = (tracingType + 1) % 3;
+		tracingType = (tracingType + 1) % 2;
 		cout << "tracing type = " << tracingType << endl;
 		clearColor();
 		glutPostRedisplay();

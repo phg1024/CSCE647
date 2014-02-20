@@ -1,5 +1,8 @@
 #pragma once
-
+#include <iostream>
+#include <algorithm>
+#include <string>
+using namespace std;
 
 class vec2 {
 public:
@@ -160,6 +163,9 @@ public:
 	friend __device__ __host__ vec3 operator*(float f, const vec3& v);
 	friend __device__ __host__ vec3 operator/(float f, const vec3& v);
 
+	friend istream& operator>>(istream& is, vec3& v);
+	friend ostream& operator<<(ostream& os, const vec3& v);
+
 	union {
 		float3 data;
 		struct {float x, y, z, w;};
@@ -171,6 +177,16 @@ __device__ __host__ __inline__ vec3 operator+(float f, const vec3& v) { return v
 __device__ __host__ __inline__ vec3 operator-(float f, const vec3& v) { return vec3(v.x - f, v.y - f, v.z - f); }
 __device__ __host__ __inline__ vec3 operator*(float f, const vec3& v) { return vec3(v.x * f, v.y * f, v.z * f); }
 __device__ __host__ __inline__ vec3 operator/(float f, const vec3& v) { return vec3(v.x / f, v.y / f, v.z / f); }
+
+__host__ __inline__ istream& operator>>(istream& is, vec3& v) {
+	is >> v.x >> v.y >> v.z;
+	return is;
+}
+
+__host__ __inline__ ostream& operator<<(ostream& os, vec3& v) {
+	os << v.x << ' ' << v.y << ' ' << v.z;
+	return os;
+}
 
 class vec4 {
 public:
@@ -273,6 +289,84 @@ public:
 		return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 	}
 
+	__device__ __host__ static mat3 scaling(float sx, float sy, float sz) {
+		return mat3(sx, 0, 0, 0, sy, 0, 0, 0, sz);
+	}
+
+	__device__ __host__ static mat3 rotation_x(float theta) {
+		float cosTheta = cos(theta), sinTheta = sin(theta);
+		return mat3(
+			1.0,	0.0,		0.0,
+			0.0,	cosTheta,	-sinTheta,
+			0.0,	sinTheta,	cosTheta
+			);
+	}
+
+	__device__ __host__ static mat3 rotation_y(float theta) {
+		float cosTheta = cos(theta), sinTheta = sin(theta);
+		return mat3(
+			cosTheta,	0.0,	sinTheta,
+			0.0,		1.0,	0.0,
+			-sinTheta,	0.0,	cosTheta
+			);
+	}
+
+	__device__ __host__ static mat3 rotation_z(float theta) {
+		float cosTheta = cos(theta), sinTheta = sin(theta);
+		return mat3(
+			cosTheta,	-sinTheta,	0.0,
+			sinTheta,	cosTheta,	0.0,
+			0.0,		0.0,		1.0
+			);
+	}
+
+	__device__ __host__ static mat3 rotation_dx(float theta) {
+		float cosTheta = cos(theta), sinTheta = sin(theta);
+		return mat3(
+			1.0,	0.0,		0.0,
+			0.0,	-sinTheta,	-cosTheta,
+			0.0,	cosTheta,	-sinTheta
+			);
+	}
+
+	__device__ __host__ static mat3 rotation_dy(float theta) {
+		float cosTheta = cos(theta), sinTheta = sin(theta);
+		return mat3(
+			-sinTheta,	0.0,	cosTheta,
+			0.0,		1.0,	0.0,
+			-cosTheta,	0.0,	-sinTheta
+			);
+	}
+
+	__device__ __host__ static mat3 rotation_dz(float theta) {
+		float cosTheta = cos(theta), sinTheta = sin(theta);
+		return mat3(
+			-sinTheta,	-cosTheta,	0.0,
+			cosTheta,	-sinTheta,	0.0,
+			0.0,		0.0,		1.0
+			);
+	}
+
+	__device__ __host__ static mat3 rotation(float rx, float ry, float rz) {
+		mat3 mat = rotation_z(rz);
+		mat *= rotation_y(ry);
+		mat *= rotation_x(rx);
+		return mat;
+	}
+
+	__device__ __host__ static void jacobian(
+		float rx, float ry, float rz,
+		mat3& Jx, mat3& Jy, mat3& Jz
+		) {
+			mat3 Rx = rotation_x(rx);
+			mat3 Ry = rotation_y(ry);
+			mat3 Rz = rotation_z(rz);
+
+			Jx = Rz * Ry * rotation_dx(rx);
+			Jy = Rz * rotation_dy(ry) * Rx;
+			Jz = rotation_dz(rz) * Ry * Rx;
+	}
+
 	__device__ __host__ mat3 operator-() const {
 		return mat3(-elem[0], -elem[1], -elem[2], -elem[3], -elem[4], -elem[5], 
 			-elem[6], -elem[7], -elem[8]);
@@ -309,6 +403,11 @@ public:
 		res(8) = elem[6] * m(2) + elem[7] * m(5) + elem[8] * m(8);
 
 		return res;
+	}
+
+	__device__ __host__ mat3 operator*=(const mat3& m) {
+		(*this) = (*this)*m;
+		return (*this);
 	}
 
 	__device__ __host__ vec3 operator*(const vec3& v) {

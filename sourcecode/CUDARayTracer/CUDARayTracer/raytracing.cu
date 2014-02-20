@@ -315,7 +315,7 @@ __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int 
 		float x0 = (-b-delta)*inv;
 		float x1 = (-b+delta)*inv;
         
-		const float THRES = 1e-6;
+		const float THRES = 1e-3;
 		float t = 1e10;
 		if( x0 > THRES ) t = min(x0, t);
 		if( x1 > THRES ) t = min(x1, t);
@@ -789,7 +789,7 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				lpos = shapes[i].randomPointOnSurface(res, time, x, y);
 
 			// determine if this light is visible
-			bool isVisible = checkLightVisibility2(lpos, v, N, shapes, nShapes, sid);
+			bool isVisible = checkLightVisibility2(lpos, v, N, shapes, nShapes, i);
 
 			//calculate Ambient Term:
 			float3 Iamb = shapes[sid].material.ambient * shapes[i].material.emission;
@@ -886,7 +886,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				lpos = shapes[i].randomPointOnSurface(res, time, x, y);
 
 			// determine if this light is visible
-			bool isVisible = checkLightVisibility2(lpos, v, N, shapes, nShapes, sid);
+			bool isVisible = checkLightVisibility2(lpos, v, N, shapes, nShapes, i);
 
 			//calculate Ambient Term:
 			float3 Iamb = shapes[sid].material.ambient * shapes[i].material.emission;
@@ -926,9 +926,9 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				float diffuseFactor = max(NdotL, 0.0);
 				if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
 
-				float3 Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.diffuse * diffuseFactor, 0.0, 1.0);
+				float3 Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
 
-				c += Itexture * Idiff;
+				c += Itexture * (Idiff + Iamb);
 			}
 			else {
 				float3 Itexture;
@@ -977,9 +977,9 @@ __device__ float3 goochShading2(int2 res, float time, int x, int y, float3 v, fl
 			float3 Idiff = diffuse * NdotL;
 			float3 kcdiff = fminf(shapes[sid].material.kcool + shapes[sid].material.alpha * Idiff, 1.0f);
 			float3 kwdiff = fminf(shapes[sid].material.kwarm + shapes[sid].material.beta * Idiff, 1.0f);
-			float3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5);
+			float3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5) * shapes[i].material.emission;
 			// calculate Specular Term:
-			float3 Ispec = shapes[sid].material.specular
+			float3 Ispec = shapes[sid].material.specular * shapes[i].material.emission
 				* pow(max(dot(R,E),0.0),0.3*shapes[sid].material.shininess);
 			Ispec = step(make_float3(0.5, 0.5, 0.5), Ispec);
 			// edge effect

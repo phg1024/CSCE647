@@ -196,6 +196,33 @@ public:
 
 	__device__ __host__ ~Material(){}
 
+	static __host__ MaterialType string2type(const string& s) {
+		string tag = s;
+		std::for_each(tag.begin(), tag.end(), ::tolower);
+
+		if( tag == "emissive" ) {
+			return Emissive;
+		}
+		else if( tag == "diffuse" ) {
+			return Diffuse;
+		}
+		else if( tag == "specular" ) {
+			return Specular;
+		}
+		else if( tag == "refractive" ) {
+			return Refractive;
+		}
+		else if( tag == "diffusescatter" ) {
+			return DiffuseScatter;
+		}
+		else if( tag == "glossy" ) {
+			return Glossy;
+		}
+		else return Diffuse;
+	}
+
+	__host__ friend istream& operator>>(istream& is, Material& mater);
+
 	MaterialType t;
 	vec3 emission;
 	vec3 ambient;
@@ -209,6 +236,16 @@ public:
 	vec3 kcool, kwarm;
 	float alpha, beta;
 };
+
+__host__ __inline__ istream& operator>>(istream& is, Material& mater) {
+	string tag;
+	is >> tag >> mater.emission >> mater.ambient >> mater.diffuse >> mater.specular >> mater.Ks >> mater.Kr
+		>> mater.Kf >> mater.shininess >> mater.eta >> mater.kcool >> mater.kwarm >> mater.alpha >> mater.beta;
+
+	mater.t = Material::string2type(tag);
+	cout << tag << endl;
+	return is;
+}
 
 struct d_Material {
 	__device__ void init(const Material& m) {
