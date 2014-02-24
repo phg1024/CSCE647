@@ -65,7 +65,7 @@ __host__ __device__ __forceinline__ float generateRandomNumberFromThread1(int2 r
 }
 
 __host__ __device__ __forceinline__ float2 generateRandomNumberFromThread2(int2 resolution, float time, int x, int y){
-	int index = x + (y * resolution.x);
+	int index = resolution.y + x + (y * resolution.x);
 
 	thrust::default_random_engine rng(myhash(index*time));
 	thrust::uniform_real_distribution<float> u01(0,1);
@@ -120,50 +120,12 @@ __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere_
 __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(float3 normal, float xi1, float xi2) {
 
 	//return calculateRandomDirectionInHemisphere_uniform(normal, xi1, xi2);
-	/*
+	
 	double r1=2*3.1415926535897932384626433832795*xi1, r2=xi2, r2s=sqrt(r2);
-	float3 w = normal;
-	float3 u = normalize(cross((fabs(w.x)>.1?make_float3(0, 1, 0):make_float3(1.0)), w));
+	float3 w = normalize(normal);
+	float3 u = normalize(cross((fabs(w.x)>1e-6?make_float3(0, 1, 0):make_float3(w.x>0?-1:1, 0, 0)), w));
 	float3 v = normalize(cross(w, u));
-	return normalize(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2));
-	*/
-
-	
-	float  theta = acos(sqrt(1.0-xi1));
-	float  phi = 2.0 * 3.1415926535897932384626433832795 * xi2;
-
-	float xs = sinf(theta) * cosf(phi);
-	float ys = cosf(theta);
-	float zs = sinf(theta) * sinf(phi);
-
-	float3 y = normal;
-
-	
-	float3 h = y;
-	if (fabs(h.x)<=fabs(h.y) && fabs(h.x)<=fabs(h.z))
-		h.x = fmaxf(h.x, 1e-6);
-	else if (fabs(h.y)<=fabs(h.x) && fabs(h.y)<=fabs(h.z))
-		h.y = fmaxf(h.y, 1e-6);
-	else
-		h.z = fmaxf(h.z, 1e-6);
-
-	//float3 h = make_float3(0.1537, 0.2793, 0.17391);
-
-	float3 x = normalize(cross(h, y));
-	float3 z = normalize(cross(y, x));
-
-	return normalize(xs * x + ys * y + zs * z);
-		
-
-	/*
-	const float r = sqrtf(xi1);
-	const float theta = 2 * 3.14195265 * xi2;
-
-	const float x = r * cosf(theta);
-	const float y = r * sinf(theta);
-
-	return make_float3(x, y, sqrtf(fmaxf(0.0f, 1 - xi1)));
-	*/
+	return normalize(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2));		
 
 	/*
 	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!

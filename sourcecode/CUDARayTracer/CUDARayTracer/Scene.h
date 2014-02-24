@@ -19,6 +19,7 @@ public:
 	bool save(const string& filename);
 
 	const vector<Shape>& getShapes() const {return shapes;}
+	const Camera& camera() const {return cam;}
 
 protected:
 	void parse(const string& line);

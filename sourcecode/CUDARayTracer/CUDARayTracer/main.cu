@@ -191,9 +191,9 @@ void init_scene()
 #define CONBOX 1
 	// initialize the camera
 #if CONBOX
-	cam.pos = vec3(0, 1, 12);
-	cam.dir = vec3(0, -0.5, -12).normalized();
-	cam.up = vec3(0, 5, 1.5).normalized();
+	cam.pos = vec3(0, 15, 50);
+	cam.dir = vec3(0, -2.5, -15).normalized();
+	cam.up = vec3(0, 15, -2.5).normalized();
 #else
 	cam.pos = vec3(0,0, 150);
 	cam.dir = vec3(0,0, -1).normalized();
@@ -469,6 +469,10 @@ void init_scene()
 		cout << "scene loaded. " << shapes.size() << " shapes in total." << endl;
 	}
 
+	cam = scene.camera();
+
+	cudaMalloc((void**)&d_cam, sizeof(Camera));
+	cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice);
 
 	const size_t sz_shapes = shapes.size() * sizeof(Shape);
 	cudaMalloc((void**)&d_shapes, sz_shapes);
@@ -550,12 +554,13 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		   }
 	case 2:{
 		dim3 block(32, 32, 1);
-		dim3 grid(16, 16, 1);
+		dim3 grid(4, 4, 1);
 
 		dim3 blockCount(ceil(window_width/(float)block.x), ceil(window_height/(float)block.y ), 1);
 
 		unsigned totalBlocks = blockCount.x*blockCount.y;
 		//cout << "total blocks = " << totalBlocks << endl;
+		srand(clock());
 
 		initCurrentBlock<<<1, 1>>>(0);
 		raytrace3<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
@@ -654,6 +659,7 @@ int findGraphicsGPU(char *name)
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
+	srand(clock());
 	FreeImage_Initialise();
 	char *ref_file = NULL;
 
@@ -1049,7 +1055,7 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/)
 		break;
 	case 't':
 	case 'T':
-		tracingType = (tracingType + 1) % 2;
+		tracingType = (tracingType + 1) % 3;
 		cout << "tracing type = " << tracingType << endl;
 		clearColor();
 		glutPostRedisplay();

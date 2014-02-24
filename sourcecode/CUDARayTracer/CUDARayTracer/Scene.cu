@@ -42,8 +42,13 @@ void Scene::parse(const string& line)
 	cout << tag << endl;
 
 	std::for_each(tag.begin(), tag.end(), ::tolower);
-
-	if( tag == "plane" ) {
+	
+	if( tag == "camera" ) {
+		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.w >> cam.h;
+		cam.dir = cam.dir.normalized();
+		cam.up = cam.up.normalized();
+	}
+	else if( tag == "plane" ) {
 		vec3 T, S, R;
 		ss >> T >> S >> R;
 		Material mater;
