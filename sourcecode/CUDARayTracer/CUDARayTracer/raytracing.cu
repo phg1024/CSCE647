@@ -468,12 +468,11 @@ __device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nS
 
 __device__ bool checkLightVisibility2(float3 l, float3 p, float3 N, d_Shape* shapes, int nShapes, int sid) {
 	float dist = length(p - l);
+
 	Ray r;
 	r.origin = p;
-	if( isDirectionalLight )
-		r.dir = normalize(l);
-	else
-		r.dir = normalize(l - p);
+	if( isDirectionalLight ) r.dir = normalize(l);
+	else r.dir = normalize(l - p);
 	float t = lightRayIntersectsShapes2(r, shapes, nShapes, sid);
 
 	float THRES = 1e-3;

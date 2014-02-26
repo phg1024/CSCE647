@@ -103,12 +103,13 @@ __host__ __device__ __forceinline__ float3 generateRandomOffsetFromThread(int2 r
 __host__ __device__ __forceinline__ float3 calculateRandomDirectionInSphere(float xi1, float xi2) {
 
 	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!
-	const float TWO_PI = 2.0 * 3.14159265;
-	float up = sqrt(xi1); // cos(theta)
-	float over = sqrt(1 - up * up); // sin(theta)
-	float around = xi2 * TWO_PI;
+	const float TWO_PI = 2.0 * 3.1415926535897932384626433832795;
 
-	return make_float3(up * sinf(around), over * sinf(around), cos(around));
+	float u = xi1*2.0 - 1.0;
+	float uu = sqrt(1.0 - u*u);
+	float theta = xi2 * TWO_PI;
+
+	return make_float3(uu * cos(theta), uu * sin(theta), u);
 }
 
 __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere_uniform(float3 normal, float xi1, float xi2) {

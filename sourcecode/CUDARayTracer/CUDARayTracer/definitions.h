@@ -407,7 +407,7 @@ struct d_Shape {
 		case Shape::PLANE:
 			{
 				float2 uv = generateRandomOffsetFromThread2(res, time, x, y);
-				return uv.x * axis[1] + uv.y * axis[2] + p + 1e-3 * axis[0];
+				return uv.x * axis[1] * radius[0] + uv.y * axis[2] * radius[1] + p + 1e-3 * axis[0];
 			}
 		default:
 			return p;
