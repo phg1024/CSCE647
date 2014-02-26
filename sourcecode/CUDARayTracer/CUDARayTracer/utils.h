@@ -194,6 +194,17 @@ __host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float f) {
 	return u * (1.0f-f) + v * f;
 }
 
+__host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, float f) {
+	if( f > 0.5 ) {
+		float r = (f - 0.5) * 2.0;
+		return u * r + v * (1.0 - r);
+	}
+	else {
+		float r = f * 2.0;
+		return v * r + w * (1.0 - r);
+	}
+}
+
 __host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, float alpha, float beta, float gamma) {
 	return alpha * u + beta * v + gamma * w;
 }

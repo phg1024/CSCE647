@@ -18,6 +18,7 @@ __device__ bool isRayTracing = false;
 __device__ bool isDirectionalLight = false;
 __device__ bool isSpotLight = false;
 __device__ bool fakeSoftShadow = false;
+__device__ bool rainbowLight = true;
 __device__ bool jittered = true;
 __device__ uchar4* textures[32];
 __device__ int2 textureSize[32];
@@ -1010,7 +1011,15 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				float diffuseFactor = max(NdotL, 0.0);
 				if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
 
-				float3 Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
+				float3 Idiff;
+
+				if( rainbowLight ) {
+					float3 lightColor = mix(make_float3(1, 0.5, 0.5), make_float3(0.5, 1, 0.5), make_float3(0.5, 0.5, 1), diffuseFactor);
+					Idiff = clamp(shapes[sid].material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
+				}
+				else{
+					Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
+				}
 
 				float shadowFactor = 1.0;
 				if( fakeSoftShadow ) {
