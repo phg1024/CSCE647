@@ -18,7 +18,7 @@ __device__ bool isRayTracing = false;
 __device__ bool isDirectionalLight = false;
 __device__ bool isSpotLight = false;
 __device__ bool fakeSoftShadow = false;
-__device__ bool rainbowLight = true;
+__device__ bool rainbowLight = false;
 __device__ bool jittered = true;
 __device__ uchar4* textures[32];
 __device__ int2 textureSize[32];
@@ -66,10 +66,10 @@ __global__ void setParams(int specType, int tracingType) {
 	}
 }
 
-__global__ void bindTexture(uchar4** intex, int2* texSize) {
-	for(int i=0;i<32;i++){
-		textures[i] = intex[i];
-		textureSize[i] = texSize[i];
+__global__ void bindTexture(TextureObject* texs, int texCount) {
+	for(int i=0;i<texCount;i++){
+		textures[i] = (uchar4*)texs[i].addr;
+		textureSize[i] = texs[i].size;
 	}
 }
 
@@ -979,19 +979,22 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 
 				// change the normal with normal map
 				if( shapes[sid].hasNormalMap ) {
-					/*
+					
 					// normal defined in tangent space
-					vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
-
-					vec3 tangent = normalize(sphere_tangent(N));
-					vec3 bitangent = cross(N, tangent);
+					float3 n_normalmap = normalize(texel_supersample(textures[shapes[sid].normalTexId], textureSize[shapes[sid].normalTexId], t) * 2.0 - 1.0);
+										
+					float3 tangent;
+					if( shapes[sid].t == Shape::PLANE )
+						tangent = shapes[sid].axis[1];
+					else
+						tangent = normalize(sphere_tangent(N));
+					float3 bitangent = cross(N, tangent);
 
 					// find the mapping from tangent space to camera space
-					mat3 m_t = transpose(mat3(tangent, bitangent, N));
+					mat3 m_t = mat3(tangent, bitangent, N);
 
 					// convert the normal to to camera space
-					NdotL = dot(n_normalmap, normalize(m_t*L));
-					*/
+					NdotL = dot(n_normalmap, normalize(m_t*L));					
 				}
 				else {
 					NdotL = dot(N, L);
@@ -1001,6 +1004,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 					float3 ldir = normalize(lpos);
 					NdotL *= step(0.75, dot(ldir, L));
 				}
+
 
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
@@ -1012,7 +1016,6 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
 
 				float3 Idiff;
-
 				if( rainbowLight ) {
 					float3 lightColor = mix(make_float3(1, 0.5, 0.5), make_float3(0.5, 1, 0.5), make_float3(0.5, 0.5, 1), diffuseFactor);
 					Idiff = clamp(shapes[sid].material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
@@ -1020,7 +1023,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				else{
 					Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
 				}
-
+								
 				float shadowFactor = 1.0;
 				if( fakeSoftShadow ) {
 					Ray tr;
@@ -1169,7 +1172,7 @@ __device__ __forceinline__ float rand(float x, float y){
 }
 
 // ray intersection test with shading computation
-__device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	float ti = lightRayIntersectsSphere(r, shapes, sid);
 
 	if( ti > 0.0 ) {
@@ -1221,7 +1224,9 @@ __device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes
 		h.p = h.t * r.dir + r.origin;
         // normal at hit point
 		h.n = normalize(2.0 * mul(shapes[sid].m, (h.p - shapes[sid].p)) * shapes[sid].constant);
-        h.tex = spheremap(h.n);
+		
+		h.tex = spheremap(h.n);
+		
 		h.objIdx = sid;
         return h;
     }

@@ -275,6 +275,13 @@ public:
 		elem[3] = m[3]; elem[4] = m[4]; elem[5] = m[5];
 		elem[6] = m[6]; elem[7] = m[7]; elem[8] = m[8];
 	}
+
+	__device__ __host__ mat3(float3 row0, float3 row1, float3 row2) {
+		elem[0] = row0.x; elem[1] = row0.y; elem[2] = row0.z;
+		elem[3] = row1.x; elem[4] = row1.y; elem[5] = row1.z;
+		elem[6] = row2.x; elem[7] = row2.y; elem[8] = row2.z;
+	}
+
 	__device__ __host__ mat3& operator=(const mat3& m) {
 		elem[0] = m.elem[0]; elem[1] = m.elem[1]; elem[2] = m.elem[2];
 		elem[3] = m.elem[3]; elem[4] = m.elem[4]; elem[5] = m.elem[5];
@@ -412,6 +419,14 @@ public:
 
 	__device__ __host__ vec3 operator*(const vec3& v) {
 		return vec3(
+			elem[0] * v.x + elem[1] * v.y + elem[2] * v.z,
+			elem[3] * v.x + elem[4] * v.y + elem[5] * v.z,
+			elem[6] * v.x + elem[7] * v.y + elem[8] * v.z
+			);
+	}
+
+	__device__ __host__ float3 operator*(const float3& v) {
+		return make_float3(
 			elem[0] * v.x + elem[1] * v.y + elem[2] * v.z,
 			elem[3] * v.x + elem[4] * v.y + elem[5] * v.z,
 			elem[6] * v.x + elem[7] * v.y + elem[8] * v.z
@@ -747,4 +762,9 @@ public:
 	}
 
 	vec4 c;
+};
+
+struct TextureObject {
+	uchar4 *addr;
+	int2 size;
 };

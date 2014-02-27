@@ -20,6 +20,7 @@ public:
 
 	const vector<Shape>& getShapes() const {return shapes;}
 	const Camera& camera() const {return cam;}
+	const vector<TextureObject>& getTextures() const { return texs; }
 
 protected:
 	void parse(const string& line);
@@ -27,4 +28,6 @@ protected:
 private:
 	Camera cam;
 	vector<Shape> shapes;
+
+	vector<TextureObject> texs;
 };

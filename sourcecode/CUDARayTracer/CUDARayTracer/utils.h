@@ -1,8 +1,80 @@
 #pragma once
 
+#include <cuda_runtime.h>
 #include "helper_math.h"
 #include "element.h"
 #include <thrust/random.h>
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+inline void showCUDAMemoryUsage() {
+	size_t free_byte ;
+	size_t total_byte ;
+	cudaError_t cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+	if ( cudaSuccess != cuda_status ){
+		printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+		exit(1);
+	}
+
+	double free_db = (double)free_byte ;
+	double total_db = (double)total_byte ;
+	double used_db = total_db - free_db ;
+	printf("GPU memory usage: used = %f, free = %f MB, total = %f MB\n", used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
+}
+
+static int loadTexture(const char* filename, float** texAddr, int2* texSize, int& textureCount) {
+	cv::Mat image = cv::imread(filename); 
+
+	//cv::imshow("texture", image);
+
+	cout << image.cols << "x" << image.rows << endl;
+	int width = image.cols, height = image.rows;
+	vector<uchar4> buffer(width*height*3);
+	for(int i=0;i<height;i++) {
+		for(int j=0;j<width;j++) {
+			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
+			int idx = (i*width+j);
+			buffer[idx] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
+		}
+	}
+
+	texSize[textureCount] = make_int2(width, height);
+	const size_t sz_tex = width * height * sizeof(uchar4);
+	cudaMalloc((void**)&(texAddr[textureCount]), sz_tex);
+	cudaMemcpy(texAddr[textureCount], &buffer[0], sz_tex, cudaMemcpyHostToDevice);
+
+	return textureCount++;
+}
+
+static int loadTexture(const char* filename, vector<TextureObject>& texObjs) {
+	cout << "loading texture " << filename << endl;
+	cv::Mat image = cv::imread(filename); 
+	//cv::imshow("texture", image);
+
+	cout << image.cols << "x" << image.rows << endl;
+	int width = image.cols, height = image.rows;
+	vector<uchar4> buffer(width*height*3);
+	for(int i=0;i<height;i++) {
+		for(int j=0;j<width;j++) {
+			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
+			int idx = (i*width+j);
+			buffer[idx] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
+		}
+	}
+
+	TextureObject texObj;
+	texObj.size = make_int2(width, height);
+	const size_t sz_tex = width * height * sizeof(uchar4);
+	cudaMalloc((void**)&(texObj.addr), sz_tex);
+	cudaMemcpy(texObj.addr, &buffer[0], sz_tex, cudaMemcpyHostToDevice);
+
+	showCUDAMemoryUsage();
+
+	texObjs.push_back(texObj);
+	return texObjs.size()-1;
+}
 
 __host__ __device__ __forceinline__ float3 texel(uchar4* tex, int2 size, float2 t) {
 	int w = size.x, h = size.y;
@@ -245,10 +317,21 @@ __host__ __device__ __forceinline__ mat3 outerProduct(const vec3& u, const vec3&
 		);
 }
 
+__device__ __forceinline__ float2 repeated(float2 t) {
+	float2 res = t;
+	if( t.x < 0 ) res.x += 1.0;
+	if( t.x > 1.0 ) res.x -= 1.0;
+
+	if( t.y < 0 ) res.y += 1.0;
+	if( t.y > 1.0 ) res.y -= 1.0;
+	return res;
+}
+
 __device__ __forceinline__ float2 spheremap(float3 p) {
-	const float PI = 3.1415926536;
-	return make_float2((atanf(p.z / p.x) / PI + 1.0) * 0.5,
+	const float PI = 3.1415926535897;
+	float2 t = make_float2((PI - atan2f(p.z, p.x))/PI*0.5,
                 -((asinf(p.y) / PI + 0.5)));
+	return repeated(t);
 }
 
 

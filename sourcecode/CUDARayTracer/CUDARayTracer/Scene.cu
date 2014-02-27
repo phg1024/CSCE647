@@ -1,5 +1,5 @@
 #include "Scene.h"
-
+#include "utils.h"
 
 Scene::Scene(void)
 {
@@ -53,7 +53,7 @@ void Scene::parse(const string& line)
 		ss >> T >> S >> R;
 		Material mater;
 		ss >> mater;
-
+		
 		// construct transformation matrix
 		mat3 mscl = mat3::scaling(S.x, S.y, S.z);
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
@@ -61,7 +61,21 @@ void Scene::parse(const string& line)
 		vec3 n(0, 1, 0), u(1, 0, 0), v(0, 0, 1);
 		vec3 dim = mscl * vec3(1, 1, 1);
 
-		shapes.push_back(Shape::createPlane(T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		Shape sp = Shape::createPlane(T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater);
+
+		string texFile, normalFile;
+		ss >> texFile >> normalFile;
+		
+		if( texFile != "none" ) {
+			sp.hasTexture = true;
+			sp.texId = loadTexture(texFile.c_str(), texs);
+		}
+		if( normalFile != "none" ) {
+			sp.hasNormalMap = true;
+			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+		}
+
+		shapes.push_back(sp);
 	}
 	else if( tag == "box" ) {
 		vec3 T, S, R;
@@ -97,6 +111,7 @@ void Scene::parse(const string& line)
 		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
 	}
 	else if( tag == "sphere" ) {
+
 		vec3 T, S, R;
 		ss >> T >> S >> R;
 		Material mater;
@@ -107,7 +122,23 @@ void Scene::parse(const string& line)
 		mat3 M = mrot * mscl;
 
 		vec3 dim = mscl * vec3(1, 1, 1);
-		shapes.push_back(Shape::createSphere(T, dim.x, mater));
+
+		Shape sp = Shape::createSphere(T, dim.x, mater);
+
+		string texFile, normalFile;
+		ss >> texFile >> normalFile;
+		
+		if( texFile != "none" ) {
+			sp.hasTexture = true;
+			sp.texId = loadTexture(texFile.c_str(), texs);
+			cout << sp.texId << endl;
+		}
+		if( normalFile != "none" ) {
+			sp.hasNormalMap = true;
+			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+		}
+
+		shapes.push_back(sp);
 	}
 	else if( tag == "ellipsoid") {
 		vec3 T, S, R;
@@ -117,7 +148,22 @@ void Scene::parse(const string& line)
 
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
 
-		shapes.push_back(Shape::createEllipsoid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), mater));
+		Shape sp = Shape::createEllipsoid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), mater);
+
+		string texFile, normalFile;
+		ss >> texFile >> normalFile;
+		
+		if( texFile != "none" ) {
+			sp.hasTexture = true;
+			sp.texId = loadTexture(texFile.c_str(), texs);
+			cout << sp.texId << endl;
+		}
+		if( normalFile != "none" ) {
+			sp.hasNormalMap = true;
+			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+		}
+
+		shapes.push_back(sp);
 	}
 	else if( tag == "cylinder" ) {
 		vec3 T, S, R;

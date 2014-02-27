@@ -109,13 +109,10 @@ void timerEvent(int value);
 
 // Cuda functionality
 extern __global__ void setParams(int, int);
-extern __global__ void bindTexture(uchar4**, int2* );
+extern __global__ void bindTexture(TextureObject* texs, int texCount);
 
 extern __global__ void copy2pbo(float3*, float3*, int, int, int, float);
 extern __global__ void clearCumulatedColor(float3*, int, int);
-
-extern __global__ void initScene(int nLights, Light* lights, 
-								 int nShapes, Shape* shapes);
 
 extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
 						 int nLights, Light* lights, 
@@ -141,15 +138,14 @@ extern __global__ void raytrace3(float time, float3 *pos, Camera* cam,
 
 void runCuda(struct cudaGraphicsResource **vbo_resource);
 
+
+Scene scene;
+
 Camera cam;
 Camera* d_cam;
 vector<Shape> shapes;
 Shape* d_shapes;
-int textureCount = 0;
-float* texAddr[32];
-uchar4** d_texAddr;
-int2 texSize[32];
-int2* d_texSize;
+TextureObject* d_tex;
 //texture<float, cudaTextureType2D, cudaReadModeElementType> texObjs[32];
 vector<Light> lights;
 Light* d_lights;
@@ -162,311 +158,20 @@ int tracingType = 0;
 int iterations = 0;
 float gamma = 1.0;
 
-int loadTexture(const char* filename) {
-	cv::Mat image = cv::imread(filename); 
-
-	//cv::imshow("texture", image);
-
-	cout << image.cols << "x" << image.rows << endl;
-	int width = image.cols, height = image.rows;
-	vector<uchar4> buffer(width*height*3);
-	for(int i=0;i<height;i++) {
-		for(int j=0;j<width;j++) {
-			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
-			int idx = (i*width+j);
-			buffer[idx] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
-		}
-	}
-
-	texSize[textureCount] = make_int2(width, height);
-	const size_t sz_tex = width * height * sizeof(uchar4);
-	cudaMalloc((void**)&(texAddr[textureCount]), sz_tex);
-	cudaMemcpy(texAddr[textureCount], &buffer[0], sz_tex, cudaMemcpyHostToDevice);
-
-	return textureCount++;
-}
-
 void init_scene()
 {
-#define CONBOX 1
-	// initialize the camera
-#if CONBOX
-	cam.pos = vec3(0, 15, 50);
-	cam.dir = vec3(0, -2.5, -15).normalized();
-	cam.up = vec3(0, 15, -2.5).normalized();
-#else
-	cam.pos = vec3(0,0, 150);
-	cam.dir = vec3(0,0, -1).normalized();
-	cam.up = vec3(0, 1, 0);
-#endif
-	cam.f = 2.0;
-	cam.w = 1.0; cam.h = window_height / (float) window_width; 
-
+	showCUDAMemoryUsage();
 	const size_t sz = sizeof(Camera);
 	cudaMalloc((void**)&d_cam, sz);
 	cudaMemcpy(d_cam, &cam, sz, cudaMemcpyHostToDevice);
 
-	/*
-	int scount = 7;
-	// initialize the scene by uploading scene objects to GPU
-	for(int i=0;i<scount;i++)
-		for(int j=0;j<scount;j++)
-		{
-			vec3 pos(i*4-scount*2, 0.0, j*4-scount*2);
-			shapes.push_back(
-				Shape::createSphere(pos, 1.0, Material(
-				random3(i*13+j),		// diffuse
-				vec3(1.0, 1.0, 1.0),		// specular
-				vec3(0.10, 0.10, 0.1),		// ambient
-				50.0f,							// shininess
-				vec3(0, 0, .4),				// kcool
-				vec3(.4, .4, 0),				// kwarm
-				0.15, 0.25,
-				0.75, 0.25, 0.0))
-				);
-		}
-		*/
-
-	
-	// make a bounding box
-#if CONBOX
-	// left
-	shapes.push_back(Shape::createPlane(
-		vec3(-3, 3, -1),
-		4.0, 4.0,
-		vec3(1, 0, 0),
-		vec3(0, 0, 1),
-		vec3(0, 1, 0),
-		Material::makeDiffuse(vec3(0.75, 0.25, 0.25))
-		));
-	// right
-	shapes.push_back(Shape::createPlane(
-		vec3(3, 3, -1),
-		4.0, 4.0,
-		vec3(-1, 0, 0),
-		vec3(0, 0, 1),
-		vec3(0, 1, 0),
-		Material::makeDiffuse(vec3(0.25, 0.75, 0.25))
-		));
-	// top
-	shapes.push_back(Shape::createPlane(
-		vec3(0, 5.0, -1),
-		4.0, 4.0,
-		vec3(0, -1, 0),
-		vec3(0, 0, 1),
-		vec3(1, 0, 0),
-		Material(
-		vec3(0.0, 0.0, 1.0),
-		vec3(1, 1, 1),
-		vec3(0.05, 0.05, 0.05),
-		50.0,
-		vec3(0, 0, .4),
-		vec3(.4, .4, 0),
-		0.15, 0.25,
-		1.0, 0.5, 0.0
-		)
-		));
-	// top light
-	shapes.push_back(Shape::createPlane(
-		vec3(2.5, 4.0, 4.0),
-		0.5, 0.5,
-		vec3(0, -1, 0),
-		vec3(0, 0, 1),
-		vec3(1, 0, 0),
-		Material::makeEmissive(vec3(1.0, 1.0, 1.0))
-		));
-	// back
-	shapes.push_back(Shape::createPlane(
-		vec3(0, 3, -5),
-		4.0, 4.0,
-		vec3(0, 0, 1),
-		vec3(1, 0, 0),
-		vec3(0, 1, 0),
-		Material(
-		vec3(0.55, 0.55, 0.55),
-		vec3(1, 1, 1),
-		vec3(0.05, 0.05, 0.05),
-		50.0,
-		vec3(0, 0, .4),
-		vec3(.4, .4, 0),
-		0.15, 0.25,
-		1.0, 0.0, 0.0
-		)
-		));
-	
-
-	Shape sp = Shape(Shape::PLANE,
-		vec3(0, -1, 0),
-		500.0, 500.0, 0.0,
-		vec3(0, 1, 0),
-		vec3(1, 0, 0),
-		vec3(0, 0, 1),
-		Material(
-		vec3(1.0, 1.0, 1.0),
-		vec3(1, 1, 1),
-		vec3(0.05, 0.05, 0.05),
-		50.0,
-		vec3(0, 0, .4),
-		vec3(.4, .4, 0),
-		0.15, 0.25,
-		1.0, 0.01, 0.0));
-	sp.hasTexture = true;
-	sp.texId = loadTexture("./textures/chessboard.png");
-	//sp.texId = loadTexture("./textures/wood-texture.jpg");
-	cout << "tex id = " << sp.texId << endl;
-	shapes.push_back( sp );
-
-	Material marble(
-		vec3(0.95, 0.95, 0.85),
-		vec3(1, 1, 1),
-		vec3(0.05, 0.05, 0.05),
-		50.0,
-		vec3(0, 0, .4),
-		vec3(.4, .4, 0),
-		0.15, 0.25,
-		1.0, 0.5, 0.0);
-
-	// box
-	// top
-	shapes.push_back(Shape::createPlane(
-		vec3(-1.0, -0.5, 0.5),
-		0.25, 0.25,
-		vec3(0, 1, 0), vec3(1, 0, 0), vec3(0, 0, 1), marble));
-	// bottom
-	shapes.push_back(Shape::createPlane(
-		vec3(-1.0, -1.0, 0.5),
-		0.25, 0.25,
-		vec3(0, -1, 0), vec3(1, 0, 0), vec3(0, 0, 1), marble));
-	// front
-	shapes.push_back(Shape::createPlane(
-		vec3(-1.0, -0.75, 0.75),
-		0.25, 0.25,
-		vec3(0, 0, 1), vec3(1, 0, 0), vec3(0, 1, 0), marble));
-	// back
-	shapes.push_back(Shape::createPlane(
-		vec3(-1.0, -0.75, 0.25),
-		0.25, 0.25,
-		vec3(0, 0, -1), vec3(1, 0, 0), vec3(0, 1, 0), marble));
-	// left
-	shapes.push_back(Shape::createPlane(
-		vec3(-1.25, -0.75, 0.5),
-		0.25, 0.25,
-		vec3(-1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), marble));
-	// right
-	shapes.push_back(Shape::createPlane(
-		vec3(-0.75, -0.75, 0.5),
-		0.25, 0.25,
-		vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), marble));
-
-	// other shapes
-	shapes.push_back( Shape::createSphere(
-		vec3(0, -0.5, 0.5), 0.5, 
-		Material(
-		vec3(0.75, 0.75, 0.75),		// diffuse
-		vec3(1.0 , 1.0 , 1.0 ),		// specular
-		vec3(0.01, 0.02, 0.03),		// ambient
-		50.0f,							// shininess
-		vec3(0, 0, .4),				// kcool
-		vec3(.4, .4, 0),				// kwarm
-		0.15, 0.25,
-		0.25, 1.0, 0.8, 1.5, Material::Refractive))
-		);
-	shapes.push_back( Shape::createSphere(
-		vec3(0.5, -0.75, 1),	// p 
-		0.25,
-		Material(
-		vec3(0.5, 0.6, 1.0),		// diffuse
-		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.05, 0.05, 0.05),		// ambient
-		20.0f,							// shininess
-		vec3(0, .4, 0),				// kcool
-		vec3(.4, 0, .4),				// kwarm
-		0.15, 0.25,
-		1.0, 0.25, 0.2, 1.5, Material::Diffuse))
-		);
-	shapes.push_back(Shape( Shape::ELLIPSOID, 
-		vec3(1.25, -0.25, 0.5),	// p 
-		0.75, 0.5, 0.5,		// radius
-		vec3(1, 0, 1),			// axis[0]
-		vec3(1, 1, 0),			// axis[1]
-		vec3(0, 1, 1),			// axis[2]
-		Material(
-		vec3(0.75, 0.95, 0.75),		// diffuse
-		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.05, 0.025, 0.015),		// ambient
-		100.0f,							// shininess
-		vec3(.0, .9, .3),				// kcool
-		vec3(.05, .35, .95),				// kwarm
-		0.25, 0.25,
-		1.0, 0.95, 0.0, 1.01, Material::Specular
-		))
-		);
-	
-	shapes.push_back(Shape( Shape::CYLINDER, 
-		vec3(0.5, -1.0, -0.75),	// p 
-		0.5, 0.5, 0.5,		// radius
-		vec3(0, 1, 0),			// axis[0]
-		vec3(1, 0, 0),			// axis[1]
-		vec3(0, 0, 1),			// axis[2]
-		Material(
-		vec3(0.55, 0.95, 0.65),		// diffuse
-		vec3(1.0 , 1.0 , 1.0),		// specular
-		vec3(0.05, 0.05, 0.05),		// ambient
-		100.0f,							// shininess
-		vec3(.9, .1, .6),				// kcool
-		vec3(.05, .45, .05),				// kwarm
-		0.25, 0.15,
-		1.0, 0.15, 0.0, 1.0, Material::DiffuseScatter
-		))
-		);
-		
-	shapes.push_back(Shape( Shape::CONE, 
-		vec3(0.4, -1.0, -1.25),	// p 
-		0.25, 0.05, 0.05,		// radius
-		vec3(-1.0, atan(0.3), 0),			// axis[0]
-		vec3(atan(0.3), 1.0, 0),			// axis[1]
-		vec3(0, 0, 1),			// axis[2]
-		Material::makeGlossy(vec3(0.95, 0.75, 0.75), 0.5)
-		));
-		
-	shapes.push_back(Shape( Shape::HYPERBOLOID, 
-		vec3(-1.0, 1.0, -2.0),	// p 
-		0.2, 0.1, 0.1,		// radius
-		vec3(0, 1, 0),			// axis[0]
-		vec3(1, 0, 0),			// axis[1]
-		vec3(0, 0, 1),			// axis[2]
-		Material::makeRefractive(vec3(1,1,0.75)))
-		);
-
-	shapes.push_back(Shape( Shape::HYPERBOLOID2, 
-		vec3(2.5, 0.25, -2.0),	// p 
-		0.125, 0.1, 0.1,		// radius
-		vec3(0, 1, 0),			// axis[0]
-		vec3(1, 0, 0),			// axis[1]
-		vec3(0, 0, 1),			// axis[2]
-		Material::makeDiffuse(vec3(0.35, 0.45, 0.65)))
-		);
-#else
-	shapes.push_back(Shape::createPlane(vec3(-50, 0.0, 0.0), 50.0, 50.0, vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(0.75, 0.25, 0.25))));
-	shapes.push_back(Shape::createPlane(vec3(50, 0.0, 0.0), 50.0, 50.0, vec3(-1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(.25, .25, .75))));
-	
-	shapes.push_back(Shape::createPlane(vec3(0.0, -50, 0.0), 50.0, 50.0, vec3(0, 1, 0), vec3(1, 0, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(.75,.75,.75))));
-	shapes.push_back(Shape::createPlane(vec3(0.0, 50, 0.0), 50.0, 50.0, vec3(0, -1, 0), vec3(1, 0, 0), vec3(0, 0, 1), Material::makeDiffuse(vec3(0.75, 0.75, 0.75))));
-	
-	shapes.push_back(Shape::createPlane(vec3(0.0, 0.0, -50.0), 50.0, 50.0, vec3(0, 0, 1), vec3(1, 0, 0), vec3(0, 1, 0), Material::makeDiffuse(vec3(0.75, 0.75, 0.75))));
-	//shapes.push_back(Shape::createPlane(vec3(50.0, 50.0, 100.0), 50.0, 50.0, vec3(0, 0, -1), vec3(1, 0, 0), vec3(0, 1, 0), Material::makeDiffuse(vec3())));
-	
-	//shapes.push_back(Shape::createSphere(vec3(-15.0, 15.5, 10.0), 10.0, Material::makeDiffuseScatter(vec3(.999, .999, .999), 0.25)));
-	shapes.push_back(Shape::createSphere(vec3(-27, -33.5, -30), 16.5, Material::makeSpecular(vec3(.999, .999, .999))));
-	shapes.push_back(Shape::createSphere(vec3(23, -33.5, 15), 16.5, Material::makeRefractive(vec3(1., 1., 1.))));
-	shapes.push_back(Shape::createSphere(vec3(0, 50.0, 0.0), 10.0, Material::makeEmissive(vec3(12.0, 12.0, 12.0))));
-#endif
-
-	Scene scene;
 	if(!scene.load("scene0.txt")) cout << "scene file loading failed!" << endl;
 	else {
 		shapes = scene.getShapes();
-		cout << "scene loaded. " << shapes.size() << " shapes in total." << endl;
+		cout << "scene loaded. " 
+			 << shapes.size() << " shapes in total." 
+			 << scene.getTextures().size() << " textures in total." 
+			 << endl;
 	}
 
 	cam = scene.camera();
@@ -478,22 +183,15 @@ void init_scene()
 	cudaMalloc((void**)&d_shapes, sz_shapes);
 	cudaMemcpy(d_shapes, &(shapes[0]), sz_shapes, cudaMemcpyHostToDevice);
 
-	//lights.push_back(Light(Light::SPHERE, 0.5, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(-2, 4, -10), vec3(2, -4, 10)));
-	//lights.push_back(Light(Light::SPHERE, 0.25, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(4, 4, -10), 0.5));
-	//lights.push_back(Light(Light::POINT, 0.1, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(1000, 1000, -1000)));
-	//lights.push_back(Light(Light::DIRECTIONAL, 0.15, vec3(1, 1, 1), vec3(1, 1, 1), vec3(1, 1, 1), vec3(0, 10, -10), vec3(0, -10, 10)));
+	//const size_t sz_lights = lights.size() * sizeof(Light);
+	//cudaMalloc((void**)&d_lights, sz_lights);
+	//cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
 
-	const size_t sz_lights = lights.size() * sizeof(Light);
-	cudaMalloc((void**)&d_lights, sz_lights);
-	cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
-
-	const size_t sz_texAddr = sizeof(uchar4*)*32;
-	cudaMalloc((void**)&d_texAddr, sz_texAddr);
-	cudaMemcpy(d_texAddr, &(texAddr[0]), sz_texAddr, cudaMemcpyHostToDevice);
-
-	const size_t sz_texSize = sizeof(int2)*32;
-	cudaMalloc((void**)&d_texSize, sz_texSize);
-	cudaMemcpy(d_texSize, &(texSize[0]), sz_texSize, cudaMemcpyHostToDevice);
+	const vector<TextureObject>& texs = scene.getTextures();
+	const size_t sz_tex = sizeof(TextureObject)*texs.size();
+	cout << "sz_tex = " << sz_tex << endl;
+	cudaMalloc((void**)&d_tex, sz_tex);
+	cudaMemcpy(d_tex, &(texs[0]), sz_tex, cudaMemcpyHostToDevice);
 
 	cout << "scene initialized." << endl;
 }
@@ -521,12 +219,8 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	
 	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
-	bindTexture<<< 1, 1 >>>(d_texAddr, d_texSize);
+	bindTexture<<< 1, 1 >>>(d_tex, scene.getTextures().size());
 	setParams<<<1, 1>>>(specType, tracingType);
-	/*
-	initScene<<<1, dim3(8,8,1)>>>(lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
-								  shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]));
-	*/
 
 	switch( kernelIdx ) {
 	case 0:{
@@ -703,21 +397,6 @@ void computeFPS()
 }
 
 
-void showCUDAMemoryUsage() {
-    size_t free_byte ;
-    size_t total_byte ;
-    cudaError_t cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
-    if ( cudaSuccess != cuda_status ){
-		printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
-		exit(1);
-    }
-	
-	double free_db = (double)free_byte ;
-    double total_db = (double)total_byte ;
-    double used_db = total_db - free_db ;
-    printf("GPU memory usage: used = %f, free = %f MB, total = %f MB\n", used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
-}
-
 void resize(int w, int h) 
 {
 	tball.reshape(w, h);
@@ -835,7 +514,6 @@ bool runTest(int argc, char **argv, char *ref_file)
 
 	// initialize the scene on CUDA kernels
 	init_scene();
-
 	
 	// register callbacks
 	glutDisplayFunc(display);
