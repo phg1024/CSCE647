@@ -22,8 +22,11 @@ __device__ bool rainbowLight = false;
 __device__ bool jittered = true;
 __device__ uchar4* textures[32];
 __device__ int2 textureSize[32];
+__device__ int envMapIdx;
 
-__global__ void setParams(int specType, int tracingType) {
+__global__ void setParams(int specType, int tracingType, int envmap) {
+	envMapIdx = envmap;
+
 	circularSpecular = false;
 	rectangularSpecular = false;
 	rampedSpecular = false;
@@ -1313,8 +1316,13 @@ __device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes) {
 __device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, d_Light* lights) {
 	Hit h = rayIntersectsShapes(r, nShapes, shapes);
 	if( h.objIdx == -1 ) {
-		// no hit
-		return make_float3(0, 0, 0);
+		// no hit, sample environment map
+		if( envMapIdx >= 0 ) {
+			float2 t = spheremap(r.dir);
+			return texel_supersample(textures[envMapIdx], textureSize[envMapIdx], t);
+		}
+		else
+			return make_float3(0, 0, 0);
 	}
 	else {
 		// hit a light
@@ -1485,7 +1493,11 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 		float3 color = make_float3(0.0f);
 
 		if( h.objIdx == -1 ) {	
-			//colormask *= 0.0;	// black background			
+			// no hit, sample environment map
+			if( envMapIdx >= 0 ) {
+				float2 t = spheremap(ray.dir);
+				colormask *= texel_supersample(textures[envMapIdx], textureSize[envMapIdx], t);
+			}
 			break;
 		}
 

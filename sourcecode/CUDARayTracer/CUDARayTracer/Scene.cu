@@ -3,6 +3,7 @@
 
 Scene::Scene(void)
 {
+	envmap = -1;
 }
 
 
@@ -43,7 +44,12 @@ void Scene::parse(const string& line)
 
 	std::for_each(tag.begin(), tag.end(), ::tolower);
 	
-	if( tag == "camera" ) {
+	if( tag == "environment" ) {
+		string texFile;
+		ss >> texFile;
+		envmap = loadTexture(texFile.c_str(), texs);
+	}
+	else if( tag == "camera" ) {
 		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.w >> cam.h;
 		cam.dir = cam.dir.normalized();
 		cam.up = cam.up.normalized();

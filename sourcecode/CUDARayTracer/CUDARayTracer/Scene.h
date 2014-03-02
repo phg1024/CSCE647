@@ -22,6 +22,9 @@ public:
 	const Camera& camera() const {return cam;}
 	const vector<TextureObject>& getTextures() const { return texs; }
 
+	const int getEnvironmentMap() const {
+		return envmap;
+	}
 protected:
 	void parse(const string& line);
 
@@ -30,4 +33,6 @@ private:
 	vector<Shape> shapes;
 
 	vector<TextureObject> texs;
+
+	int envmap;
 };
