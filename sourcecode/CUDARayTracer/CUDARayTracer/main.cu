@@ -110,6 +110,7 @@ void timerEvent(int value);
 // Cuda functionality
 extern __global__ void setParams(int, int, int);
 extern __global__ void bindTexture(TextureObject* texs, int texCount);
+extern __global__ void bindTexture2(const cudaTextureObject_t* texs, int texCount);
 
 extern __global__ void copy2pbo(float3*, float3*, int, int, int, float);
 extern __global__ void clearCumulatedColor(float3*, int, int);
@@ -146,7 +147,7 @@ Camera* d_cam;
 vector<Shape> shapes;
 Shape* d_shapes;
 TextureObject* d_tex;
-//texture<float, cudaTextureType2D, cudaReadModeElementType> texObjs[32];
+cudaTextureObject_t* d_texobjs;
 vector<Light> lights;
 Light* d_lights;
 float3* cumulatedColor = 0;
@@ -193,6 +194,43 @@ void init_scene()
 	cudaMalloc((void**)&d_tex, sz_tex);
 	cudaMemcpy(d_tex, &(texs[0]), sz_tex, cudaMemcpyHostToDevice);
 
+	// create texture objects for textures
+	vector<cudaTextureObject_t> texobjs;
+	for(int i=0;i<texs.size();i++) {
+		// Allocate CUDA array in device memory
+		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+		cudaArray* cuArray;
+		cudaMallocArray(&cuArray, &channelDesc, texs[i].size.x, texs[i].size.y);
+
+		// Copy to device memory some data located at address h_data
+		// in host memory 
+		cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*sizeof(uchar4), cudaMemcpyDeviceToDevice);
+
+		// create texture object
+		cudaResourceDesc resDesc;
+		memset(&resDesc, 0, sizeof(resDesc));
+		resDesc.resType = cudaResourceTypeArray;
+		resDesc.res.array.array = cuArray;
+
+		// Specify texture object parameters
+		struct cudaTextureDesc texDesc;
+		memset(&texDesc, 0, sizeof(texDesc));
+		texDesc.addressMode[0]   = cudaAddressModeWrap;
+		texDesc.addressMode[1]   = cudaAddressModeWrap;
+		texDesc.filterMode       = cudaFilterModeLinear;
+		texDesc.readMode         = cudaReadModeNormalizedFloat;
+		texDesc.normalizedCoords = 1;
+
+		// create texture object: we only have to do this once!
+		cudaTextureObject_t tex=0;
+		cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+
+		texobjs.push_back(tex);
+	}
+	size_t sz_texobjs = sizeof(cudaTextureObject_t)*texobjs.size();
+	cudaMalloc((void**)&d_texobjs, sz_texobjs);
+	cudaMemcpy(d_texobjs, &(texobjs[0]), sz_texobjs, cudaMemcpyHostToDevice);
+
 	cout << "scene initialized." << endl;
 }
 
@@ -220,6 +258,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
 	bindTexture<<< 1, 1 >>>(d_tex, scene.getTextures().size());
+	bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
 	setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
 
 	switch( kernelIdx ) {

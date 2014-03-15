@@ -334,8 +334,8 @@ public:
 		return Shape(ELLIPSOID, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createPlane(vec3 center, float w, float h, vec3 normal, vec3 u, vec3 v, Material mater) {
-		return Shape(PLANE, center, w, h, 0.0, normal, u, v, mater);
+	static Shape createPlane(vec3 center, float w, float h, float d, vec3 normal, vec3 u, vec3 v, Material mater) {
+		return Shape(PLANE, center, w, h, d, normal, u, v, mater);
 	}
 
 	static Shape createCylinder(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater){

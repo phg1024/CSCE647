@@ -67,14 +67,26 @@ void Scene::parse(const string& line)
 		vec3 n(0, 1, 0), u(1, 0, 0), v(0, 0, 1);
 		vec3 dim = mscl * vec3(1, 1, 1);
 
-		Shape sp = Shape::createPlane(T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater);
+		Shape sp = Shape::createPlane(T, dim.x, dim.y, dim.z, mrot*n, mrot*u, mrot*v, mater);
 
 		string texFile, normalFile;
 		ss >> texFile >> normalFile;
 		
 		if( texFile != "none" ) {
 			sp.hasTexture = true;
-			sp.texId = loadTexture(texFile.c_str(), texs);
+
+			if( texFile == "julia" ) {
+				// procedural texture with julia set
+				sp.texId = TextureObject::Julia;
+			}
+			else if( texFile == "perlin" ) {
+				// procedural texture with julia set
+				sp.texId = TextureObject::Perlin;
+			}
+			else { 
+				// load texture from image file
+				sp.texId = loadTexture(texFile.c_str(), texs);
+			}
 		}
 		if( normalFile != "none" ) {
 			sp.hasNormalMap = true;
@@ -99,22 +111,22 @@ void Scene::parse(const string& line)
 
 		// top
 		p = vec3(0, 1.0, 0), n = vec3(0, 1, 0), u = vec3(1, 0, 0), v = vec3(0, 0, 1);		
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, mater));
 		// bottom
 		p = vec3(0, -1.0, 0), n = vec3(0, -1, 0), u = vec3(-1, 0, 0), v = vec3(0, 0, -1);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, mater));
 		// left
 		p = vec3(-1.0, 0, 0), n = vec3(-1, 0, 0), u = vec3(0, 1, 0), v = vec3(0, 0, 1);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, mater));
 		// right
 		p = vec3(1.0, 0, 0), n = vec3(1, 0, 0), u = vec3(0, -1, 0), v = vec3(0, 0, -1);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, mater));
 		// front
 		p = vec3(0, 0, 1.0), n = vec3(0, 0, 1), u = vec3(0, 1, 0), v = vec3(1, 0, 0);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, mater));
 		// back
 		p = vec3(0, 0, -1.0), n = vec3(0, 0, -1), u = vec3(0, -1, 0), v = vec3(-1, 0, 0);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, mrot*n, mrot*u, mrot*v, mater));
+		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, mater));
 	}
 	else if( tag == "sphere" ) {
 
@@ -136,8 +148,18 @@ void Scene::parse(const string& line)
 		
 		if( texFile != "none" ) {
 			sp.hasTexture = true;
-			sp.texId = loadTexture(texFile.c_str(), texs);
-			cout << sp.texId << endl;
+			if( texFile == "julia" ) {
+				// procedural texture with julia set
+				sp.texId = TextureObject::Julia;
+			}
+			else if( texFile == "perlin" ) {
+				// procedural texture with julia set
+				sp.texId = TextureObject::Perlin;
+			}
+			else { 
+				// load texture from image file
+				sp.texId = loadTexture(texFile.c_str(), texs);
+			}
 		}
 		if( normalFile != "none" ) {
 			sp.hasNormalMap = true;
@@ -161,8 +183,18 @@ void Scene::parse(const string& line)
 		
 		if( texFile != "none" ) {
 			sp.hasTexture = true;
-			sp.texId = loadTexture(texFile.c_str(), texs);
-			cout << sp.texId << endl;
+			if( texFile == "julia" ) {
+				// procedural texture with julia set
+				sp.texId = TextureObject::Julia;
+			}
+			else if( texFile == "perlin" ) {
+				// procedural texture with julia set
+				sp.texId = TextureObject::Perlin;
+			}
+			else { 
+				// load texture from image file
+				sp.texId = loadTexture(texFile.c_str(), texs);
+			}
 		}
 		if( normalFile != "none" ) {
 			sp.hasNormalMap = true;

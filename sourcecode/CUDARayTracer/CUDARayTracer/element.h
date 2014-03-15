@@ -765,6 +765,12 @@ public:
 };
 
 struct TextureObject {
+	enum TextureType {
+		Julia = 10001,
+		Perlin = 10002,
+		Image
+	};
+
 	uchar4 *addr;
 	int2 size;
 };

@@ -341,3 +341,14 @@ __device__ __forceinline__ float3 sphere_tangent(float3 p) {
 	float2 bn = normalize(make_float2(p.x, p.z)) * sinf(phi);
 	return make_float3(bn.x, -cosf(phi), bn.y);
 }
+
+__device__ __host__ __forceinline__ float3 tofloat3(float4 v) { return make_float3(v.x, v.y, v.z); }
+
+
+__device__ __forceinline__ float2 complex_mul(float2 z1, float2 z2) {
+	return make_float2(z1.x*z2.x-z1.y*z2.y, z1.x*z2.y+z1.y*z2.x);
+}
+
+__device__ __forceinline__ float complex_mag(float2 z) {
+	return z.x*z.x+z.y*z.y;
+}

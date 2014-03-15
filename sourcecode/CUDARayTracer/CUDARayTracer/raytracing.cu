@@ -20,9 +20,13 @@ __device__ bool isSpotLight = false;
 __device__ bool fakeSoftShadow = false;
 __device__ bool rainbowLight = false;
 __device__ bool jittered = true;
+
 __device__ uchar4* textures[32];
 __device__ int2 textureSize[32];
 __device__ int envMapIdx;
+
+// texture using tex object
+__device__ cudaTextureObject_t tex[32];
 
 __global__ void setParams(int specType, int tracingType, int envmap) {
 	envMapIdx = envmap;
@@ -73,6 +77,12 @@ __global__ void bindTexture(TextureObject* texs, int texCount) {
 	for(int i=0;i<texCount;i++){
 		textures[i] = (uchar4*)texs[i].addr;
 		textureSize[i] = texs[i].size;
+	}
+}
+
+__global__ void bindTexture2(const cudaTextureObject_t *texs, int texCount) {
+	for(int i=0;i<texCount;i++){
+		tex[i] = texs[i];
 	}
 }
 
@@ -483,6 +493,69 @@ __device__ bool checkLightVisibility2(float3 l, float3 p, float3 N, d_Shape* sha
 	return t < THRES || t > dist-THRES;
 }
 
+__device__ __forceinline__ float rand(float x, float y){
+  float val = sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return val - floorf(val);
+}
+
+
+__device__ int juliaset_iteration(float u, float v) {
+	float2 z = make_float2((u-0.5)*7.0, (v-0.5)*3.5);
+	float2 cval = make_float2(-0.8, 0.16);
+
+	float val = complex_mag(z);
+	int counter = 0;
+	const int maxiters = 8192;
+	const float THRES = 65536;
+	for(int i=0; i<maxiters; i++)
+	{
+		z = complex_mul(z, z) + cval;
+		val = complex_mag(z);
+		if( val >= THRES || i > maxiters ) break;
+		counter++;
+	}
+
+	return counter;
+}
+
+__device__ float3 juliaset(float u, float v) {
+	int counter = juliaset_iteration(u, v);
+
+	const int maxiters = 1024;
+	float t = counter / float(maxiters);
+	t = powf(t, 0.25);
+	float3 color;
+	float3 c1 = make_float3(0);
+	float3 c2 = make_float3(0.05, 0.10, 0.05);
+	float3 c3 = make_float3(0.075, 0.15, 0.175);
+	float3 c4 = make_float3(0.65, 0.75, 1.0);
+
+	if( t >= 0.75 )
+		color = mix(c2, c1, pow((t - 0.75) / 0.25, 1.0));
+	else if( t >= 0.5 )
+		color = mix(c3, c2, pow((t - 0.5) / 0.25, 0.25));
+	else
+		color = mix(c4, c3, pow(t / 0.5, 2.0));
+
+	return color;
+}
+
+__device__ float3 perlin(float u, float v) {
+	float x = rand(u, v);
+	return make_float3(x, x, x);
+}
+
+__device__ float3 texturefunc(int texId, float u, float v) {
+	switch( texId ) {
+	case TextureObject::Julia:
+		return juliaset(u, v);
+	case TextureObject::Perlin:
+		return perlin(u, v);
+	default:
+		return tofloat3(tex2D<float4>(tex[texId], u, v));		
+	}
+}
+
 __device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int lightCount, int sid) {
     //float3 c = make_float3(0, 0, 0);
 	float3 c = shapes[sid].material.emission;
@@ -563,7 +636,7 @@ __device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, flo
 					Ispec = clamp(Ispec, 0.0, 1.0);
 
 					if( shapes[sid].hasTexture ) {
-						float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+						float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 						cc = cc + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
 					}
 					else{
@@ -574,8 +647,8 @@ __device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, flo
 					}
 				}
 				else {
-					if( shapes[sid].hasTexture ) {
-						float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					if( shapes[sid].hasTexture ) {						
+						float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 						cc = cc + Itexture * Iamb * lights[i].intensity;
 					}
 					else{
@@ -648,7 +721,7 @@ __device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, flo
 				Ispec = clamp(Ispec, 0.0, 1.0);
 
 				if( shapes[sid].hasTexture ) {
-					float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 					c = c + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
 				}
 				else{
@@ -660,7 +733,7 @@ __device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, flo
 			}
 			else {
 				if( shapes[sid].hasTexture ) {
-					float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 					c = c + Itexture * Iamb * lights[i].intensity;
 				}
 				else{
@@ -729,8 +802,8 @@ __device__ float3 lambertShading(int2 res, float time, int x, int y, float3 v, f
 				}
 			}
 			float3 Itexture;
-			if( shapes[sid].hasTexture ) {
-				Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+			if( shapes[sid].hasTexture ) {				
+				Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 			}
 			else Itexture = make_float3(1.0);
 			c = c + Itexture * contribution / (float)lightSamples;
@@ -775,7 +848,7 @@ __device__ float3 lambertShading(int2 res, float time, int x, int y, float3 v, f
 
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
-					Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -864,19 +937,23 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 
 				float NdotL, RdotE;
 				if( shapes[sid].hasNormalMap ) {
-					/*
 					// normal defined in tangent space
-					vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
-
-					vec3 tangent = normalize(sphere_tangent(N));
-					vec3 bitangent = cross(N, tangent);
+					float4 texVal = tex2D<float4>(tex[shapes[sid].normalTexId], t.x, t.y) * 2.0 - 1.0;
+					float3 n_normalmap = normalize(make_float3(texVal.x, texVal.y, texVal.z));
+										
+					float3 tangent;
+					if( shapes[sid].t == Shape::PLANE )
+						tangent = shapes[sid].axis[1];
+					else
+						tangent = normalize(sphere_tangent(N));
+					float3 bitangent = cross(N, tangent);
 
 					// find the mapping from tangent space to camera space
-					mat3 m_t = transpose(mat3(tangent, bitangent, N));
+					mat3 m_t = mat3(tangent, bitangent, N);
 
-					NdotL = dot(n_normalmap, normalize(m_t*L));
+					// convert the normal to to camera space
+					NdotL = dot(n_normalmap, normalize(m_t*L));		
 					RdotE = dot(m_t*R, normalize(m_t*E));
-					*/
 				}
 				else {
 					NdotL = dot(N, L);
@@ -923,8 +1000,8 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 					* specFactor;
 				Ispec = clamp(Ispec, 0.0, 1.0);
 
-				if( shapes[sid].hasTexture ) {
-					float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+				if( shapes[sid].hasTexture ) {					
+					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 					c = c + Itexture * ((Idiff + Ispec) + Iamb);
 				}
 				else{
@@ -935,8 +1012,8 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				}
 			}
 			else {
-				if( shapes[sid].hasTexture ) {
-					float3 Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+				if( shapes[sid].hasTexture ) {					
+					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 					c = c + Itexture * Iamb;
 				}
 				else{
@@ -973,7 +1050,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 			if( isVisible || fakeSoftShadow ) {
 				float3 L;
 				if( isDirectionalLight )
-					L = normalize(lpos);
+					L = normalize(shapes[i].axis[0]);
 				else
 					L = normalize(lpos - v);
 				float3 E = normalize(r.origin - v);
@@ -981,10 +1058,10 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				float NdotL;
 
 				// change the normal with normal map
-				if( shapes[sid].hasNormalMap ) {
-					
+				if( shapes[sid].hasNormalMap ) {					
 					// normal defined in tangent space
-					float3 n_normalmap = normalize(texel_supersample(textures[shapes[sid].normalTexId], textureSize[shapes[sid].normalTexId], t) * 2.0 - 1.0);
+					float4 texVal = tex2D<float4>(tex[shapes[sid].normalTexId], t.x, t.y) * 2.0 - 1.0;
+					float3 n_normalmap = normalize(make_float3(texVal.x, texVal.y, texVal.z));
 										
 					float3 tangent;
 					if( shapes[sid].t == Shape::PLANE )
@@ -1011,7 +1088,8 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
-					Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					//Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
+					Itexture = texturefunc(shapes[sid].texId, t.x, t.y);
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -1024,7 +1102,30 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 					Idiff = clamp(shapes[sid].material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
 				}
 				else{
-					Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
+					if( shapes[i].hasTexture ) {
+						// projective light
+						float3 lightDir = shapes[i].axis[0], lightU = shapes[i].axis[1], lightV = shapes[i].axis[2];
+						float w = shapes[i].radius[0], h = shapes[i].radius[1], d = shapes[i].radius[2];
+						float3 lightColor;
+						float t = d / dot(L, lightDir);
+						if( t > 0.0 ) {
+							float3 pl = shapes[i].p + t * L, po = shapes[i].p + d * lightDir;
+							float u = dot(pl - po, lightU) / w + 0.5;
+							float v = dot(pl - po, lightV) / h + 0.5;
+							if( u > 1.0 || u < 0.0 || v > 1.0 || v < 0.0 )
+								lightColor = shapes[i].material.emission;
+							else
+								//lightColor = tofloat3(tex2D<float4>(tex[shapes[i].texId], u, v));
+								lightColor = texturefunc(shapes[i].texId, u, v);
+						}
+						else {
+							lightColor = shapes[i].material.emission;
+						}
+
+						Idiff = clamp(shapes[sid].material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
+					}
+					else
+						Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
 				}
 								
 				float shadowFactor = 1.0;
@@ -1043,7 +1144,8 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 			else {
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
-					Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					//Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
+					Itexture = texturefunc(shapes[sid].texId, t.x, t.y);
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -1167,11 +1269,6 @@ __device__ __forceinline__ Ray generateRay(Camera* cam, float u, float v) {
     r.dir = normalize(pcanvas - cam->pos.data);
 
 	return r;
-}
-
-__device__ __forceinline__ float rand(float x, float y){
-  float val = sin(x * 12.9898 + y * 78.233) * 43758.5453;
-  return val - floorf(val);
 }
 
 // ray intersection test with shading computation
@@ -1319,7 +1416,7 @@ __device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int
 		// no hit, sample environment map
 		if( envMapIdx >= 0 ) {
 			float2 t = spheremap(r.dir);
-			return texel_supersample(textures[envMapIdx], textureSize[envMapIdx], t);
+			return tofloat3(tex2D<float4>(tex[envMapIdx], t.x, t.y));
 		}
 		else
 			return make_float3(0, 0, 0);
@@ -1464,7 +1561,7 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
-					Itexture = texel_supersample(textures[shapes[sid].texId], textureSize[shapes[sid].texId], t);
+					Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -1496,7 +1593,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 			// no hit, sample environment map
 			if( envMapIdx >= 0 ) {
 				float2 t = spheremap(ray.dir);
-				colormask *= texel_supersample(textures[envMapIdx], textureSize[envMapIdx], t);
+				colormask *= tofloat3(tex2D<float4>(tex[envMapIdx], t.x, t.y));
 			}
 			break;
 		}
@@ -1528,7 +1625,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				accumulatedColor += shapes[h.objIdx].material.emission * colormask;
 
 				if( shapes[h.objIdx].hasTexture ) {
-					color = texel_supersample(textures[shapes[h.objIdx].texId], textureSize[shapes[h.objIdx].texId], h.tex);
+					color = tofloat3(tex2D<float4>(tex[shapes[h.objIdx].texId], h.tex.x, h.tex.y));
 				}
 				else color = shapes[h.objIdx].material.diffuse;
 				
@@ -1548,7 +1645,8 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 				float3 color;
 				if( shapes[h.objIdx].hasTexture ) {
-					color = texel_supersample(textures[shapes[h.objIdx].texId], textureSize[shapes[h.objIdx].texId], h.tex);
+					color = tofloat3(tex2D<float4>(tex[shapes[h.objIdx].texId], h.tex.x, h.tex.y));
+					
 				}
 				else color = shapes[h.objIdx].material.diffuse;
 
