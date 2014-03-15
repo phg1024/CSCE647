@@ -766,10 +766,24 @@ public:
 
 struct TextureObject {
 	enum TextureType {
-		Julia = 10001,
-		Perlin = 10002,
+		Julia2D = 10001,
+		Julia,
+		Perlin2D,
+		Perlin,
+		Marble,
+		WoodGrain,
 		Image
 	};
+
+	static TextureType parseType(const string& str) {
+		if( str == "julia2d" ) return Julia2D;
+		else if( str == "julia" ) return Julia;
+		else if( str == "perlin2d" ) return Perlin2D;
+		else if( str == "perlin" ) return Perlin;
+		else if( str == "marble" ) return Marble;
+		else if( str == "woodgrain" ) return WoodGrain;
+		else return Image;
+	}
 
 	uchar4 *addr;
 	int2 size;

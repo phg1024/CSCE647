@@ -6,6 +6,7 @@
 #include "definitions.h"
 #include "utils.h"
 #include "randvec.h"
+#include "perlin.cuh"
 
 __device__ int shadingMode;
 __device__ bool circularSpecular = false;
@@ -21,15 +22,15 @@ __device__ bool fakeSoftShadow = false;
 __device__ bool rainbowLight = false;
 __device__ bool jittered = true;
 
-__device__ uchar4* textures[32];
-__device__ int2 textureSize[32];
 __device__ int envMapIdx;
+__device__ PerlinNoise pn;
 
 // texture using tex object
 __device__ cudaTextureObject_t tex[32];
 
 __global__ void setParams(int specType, int tracingType, int envmap) {
 	envMapIdx = envmap;
+	pn.init();
 
 	circularSpecular = false;
 	rectangularSpecular = false;
@@ -70,13 +71,6 @@ __global__ void setParams(int specType, int tracingType, int envmap) {
 		break;
 	default:
 		break;
-	}
-}
-
-__global__ void bindTexture(TextureObject* texs, int texCount) {
-	for(int i=0;i<texCount;i++){
-		textures[i] = (uchar4*)texs[i].addr;
-		textureSize[i] = texs[i].size;
 	}
 }
 
@@ -498,9 +492,8 @@ __device__ __forceinline__ float rand(float x, float y){
   return val - floorf(val);
 }
 
-
 __device__ int juliaset_iteration(float u, float v) {
-	float2 z = make_float2((u-0.5)*7.0, (v-0.5)*3.5);
+	float2 z = make_float2(u, v);
 	float2 cval = make_float2(-0.8, 0.16);
 
 	float val = complex_mag(z);
@@ -521,7 +514,7 @@ __device__ int juliaset_iteration(float u, float v) {
 __device__ float3 juliaset(float u, float v) {
 	int counter = juliaset_iteration(u, v);
 
-	const int maxiters = 1024;
+	const int maxiters = 8192;
 	float t = counter / float(maxiters);
 	t = powf(t, 0.25);
 	float3 color;
@@ -540,19 +533,102 @@ __device__ float3 juliaset(float u, float v) {
 	return color;
 }
 
-__device__ float3 perlin(float u, float v) {
-	float x = rand(u, v);
+__device__ int juliaset_iteration_3d(float u, float v, float w) {
+	float3 z = make_float3(u, v, w);
+	float3 cval = make_float3(-0.8, 0.16, 0.1);
+
+	float val = complex_mag(z);
+	int counter = 0;
+	const int maxiters = 8192;
+	const float THRES = 65536;
+	for(int i=0; i<maxiters; i++)
+	{
+		z = complex_mul(z, z) + cval;
+		val = complex_mag(z);
+		if( val >= THRES || i > maxiters ) break;
+		counter++;
+	}
+
+	return counter;
+}
+
+__device__ float3 juliaset3d(float u, float v, float w) {
+	int counter = juliaset_iteration_3d(u, v, w);
+
+	const int maxiters = 8192;
+	float t = counter / float(maxiters);
+	t = powf(t, 0.25);
+	float3 color;
+	float3 c1 = make_float3(0);
+	float3 c2 = make_float3(0.05, 0.10, 0.05);
+	float3 c3 = make_float3(0.075, 0.15, 0.175);
+	float3 c4 = make_float3(0.65, 0.75, 1.0);
+
+	if( t >= 0.75 )
+		color = mix(c2, c1, pow((t - 0.75) / 0.25, 1.0));
+	else if( t >= 0.5 )
+		color = mix(c3, c2, pow((t - 0.5) / 0.25, 0.25));
+	else
+		color = mix(c4, c3, pow(t / 0.5, 2.0));
+
+	return color;
+}
+
+__device__ float3 perlin(float3 p) {
+	p = p * 8.0;
+	float vec[3] = {p.x, p.y, p.z};
+	float x = (pn.noise3(vec)+1.0)*0.5;
 	return make_float3(x, x, x);
 }
 
-__device__ float3 texturefunc(int texId, float u, float v) {
+__device__ float3 perlin2d(float u, float v) {
+	const float scale = 64.0;
+	float vec[2] = {u * scale * 2.0, v * scale};
+	float x = (pn.noise2(vec)+1.0)*0.5;
+	return make_float3(x, x, x);
+}
+
+__device__ float3 marble(float3 p) {
+	float vec[3] = {p.x, p.y, p.z};
+	float x = (cosf(p.x * 10.0 + pn.noise3(vec) * 10.0)+1.0)*0.5;
+	return make_float3(x, x, x);
+}
+
+__device__ float3 woodgrain(float3 p) {
+	const float scale = 0.75;
+	float vec[3] = {p.x * scale, p.y * scale, 0.8};
+	float x = (pn.noise3(vec)+1.0)*10;
+	x = x - floorf(x);
+	const float3 light = make_float3(0.72, 0.72, 0.45);
+	const float3 dark = make_float3(0.49, 0.33, 0.11);
+	return mix(light, dark, x);
+}
+
+__device__ float3 texturefunc(int texId, float2 t, float3 p = make_float3(0, 0, 0)) {
 	switch( texId ) {
+	case TextureObject::Julia2D:
+		return juliaset((t.x-0.5)*7.0, (t.y-0.5)*3.5);
 	case TextureObject::Julia:
-		return juliaset(u, v);
+		p = p / 10.0;
+		return juliaset3d(p.x, p.y, p.z);
+	case TextureObject::Perlin2D:
+		return perlin2d(t.x, t.y);
 	case TextureObject::Perlin:
-		return perlin(u, v);
-	default:
-		return tofloat3(tex2D<float4>(tex[texId], u, v));		
+		return perlin(p);
+	case TextureObject::Marble:
+		return marble(p);
+	case TextureObject::WoodGrain:
+		return woodgrain(p);
+	default: {
+		if( texId >= TextureObject::Image ) {
+			// solid texturing with image
+			p = (p + 1.0)*0.5;
+			return tofloat3(tex2D<float4>(tex[texId - TextureObject::Image], p.x, p.y));
+		}
+		else
+			// 2d texturing with image
+			return tofloat3(tex2D<float4>(tex[texId], t.x, t.y));
+			 }
 	}
 }
 
@@ -1088,8 +1164,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
-					//Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
-					Itexture = texturefunc(shapes[sid].texId, t.x, t.y);
+					Itexture = texturefunc(shapes[sid].texId, t, (v-shapes[sid].p)/make_float3(shapes[sid].radius[0], shapes[sid].radius[1], shapes[sid].radius[2]));
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -1115,8 +1190,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 							if( u > 1.0 || u < 0.0 || v > 1.0 || v < 0.0 )
 								lightColor = shapes[i].material.emission;
 							else
-								//lightColor = tofloat3(tex2D<float4>(tex[shapes[i].texId], u, v));
-								lightColor = texturefunc(shapes[i].texId, u, v);
+								lightColor = texturefunc(shapes[i].texId, make_float2(u, v));
 						}
 						else {
 							lightColor = shapes[i].material.emission;
@@ -1144,8 +1218,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 			else {
 				float3 Itexture;
 				if( shapes[sid].hasTexture ) {
-					//Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
-					Itexture = texturefunc(shapes[sid].texId, t.x, t.y);
+					Itexture = texturefunc(shapes[sid].texId, t, (v-shapes[sid].p)/make_float3(shapes[sid].radius[0], shapes[sid].radius[1], shapes[sid].radius[2]));
 				}
 				else Itexture = make_float3(1, 1, 1);
 

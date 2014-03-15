@@ -352,3 +352,11 @@ __device__ __forceinline__ float2 complex_mul(float2 z1, float2 z2) {
 __device__ __forceinline__ float complex_mag(float2 z) {
 	return z.x*z.x+z.y*z.y;
 }
+
+__device__ __forceinline__ float3 complex_mul(float3 z1, float3 z2) {
+	return make_float3(z1.x*z2.x-z1.y*z2.y-z1.z*z2.z, z1.x*z2.y+z1.y*z2.x, z1.x*z2.z+z2.x*z1.z);
+}
+
+__device__ __forceinline__ float complex_mag(float3 z) {
+	return z.x*z.x+z.y*z.y+z.z*z.z;
+}

@@ -28,8 +28,7 @@ bool Scene::load(const string& filename)
 	return true;
 }
 
-bool Scene::save(const string& filename)
-{
+bool Scene::save(const string& filename){
 	return false;
 }
 
@@ -70,22 +69,18 @@ void Scene::parse(const string& line)
 		Shape sp = Shape::createPlane(T, dim.x, dim.y, dim.z, mrot*n, mrot*u, mrot*v, mater);
 
 		string texFile, normalFile;
-		ss >> texFile >> normalFile;
+		int solidFlag;
+		ss >> texFile >> solidFlag >> normalFile;
 		
 		if( texFile != "none" ) {
 			sp.hasTexture = true;
-
-			if( texFile == "julia" ) {
-				// procedural texture with julia set
-				sp.texId = TextureObject::Julia;
-			}
-			else if( texFile == "perlin" ) {
-				// procedural texture with julia set
-				sp.texId = TextureObject::Perlin;
-			}
-			else { 
+			sp.texId = TextureObject::parseType(texFile);
+			if( sp.texId == TextureObject::Image ){ 
 				// load texture from image file
-				sp.texId = loadTexture(texFile.c_str(), texs);
+				if( solidFlag ) 
+					sp.texId += loadTexture(texFile.c_str(), texs);
+				else
+					sp.texId = loadTexture(texFile.c_str(), texs);
 			}
 		}
 		if( normalFile != "none" ) {
@@ -144,21 +139,18 @@ void Scene::parse(const string& line)
 		Shape sp = Shape::createSphere(T, dim.x, mater);
 
 		string texFile, normalFile;
-		ss >> texFile >> normalFile;
+		int solidFlag;
+		ss >> texFile >> solidFlag >> normalFile;
 		
 		if( texFile != "none" ) {
 			sp.hasTexture = true;
-			if( texFile == "julia" ) {
-				// procedural texture with julia set
-				sp.texId = TextureObject::Julia;
-			}
-			else if( texFile == "perlin" ) {
-				// procedural texture with julia set
-				sp.texId = TextureObject::Perlin;
-			}
-			else { 
+			sp.texId = TextureObject::parseType(texFile);
+			if( sp.texId == TextureObject::Image ){ 
 				// load texture from image file
-				sp.texId = loadTexture(texFile.c_str(), texs);
+				if( solidFlag ) 
+					sp.texId += loadTexture(texFile.c_str(), texs);
+				else
+					sp.texId = loadTexture(texFile.c_str(), texs);
 			}
 		}
 		if( normalFile != "none" ) {
@@ -179,21 +171,18 @@ void Scene::parse(const string& line)
 		Shape sp = Shape::createEllipsoid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), mater);
 
 		string texFile, normalFile;
-		ss >> texFile >> normalFile;
+		int solidFlag;
+		ss >> texFile >> solidFlag >> normalFile;
 		
 		if( texFile != "none" ) {
 			sp.hasTexture = true;
-			if( texFile == "julia" ) {
-				// procedural texture with julia set
-				sp.texId = TextureObject::Julia;
-			}
-			else if( texFile == "perlin" ) {
-				// procedural texture with julia set
-				sp.texId = TextureObject::Perlin;
-			}
-			else { 
+			sp.texId = TextureObject::parseType(texFile);
+			if( sp.texId == TextureObject::Image ){ 
 				// load texture from image file
-				sp.texId = loadTexture(texFile.c_str(), texs);
+				if( solidFlag ) 
+					sp.texId += loadTexture(texFile.c_str(), texs);
+				else
+					sp.texId = loadTexture(texFile.c_str(), texs);
 			}
 		}
 		if( normalFile != "none" ) {

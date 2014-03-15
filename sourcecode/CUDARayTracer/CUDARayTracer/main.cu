@@ -109,7 +109,6 @@ void timerEvent(int value);
 
 // Cuda functionality
 extern __global__ void setParams(int, int, int);
-extern __global__ void bindTexture(TextureObject* texs, int texCount);
 extern __global__ void bindTexture2(const cudaTextureObject_t* texs, int texCount);
 
 extern __global__ void copy2pbo(float3*, float3*, int, int, int, float);
@@ -257,7 +256,6 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	
 	cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
-	bindTexture<<< 1, 1 >>>(d_tex, scene.getTextures().size());
 	bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
 	setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
 
