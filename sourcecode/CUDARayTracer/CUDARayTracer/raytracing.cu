@@ -575,7 +575,7 @@ __device__ float3 juliaset3d(float u, float v, float w) {
 }
 
 __device__ float3 perlin(float3 p) {
-	p = p * 8.0;
+	p = p * 16.0;
 	float vec[3] = {p.x, p.y, p.z};
 	float x = (pn.noise3(vec)+1.0)*0.5;
 	return make_float3(x, x, x);
@@ -588,24 +588,66 @@ __device__ float3 perlin2d(float u, float v) {
 	return make_float3(x, x, x);
 }
 
+__device__ float turbulence(float3 p, float size) {
+    float value = 0.0, initialSize = size;
+    
+    while(size >= 1)
+    {
+		float vec[3] = {p.x/size, p.y/size, p.z/size};
+		value += pn.noise3(vec) * size;
+        size /= 2.0;
+    }
+    
+    return(0.5 * value / initialSize);
+}
+
 __device__ float3 marble(float3 p) {
-	float vec[3] = {p.x, p.y, p.z};
-	float x = (cosf(p.x * 10.0 + pn.noise3(vec) * 10.0)+1.0)*0.5;
+	const float scale = 32.0;
+
+	float x = (cosf(p.x * 15.0 + turbulence(p*scale*16.0, scale) * 15.0)+1.0)*0.5;
 	return make_float3(x, x, x);
 }
 
 __device__ float3 woodgrain(float3 p) {
-	const float scale = 0.75;
-	float vec[3] = {p.x * scale, p.y * scale, 0.8};
-	float x = (pn.noise3(vec)+1.0)*10;
-	x = x - floorf(x);
+	const float scale = 32.0;
+	float x = fabsf(cosf( sqrtf(p.x*p.x + p.y*p.y) * 15.0 + turbulence(p*scale*1.5, scale) * 5.0) );
+
 	const float3 light = make_float3(0.72, 0.72, 0.45);
 	const float3 dark = make_float3(0.49, 0.33, 0.11);
 	return mix(light, dark, x);
 }
 
-__device__ float3 texturefunc(int texId, float2 t, float3 p = make_float3(0, 0, 0)) {
+__device__ float3 chessboard(float2 t) {
+	const int blocks = 8;
+	int blkx = t.x*blocks;
+	int blky = t.y*blocks;
+
+	int flag = (blkx&0x1) ^ (blky&0x1);
+	const float3 red = make_float3(1, 0, 0);
+	const float3 yellow = make_float3(1, 1, 0);
+	return mix(red, yellow, flag);
+}
+
+__device__ float3 chessboard3d(float3 p) {
+	const int blocks = 8;
+	int blkx = p.x*blocks;
+	int blky = p.y*blocks;
+	int blkz = p.z*blocks;
+
+	int flag1 = (blkx&0x1) ^ (blky&0x1);
+	int flag2 = (blkz&0x1) ^ (blky&0x1);
+	const float3 red = make_float3(1, 0, 0);
+	const float3 green = make_float3(0, 1, 0);
+	const float3 blue = make_float3(0, 0, 1);
+	return mix(red, green, blue, (flag1&flag2)?0.0:((flag1^flag2)?0.5:1.0));
+}
+
+__device__ float3 texturefunc(int texId, float2 t, float3 p = make_float3(0, 0, 0), int bumpTex=0) {
 	switch( texId ) {
+	case TextureObject::Chessboard2D:
+		return chessboard(t);
+	case TextureObject::Chessboard:
+		return chessboard3d(p);
 	case TextureObject::Julia2D:
 		return juliaset((t.x-0.5)*7.0, (t.y-0.5)*3.5);
 	case TextureObject::Julia:
@@ -613,8 +655,23 @@ __device__ float3 texturefunc(int texId, float2 t, float3 p = make_float3(0, 0, 
 		return juliaset3d(p.x, p.y, p.z);
 	case TextureObject::Perlin2D:
 		return perlin2d(t.x, t.y);
-	case TextureObject::Perlin:
-		return perlin(p);
+	case TextureObject::Perlin: 
+		{
+			if( bumpTex == 1 ) {
+				const float dx = 0.1, dy = 0.1, dz = 0.1;
+				float3 p1, p2, p3;
+				p1 = make_float3(p.x + dx, p.y, p.z);
+				p2 = make_float3(p.x, p.y + dy, p.z);
+				p3 = make_float3(p.x, p.y, p.z + dz);
+				float h0 = perlin(p).x;
+				float h1 = perlin(p1).x;
+				float h2 = perlin(p2).x;
+				float h3 = perlin(p3).x;
+				return normalize(make_float3(h1-h0, h2-h0, h3-h0)/dx+1.0);
+			}
+			else
+				return perlin(p);
+		}
 	case TextureObject::Marble:
 		return marble(p);
 	case TextureObject::WoodGrain:
@@ -630,6 +687,7 @@ __device__ float3 texturefunc(int texId, float2 t, float3 p = make_float3(0, 0, 
 			return tofloat3(tex2D<float4>(tex[texId], t.x, t.y));
 			 }
 	}
+
 }
 
 __device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int lightCount, int sid) {
@@ -1014,8 +1072,8 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				float NdotL, RdotE;
 				if( shapes[sid].hasNormalMap ) {
 					// normal defined in tangent space
-					float4 texVal = tex2D<float4>(tex[shapes[sid].normalTexId], t.x, t.y) * 2.0 - 1.0;
-					float3 n_normalmap = normalize(make_float3(texVal.x, texVal.y, texVal.z));
+					float3 n_normalmap = texturefunc(shapes[sid].normalTexId, t, v, 1)*2.0-1.0;
+					if(shapes[sid].normalTexId == TextureObject::Perlin) n_normalmap += N;
 										
 					float3 tangent;
 					if( shapes[sid].t == Shape::PLANE )
@@ -1051,8 +1109,32 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				}
 
 				//calculate Diffuse Term:
-				float3 Idiff = shapes[sid].material.diffuse * shapes[i].material.emission * max(NdotL, 0.0);
-				Idiff = clamp(Idiff, 0.0, 1.0);
+				float3 Idiff;
+				float diffuseFactor = max(NdotL, 0.0);
+
+				if( shapes[i].hasTexture ) {
+					// projective light
+					float3 lightDir = shapes[i].axis[0], lightU = shapes[i].axis[1], lightV = shapes[i].axis[2];
+					float w = shapes[i].radius[0], h = shapes[i].radius[1], d = shapes[i].radius[2];
+					float3 lightColor;
+					float t = d / dot(L, lightDir);
+					if( t > 0.0 ) {
+						float3 pl = shapes[i].p + t * L, po = shapes[i].p + d * lightDir;
+						float u = dot(pl - po, lightU) / w + 0.5;
+						float v = dot(pl - po, lightV) / h + 0.5;
+						if( u > 1.0 || u < 0.0 || v > 1.0 || v < 0.0 )
+							lightColor = shapes[i].material.emission;
+						else
+							lightColor = texturefunc(shapes[i].texId, make_float2(u, v));
+					}
+					else {
+						lightColor = shapes[i].material.emission;
+					}
+
+					Idiff = clamp(shapes[sid].material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
+				}
+				else
+					Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
 
 				// calculate Specular Term:
 				float specFactor = pow(max(RdotE,0.0),0.3 * shapes[sid].material.shininess);
@@ -1077,7 +1159,7 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				Ispec = clamp(Ispec, 0.0, 1.0);
 
 				if( shapes[sid].hasTexture ) {					
-					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
+					float3 Itexture = texturefunc(shapes[sid].texId, t, (v-shapes[sid].p)/make_float3(shapes[sid].radius[0], shapes[sid].radius[1], shapes[sid].radius[2]));
 					c = c + Itexture * ((Idiff + Ispec) + Iamb);
 				}
 				else{
@@ -1089,7 +1171,7 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 			}
 			else {
 				if( shapes[sid].hasTexture ) {					
-					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].texId], t.x, t.y));
+					float3 Itexture = texturefunc(shapes[sid].texId, t, (v-shapes[sid].p)/make_float3(shapes[sid].radius[0], shapes[sid].radius[1], shapes[sid].radius[2]));
 					c = c + Itexture * Iamb;
 				}
 				else{
@@ -1136,8 +1218,8 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				// change the normal with normal map
 				if( shapes[sid].hasNormalMap ) {					
 					// normal defined in tangent space
-					float4 texVal = tex2D<float4>(tex[shapes[sid].normalTexId], t.x, t.y) * 2.0 - 1.0;
-					float3 n_normalmap = normalize(make_float3(texVal.x, texVal.y, texVal.z));
+					float3 n_normalmap = texturefunc(shapes[sid].normalTexId, t, v, 1)*2.0-1.0;
+					if(shapes[sid].normalTexId == TextureObject::Perlin) n_normalmap += N;
 										
 					float3 tangent;
 					if( shapes[sid].t == Shape::PLANE )
@@ -1150,7 +1232,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 					mat3 m_t = mat3(tangent, bitangent, N);
 
 					// convert the normal to to camera space
-					NdotL = dot(n_normalmap, normalize(m_t*L));					
+					NdotL = dot(n_normalmap, normalize(m_t*L));
 				}
 				else {
 					NdotL = dot(N, L);
@@ -1376,8 +1458,8 @@ __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, int sid) 
         float v = dot(pp0, shapes[sid].axis[2]);
         if( abs(u) > shapes[sid].radius[0] || abs(v) > shapes[sid].radius[1] ) return background();
         else {
-            float2 t = clamp((make_float2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]) + make_float2(1.0, 1.0))*0.5, 0.0, 1.0);
-			float scale = 0.5 * (shapes[sid].radius[0]/5.0 + shapes[sid].radius[1]/5.0);
+            float2 t = clamp(make_float2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]), -1.0, 1.0);
+			float scale = 1.0;//0.5 * (shapes[sid].radius[0]/10.0 + shapes[sid].radius[1]/10.0);
 			h.tex = t * scale;
 			h.n = shapes[sid].axis[0];
 			h.objIdx = sid;
@@ -1489,7 +1571,7 @@ __device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int
 		// no hit, sample environment map
 		if( envMapIdx >= 0 ) {
 			float2 t = spheremap(r.dir);
-			return tofloat3(tex2D<float4>(tex[envMapIdx], t.x, t.y));
+			return tofloat3(tex2D<float4>(tex[envMapIdx], -t.x, t.y));
 		}
 		else
 			return make_float3(0, 0, 0);

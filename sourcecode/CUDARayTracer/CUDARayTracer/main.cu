@@ -21,8 +21,6 @@ using namespace std;
 #include <GL/freeglut.h>
 #endif
 
-#include "FreeImage.h"
-
 // includes, cuda
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
@@ -50,6 +48,8 @@ using namespace std;
 #include "definitions.h"
 #include "Scene.h"
 #include "trackball.h"
+
+#include "FreeImagePlus.h"
 
 #define MAX_EPSILON_ERROR 10.0f
 #define THRESHOLD         0.30f
@@ -197,13 +197,20 @@ void init_scene()
 	vector<cudaTextureObject_t> texobjs;
 	for(int i=0;i<texs.size();i++) {
 		// Allocate CUDA array in device memory
-		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+		cudaChannelFormatDesc channelDesc;
+		if( texs[i].isHDR )
+			channelDesc = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
+		else
+			channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
 		cudaArray* cuArray;
 		cudaMallocArray(&cuArray, &channelDesc, texs[i].size.x, texs[i].size.y);
 
 		// Copy to device memory some data located at address h_data
-		// in host memory 
-		cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*sizeof(uchar4), cudaMemcpyDeviceToDevice);
+		// in host memory
+		if( texs[i].isHDR )
+			cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*sizeof(float4), cudaMemcpyDeviceToDevice);
+		else
+			cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*sizeof(uchar4), cudaMemcpyDeviceToDevice);
 
 		// create texture object
 		cudaResourceDesc resDesc;
@@ -217,7 +224,10 @@ void init_scene()
 		texDesc.addressMode[0]   = cudaAddressModeWrap;
 		texDesc.addressMode[1]   = cudaAddressModeWrap;
 		texDesc.filterMode       = cudaFilterModeLinear;
-		texDesc.readMode         = cudaReadModeNormalizedFloat;
+		if( texs[i].isHDR )
+			texDesc.readMode         = cudaReadModeElementType;
+		else
+			texDesc.readMode         = cudaReadModeNormalizedFloat;
 		texDesc.normalizedCoords = 1;
 
 		// create texture object: we only have to do this once!
@@ -390,14 +400,16 @@ int findGraphicsGPU(char *name)
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
-	srand(clock());
 	FreeImage_Initialise();
+
+	srand(clock());
+	
 	char *ref_file = NULL;
 
 	pArgc = &argc;
 	pArgv = argv;
 
-	printf("%s starting...\n");
+	//printf("%s starting...\n");
 
 	if (argc > 1)
 	{
@@ -411,6 +423,8 @@ int main(int argc, char **argv)
 	printf("\n");
 
 	runTest(argc, argv, ref_file);
+
+	FreeImage_DeInitialise();
 	return 0;
 }
 

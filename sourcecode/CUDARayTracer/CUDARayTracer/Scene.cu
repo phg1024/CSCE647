@@ -46,7 +46,14 @@ void Scene::parse(const string& line)
 	if( tag == "environment" ) {
 		string texFile;
 		ss >> texFile;
-		envmap = loadTexture(texFile.c_str(), texs);
+
+		// test if it is an hdr image
+		if( isHDRFile(texFile) ) {
+			envmap = loadHDRTexture(texFile, texs);
+		}
+		else {
+			envmap = loadTexture(texFile.c_str(), texs);
+		}
 	}
 	else if( tag == "camera" ) {
 		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.w >> cam.h;
@@ -85,7 +92,10 @@ void Scene::parse(const string& line)
 		}
 		if( normalFile != "none" ) {
 			sp.hasNormalMap = true;
-			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+			sp.normalTexId = TextureObject::parseType(normalFile);
+			if( sp.normalTexId == TextureObject::Image ){ 
+				sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+			}
 		}
 
 		shapes.push_back(sp);
@@ -155,7 +165,10 @@ void Scene::parse(const string& line)
 		}
 		if( normalFile != "none" ) {
 			sp.hasNormalMap = true;
-			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+			sp.normalTexId = TextureObject::parseType(normalFile);
+			if( sp.normalTexId == TextureObject::Image ){ 
+				sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+			}
 		}
 
 		shapes.push_back(sp);
@@ -187,7 +200,10 @@ void Scene::parse(const string& line)
 		}
 		if( normalFile != "none" ) {
 			sp.hasNormalMap = true;
-			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+			sp.normalTexId = TextureObject::parseType(normalFile);
+			if( sp.normalTexId == TextureObject::Image ){ 
+				sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+			}
 		}
 
 		shapes.push_back(sp);
@@ -233,7 +249,42 @@ void Scene::parse(const string& line)
 		shapes.push_back(Shape::createHyperboloid2(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), mater));
 	}
 	else if( tag == "mesh" ) {
+		vec3 T, S, R;
+		ss >> T >> S >> R;
+		Material mater;
+		ss >> mater;
 
+		mat3 mscl = mat3::scaling(S.x, S.y, S.z);
+		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
+		mat3 M = mrot * mscl;
+
+		vec3 dim = mscl * vec3(1, 1, 1);
+
+		Shape sp = Shape::createMesh(T, S, R, mater);
+
+		string meshFile, texFile, normalFile;
+		int solidFlag;
+		ss >> meshFile >> texFile >> solidFlag >> normalFile;
+		
+		// load the mesh and convert it to a texture
+		
+		if( texFile != "none" ) {
+			sp.hasTexture = true;
+			sp.texId = TextureObject::parseType(texFile);
+			if( sp.texId == TextureObject::Image ){ 
+				// load texture from image file
+				if( solidFlag ) 
+					sp.texId += loadTexture(texFile.c_str(), texs);
+				else
+					sp.texId = loadTexture(texFile.c_str(), texs);
+			}
+		}
+		if( normalFile != "none" ) {
+			sp.hasNormalMap = true;
+			sp.normalTexId = loadTexture(normalFile.c_str(), texs);
+		}
+
+		shapes.push_back(sp);
 	}
 	else return;
 }

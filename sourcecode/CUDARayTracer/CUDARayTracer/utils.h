@@ -9,6 +9,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include "FreeImagePlus.h"
+
 inline void showCUDAMemoryUsage() {
 	size_t free_byte ;
 	size_t total_byte ;
@@ -69,8 +71,46 @@ static int loadTexture(const char* filename, vector<TextureObject>& texObjs) {
 	const size_t sz_tex = width * height * sizeof(uchar4);
 	cudaMalloc((void**)&(texObj.addr), sz_tex);
 	cudaMemcpy(texObj.addr, &buffer[0], sz_tex, cudaMemcpyHostToDevice);
-
 	showCUDAMemoryUsage();
+	texObj.isHDR = false;
+
+	texObjs.push_back(texObj);
+	return texObjs.size()-1;
+}
+
+static bool isHDRFile(const string& filename) {
+	if( filename.find(".hdr") != filename.npos ) return true;
+	else if( filename.find(".hdr") != filename.npos ) return true;
+	else return false;
+}
+
+static int loadHDRTexture(const string& filename, vector<TextureObject>& texObjs) {
+	cout << "loading HDR texture " << filename << endl;
+
+	// load hdr or exr image
+	fipImage image(FIT_RGBAF);
+	image.load(filename.c_str());
+
+	cout << "size: " << image.getWidth() << "x" << image.getHeight() << endl;
+	cout << "bits per pixel: " << image.getBitsPerPixel() << endl;
+
+	int width = image.getWidth(), height = image.getHeight();
+	vector<float4> buffer(width*height);
+	for(int i=0,idx=0;i<height;i++) {
+		float* scanline = reinterpret_cast<float*>(image.getScanLine(height-1-i));
+		for(int j=0;j<width;j++,idx++) {			
+			int offset = j*3;
+			buffer[idx] = make_float4(scanline[offset], scanline[offset+1], scanline[offset+2], 1.0);
+		}
+	}
+
+	TextureObject texObj;
+	texObj.size = make_int2(width, height);
+	const size_t sz_tex = width * height * sizeof(float4);
+	cudaMalloc((void**)&(texObj.addr), sz_tex);
+	cudaMemcpy(texObj.addr, &buffer[0], sz_tex, cudaMemcpyHostToDevice);
+	showCUDAMemoryUsage();
+	texObj.isHDR = true;
 
 	texObjs.push_back(texObj);
 	return texObjs.size()-1;

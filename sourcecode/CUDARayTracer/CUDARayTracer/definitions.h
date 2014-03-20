@@ -354,6 +354,10 @@ public:
 		return Shape(HYPERBOLOID2, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
+	static Shape createMesh(vec3 center, vec3 rad, vec3 rot, Material mater) {
+		return Shape();
+	}
+
 	ShapeType t;
 
 	// geometry
@@ -368,6 +372,9 @@ public:
 	int texId;
 	bool hasNormalMap;
 	int normalTexId;
+
+	// for triangular mesh
+	int faceTex;
 };
 
 struct d_Shape {
@@ -391,6 +398,8 @@ struct d_Shape {
 		texId = s.texId;
 		hasNormalMap = s.hasNormalMap;
 		normalTexId = s.normalTexId;
+
+		faceTex = s.faceTex;
 
 		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
 		constant2 = (t==Shape::CONE)?0.0:1.0;
@@ -428,6 +437,8 @@ struct d_Shape {
 	int texId;
 	bool hasNormalMap;
 	int normalTexId;
+
+	int faceTex;
 };
 
 struct Ray {

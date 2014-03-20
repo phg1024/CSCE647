@@ -770,6 +770,8 @@ struct TextureObject {
 		Julia,
 		Perlin2D,
 		Perlin,
+		Chessboard2D,
+		Chessboard,
 		Marble,
 		WoodGrain,
 		Image
@@ -780,11 +782,15 @@ struct TextureObject {
 		else if( str == "julia" ) return Julia;
 		else if( str == "perlin2d" ) return Perlin2D;
 		else if( str == "perlin" ) return Perlin;
+		else if( str == "chessboard2d" ) return Chessboard2D;
+		else if( str == "chessboard" ) return Chessboard;
 		else if( str == "marble" ) return Marble;
 		else if( str == "woodgrain" ) return WoodGrain;
 		else return Image;
 	}
 
+	bool isHDR;
+	float4 *addrf;
 	uchar4 *addr;
 	int2 size;
 };
