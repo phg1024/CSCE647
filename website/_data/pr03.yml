@@ -1,0 +1,59 @@
+- name: basic.png
+  des: Basic texture mapping for sphere and plane
+  id: "1"
+
+- name: normalmap.png
+  des: Texture mapping and normal mapping
+  id: "2"
+
+- name: project.png
+  des: Projective mapping
+  id: "3"
+
+- name: image_2d.png
+  des: Texture mapping with image
+  id: "4"
+
+- name: image_solid.png
+  des: Image converted solid texture mapping
+  id: "5"
+
+- name: image_2d2.png
+  des: Texture mapping with image II
+  id: "6"
+
+- name: image_solid2.png
+  des: Image converted solid texture mapping II
+  id: "7"
+
+- name: image_2d3.png
+  des: Texture mapping with image III
+  id: "8"
+
+- name: image_solid3.png
+  des: Image converted solid texture mapping III
+  id: "9"
+
+- name: julia.png
+  des: Procedure texture mapping - Julia set
+  id: "10"
+
+- name: perlin.png
+  des: Procedure texture mapping - Perlin noise
+  id: "11"
+
+- name: marble.png
+  des: Procedure texture mapping - Marble pattern generated with 3D Perlin noise
+  id: "12"
+
+- name: procedure.png
+  des: Procedure texture mapping - Texture generated with 2D and 3D functions
+  id: "13"
+
+- name: envmap.png
+  des: Environment mapping
+  id: "14"
+
+- name: overview.png
+  des: Various mapping effects
+  id: "15"

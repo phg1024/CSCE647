@@ -47,7 +47,15 @@
         <h2>Project 02 - Shadow Casting</h2>
         <div class="projectbrief">
             <p>
-                For this project, I have done all the required tasks. Below are the renders I generated.
+                In this project, I have done all the required tasks. Below are the renders I generated.
+             </p>
+            <p>
+                With GPU acceleration, regular lighting images (point light, spot light and fake shadow with "transparent" object)
+                are rendered in real time.</p>
+            <p>
+                For the area lights,
+                over 1024 (32x32) samples are used in generating soft shadows. The images are rendered in a progressive way and
+                the typical running time for an image with 1200 shadow samples is 30 seconds.
             </p>
         </div>
         <div class="results">
@@ -55,8 +63,8 @@
             <p class="note">Click on the images to view full size version.</p>
             
             <div class="resultentry">
-                <a class="fbox" href="./images/point_light.png" title="Point Light"><img class="resultimage"  src="./images/point_light.png"></a>
-                <p class="resultdes">Image 1: Point Light</p>
+                <a class="fbox" href="./images/point_light.png" title="Point Light (the white dot)"><img class="resultimage"  src="./images/point_light.png"></a>
+                <p class="resultdes">Image 1: Point Light (the white dot)</p>
             </div>
             
             <div class="resultentry">
@@ -100,8 +108,13 @@
             </div>
             
             <div class="resultentry">
-                <a class="fbox" href="./images/arealight.png" title="Soft Shadow with Area Light"><img class="resultimage"  src="./images/arealight.png"></a>
-                <p class="resultdes">Image 11: Soft Shadow with Area Light</p>
+                <a class="fbox" href="./images/arealight.png" title="Soft Shadow with Area Light (the white quad)"><img class="resultimage"  src="./images/arealight.png"></a>
+                <p class="resultdes">Image 11: Soft Shadow with Area Light (the white quad)</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/arealight_sphere.png" title="Soft Shadow with Spherical Area Light (the white sphere)"><img class="resultimage"  src="./images/arealight_sphere.png"></a>
+                <p class="resultdes">Image 11: Soft Shadow with Spherical Area Light (the white sphere)</p>
             </div>
             
             <div class="resultentry">
@@ -110,11 +123,20 @@
             </div>
             
             <div class="resultentry">
+                <a class="fbox" href="./images/arealight_sphere_gooch.png" title="Soft Shadow with Spherical Area Light, Gooch Shading"><img class="resultimage"  src="./images/arealight_sphere_gooch.png"></a>
+                <p class="resultdes">Image 12: Soft Shadow with Spherical Area Light, Gooch Shading</p>
+            </div>
+            
+            <div class="resultentry">
                 <a class="fbox" href="./images/final.png" title="Multiple Spot Lights with Ray-traced Soft Shadow"><img class="resultimage"  src="./images/final.png"></a>
                 <p class="resultdes">Image 13: Multiple Spot Lights with Ray-traced Soft Shadow</p>
             </div>
             
-
+            <div class="resultentry">
+                <a class="fbox" href="./images/rainbow.png" title="Special Lighting Effect using Red-Green-Blue Interpolation for Light Color, Soft Shadow"><img class="resultimage"  src="./images/rainbow.png"></a>
+                <p class="resultdes">Image 14: Special Lighting Effect using Red-Green-Blue Interpolation for Light Color, Soft Shadow</p>
+            </div>
+            
         </div>
     </div>
 </article>
