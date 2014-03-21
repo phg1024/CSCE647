@@ -1,5 +1,5 @@
 - name: point_light.png
-  des: Point Light
+  des: Point Light (the white dot)
   id: "1"
 
 - name: point_light_gooch.png
@@ -35,13 +35,25 @@
   id: "10"
 
 - name: arealight.png
-  des: Soft Shadow with Area Light
+  des: Soft Shadow with Area Light (the white quad)
+  id: "11"
+
+- name: arealight_sphere.png
+  des: Soft Shadow with Spherical Area Light (the white sphere)
   id: "11"
 
 - name: arealight_gooch.png
   des: Soft Shadow with Area Light, Gooch Shading
   id: "12"
 
+- name: arealight_sphere_gooch.png
+  des: Soft Shadow with Spherical Area Light, Gooch Shading
+  id: "12"
+
 - name: final.png
   des: Multiple Spot Lights with Ray-traced Soft Shadow
   id: "13"
+
+- name: rainbow.png
+  des: Special Lighting Effect using Red-Green-Blue Interpolation for Light Color, Soft Shadow
+  id: "14"
