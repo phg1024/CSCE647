@@ -115,14 +115,16 @@ extern __global__ void copy2pbo(float3*, float3*, int, int, int, float);
 extern __global__ void clearCumulatedColor(float3*, int, int);
 
 extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
-						 int nLights, Light* lights, 
-						 int nShapes, Shape* shapes, 
+						 int nLights, int* lights, 
+						 int nShapes, Shape* shapes,
+						 int nMaterials, Material* materials,
 						 unsigned int width, unsigned int height,
 						 int sMode, int AASamples);
 
 extern __global__ void raytrace2(float time, float3 *pos, Camera* cam, 
-						 int nLights, Light* lights, 
+						 int nLights, int* lights, 
 						 int nShapes, Shape* shapes, 
+						 int nMaterials, Material* materials,
 						 unsigned int width, unsigned int height,
 						 int sMode, int AASamples, 
 						 int gx, int gy, int gmx, int gmy);
@@ -130,8 +132,9 @@ extern __global__ void raytrace2(float time, float3 *pos, Camera* cam,
 extern __global__ void initCurrentBlock(int v);
 
 extern __global__ void raytrace3(float time, float3 *pos, Camera* cam, 
-						 int nLights, Light* lights, 
+						 int nLights, int* lights, 
 						 int nShapes, Shape* shapes, 
+						 int nMaterials, Material* materials,
 						 unsigned int width, unsigned int height,
 						 int sMode, int AASamples, 
 						 int bmx, int bmy, int tlb);
@@ -147,8 +150,10 @@ vector<Shape> shapes;
 Shape* d_shapes;
 TextureObject* d_tex;
 cudaTextureObject_t* d_texobjs;
-vector<Light> lights;
-Light* d_lights;
+vector<int> lights;
+int* d_lights;
+vector<Material> materials;
+Material* d_materials;
 float3* cumulatedColor = 0;
 int AASamples = 1;
 int sMode = 1;
@@ -168,8 +173,11 @@ void init_scene()
 	if(!scene.load("scene0.txt")) cout << "scene file loading failed!" << endl;
 	else {
 		shapes = scene.getShapes();
+		materials = scene.getMaterials();
+		lights = scene.getLights();
 		cout << "scene loaded. " 
 			 << shapes.size() << " shapes in total." 
+			 << materials.size() << " materials in total." 
 			 << scene.getTextures().size() << " textures in total." 
 			 << endl;
 	}
@@ -183,9 +191,13 @@ void init_scene()
 	cudaMalloc((void**)&d_shapes, sz_shapes);
 	cudaMemcpy(d_shapes, &(shapes[0]), sz_shapes, cudaMemcpyHostToDevice);
 
-	//const size_t sz_lights = lights.size() * sizeof(Light);
-	//cudaMalloc((void**)&d_lights, sz_lights);
-	//cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
+	const size_t sz_mats = materials.size() * sizeof(Material);
+	cudaMalloc((void**)&d_materials, sz_mats);
+	cudaMemcpy(d_materials, &(materials[0]), sz_mats, cudaMemcpyHostToDevice);
+
+	const size_t sz_lights = lights.size() * sizeof(int);
+	cudaMalloc((void**)&d_lights, sz_lights);
+	cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
 
 	const vector<TextureObject>& texs = scene.getTextures();
 	const size_t sz_tex = sizeof(TextureObject)*texs.size();
@@ -275,8 +287,9 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		dim3 block(32, 32, 1);
 		dim3 grid(mesh_width / block.x, mesh_height / block.y, 1);
 		raytrace<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
-			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
-			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+			lights.size(), d_lights,
+			shapes.size(), d_shapes,
+			materials.size(), d_materials,
 			window_width, window_height, sMode, AASamples);
 		break;
 		   }
@@ -287,8 +300,9 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
 
 		raytrace2<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
-			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
-			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]),
+			lights.size(), d_lights,
+			shapes.size(), d_shapes,
+			materials.size(), d_materials,
 			window_width, window_height, sMode, AASamples, 
 			group.x, group.y, groupCount.x, groupCount.y);
 		break;
@@ -305,8 +319,9 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 
 		initCurrentBlock<<<1, 1>>>(0);
 		raytrace3<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
-			lights.size(), thrust::raw_pointer_cast(&d_lights[0]),
-			shapes.size(), thrust::raw_pointer_cast(&d_shapes[0]), 
+			lights.size(), d_lights,
+			shapes.size(), d_shapes,
+			materials.size(), d_materials,
 			window_width, window_height, sMode, AASamples, 
 			blockCount.x, blockCount.y, totalBlocks);
 		break;

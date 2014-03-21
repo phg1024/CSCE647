@@ -19,6 +19,14 @@ public:
 	bool save(const string& filename);
 
 	const vector<Shape>& getShapes() const {return shapes;}
+	const vector<Material>& getMaterials() const {return materials;}
+	const vector<int>& getLights() const { 
+		lights.clear();
+		for(int i=0;i<shapes.size();i++) {
+			if( shapes[i].material.t == Material::Emissive ) lights.push_back(i);
+		}
+		return lights;
+	}
 	const Camera& camera() const {return cam;}
 	const vector<TextureObject>& getTextures() const { return texs; }
 
@@ -31,8 +39,10 @@ protected:
 private:
 	Camera cam;
 	vector<Shape> shapes;
-
+	vector<Material> materials;
+	mutable vector<int> lights;
 	vector<TextureObject> texs;
+	map<string, int> materialMap;
 
 	int envmap;
 };

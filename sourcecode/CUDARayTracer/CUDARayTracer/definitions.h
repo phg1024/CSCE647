@@ -182,17 +182,22 @@ public:
 		{
 			Ks = ks; Kr = kr; Kf = kf;
 		}
+	/*
 	__device__ __host__ Material(const Material& m):
 		t(m.t), emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess), eta(m.eta),
-		Ks(m.Ks), Kr(m.Kr), Kf(m.Kf), kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta)
+		Ks(m.Ks), Kr(m.Kr), Kf(m.Kf), kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta), isSolidTex(m.isSolidTex), 
+		diffuseTex(m.diffuseTex), normalTex(m.normalTex), diffuseTexName(m.diffuseTexName), normalTexName(m.normalTexName)
 	{}
 	__device__ __host__ Material& operator=(const Material& m) {
 		t = m.t; emission = m.emission; ambient = m.ambient; diffuse = m.diffuse; specular = m.specular;
 		shininess = m.shininess; eta = m.eta; Ks = m.Ks; Kr = m.Kr; Kf = m.Kf; 
 		kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
+		isSolidTex = m.isSolidTex; diffuseTex = m.diffuseTex; normalTex = m.normalTex;
+		diffuseTexName = m.diffuseTexName; normalTexName = m.normalTexName;
 
 		return (*this);
 	}
+	*/
 
 	__device__ __host__ ~Material(){}
 
@@ -223,6 +228,7 @@ public:
 
 	__host__ friend istream& operator>>(istream& is, Material& mater);
 
+	string name;
 	MaterialType t;
 	vec3 emission;
 	vec3 ambient;
@@ -235,12 +241,20 @@ public:
 
 	vec3 kcool, kwarm;
 	float alpha, beta;
+
+	int isSolidTex;
+	string diffuseTexName;
+	string normalTexName;
+		
+	int diffuseTex;
+	int normalTex;
 };
 
 __host__ __inline__ istream& operator>>(istream& is, Material& mater) {
 	string tag;
 	is >> tag >> mater.emission >> mater.ambient >> mater.diffuse >> mater.specular >> mater.Ks >> mater.Kr
-		>> mater.Kf >> mater.shininess >> mater.eta >> mater.kcool >> mater.kwarm >> mater.alpha >> mater.beta;
+		>> mater.Kf >> mater.shininess >> mater.eta >> mater.kcool >> mater.kwarm >> mater.alpha >> mater.beta
+		>> mater.diffuseTexName >> mater.isSolidTex >> mater.normalTexName;
 
 	mater.t = Material::string2type(tag);
 	cout << tag << endl;
@@ -265,6 +279,9 @@ struct d_Material {
 
 		alpha = m.alpha;
 		beta = m.beta;
+
+		diffuseTex = m.diffuseTex;
+		normalTex = m.normalTex;
 	}
 
 	Material::MaterialType t;
@@ -279,6 +296,14 @@ struct d_Material {
 
 	float3 kcool, kwarm;
 	float alpha, beta;
+
+	bool isSolidTex;
+	int diffuseTex, normalTex;
+};
+
+struct TriangleMeshInfo {
+	int faceTex;		// float4 texture of a list of faces, together with material indices
+	int texCoordTex;	// float2 texture of texture coordinates, if exists
 };
 
 class Shape {
@@ -295,8 +320,8 @@ public:
     __device__ __host__ Shape(){}
 	__device__ __host__ Shape(ShapeType t, vec3 p, float r0, float r1, float r2,
 		  vec3 a0, vec3 a1, vec3 a2,
-		  Material mater):
-	t(t), p(p), material(mater), hasTexture(false), texId(-1), hasNormalMap(false), normalTexId(-1) {
+		  int mater):
+	t(t), p(p), materialId(mater) {
 		a0 = a0.normalized(); a1 = a1.normalized(); a2 = a2.normalized();
 		axis[0] = a0; axis[1] = a1; axis[2] = a2;
 		radius[0] = r0; radius[1] = r1; radius[2] = r2;
@@ -316,8 +341,7 @@ public:
 	}
 
 	__device__ __host__ Shape(const Shape& s):t(s.t), p(s.p), m(s.m), 
-		material(s.material), hasTexture(s.hasTexture), texId(s.texId), hasNormalMap(s.hasNormalMap),
-	normalTexId(s.normalTexId){
+		materialId(s.materialId){
 		for(int i=0;i<3;i++) {
 			axis[i] = s.axis[i];
 			radius[i] = s.radius[i];
@@ -325,37 +349,37 @@ public:
 	}
 	__device__ __host__ ~Shape(){}
 
-	static Shape createSphere(vec3 center, float radius, Material mater){
+	static Shape createSphere(vec3 center, float radius, int mater){
 		return Shape(ELLIPSOID, center, radius, radius, radius, vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1),
 			mater);
 	}
 
-	static Shape createEllipsoid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+	static Shape createEllipsoid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, int mater) {
 		return Shape(ELLIPSOID, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createPlane(vec3 center, float w, float h, float d, vec3 normal, vec3 u, vec3 v, Material mater) {
+	static Shape createPlane(vec3 center, float w, float h, float d, vec3 normal, vec3 u, vec3 v, int mater) {
 		return Shape(PLANE, center, w, h, d, normal, u, v, mater);
 	}
 
-	static Shape createCylinder(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater){
+	static Shape createCylinder(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, int mater){
 		return Shape(CYLINDER, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createCone(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+	static Shape createCone(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, int mater) {
 		return Shape(CONE, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createHyperboloid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+	static Shape createHyperboloid(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, int mater) {
 		return Shape(HYPERBOLOID, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createHyperboloid2(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, Material mater) {
+	static Shape createHyperboloid2(vec3 center, vec3 rad, vec3 a0, vec3 a1, vec3 a2, int mater) {
 		return Shape(HYPERBOLOID2, center, rad.x, rad.y, rad.z, a0, a1, a2, mater);
 	}
 
-	static Shape createMesh(vec3 center, vec3 rad, vec3 rot, Material mater) {
-		return Shape();
+	static Shape createMesh(vec3 center, vec3 rad, mat3 rot, int mater) {
+		return Shape(TRIANGLE_MESH, center, rad.x, rad.y, rad.z, rot*vec3(1, 0, 0), rot*vec3(0, 1, 0), rot*vec3(0, 0, 1), mater);
 	}
 
 	ShapeType t;
@@ -367,14 +391,11 @@ public:
 	mat3 m;
 
 	Material material;
+	
+	int materialId;
 
-	bool hasTexture;
-	int texId;
-	bool hasNormalMap;
-	int normalTexId;
-
-	// for triangular mesh
-	int faceTex;
+	// for triangular mesh	
+	TriangleMeshInfo trimesh;
 };
 
 struct d_Shape {
@@ -392,14 +413,11 @@ struct d_Shape {
 		radius[2] = s.radius[2];
 
 		for(int i=0;i<9;i++) m[i] = s.m(i);
-		material.init(s.material);
+		
+		//material.init(s.material);
+		materialId = s.materialId;
 
-		hasTexture = s.hasTexture;
-		texId = s.texId;
-		hasNormalMap = s.hasNormalMap;
-		normalTexId = s.normalTexId;
-
-		faceTex = s.faceTex;
+		trimesh = s.trimesh;
 
 		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
 		constant2 = (t==Shape::CONE)?0.0:1.0;
@@ -430,15 +448,11 @@ struct d_Shape {
 	float m[9];
 	float constant;
 	float constant2;
-
+	
 	d_Material material;
+	int materialId;
 
-	bool hasTexture;
-	int texId;
-	bool hasNormalMap;
-	int normalTexId;
-
-	int faceTex;
+	TriangleMeshInfo trimesh;
 };
 
 struct Ray {
