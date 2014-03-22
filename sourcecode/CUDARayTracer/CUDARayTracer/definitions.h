@@ -13,101 +13,6 @@ public:
     float w, h;
 };
 
-class Light {
-public:
-	enum LightType {
-		POINT = 0,
-		DIRECTIONAL,
-		SPOT,
-		SPHERE,
-		AREA
-	};
-
-	LightType t;
-	float intensity;
-	vec3 pos;
-	vec3 dir;
-	float radius;
-
-	float spotExponent;
-	float spotCutOff;
-
-	vec3 ambient;
-	vec3 diffuse;
-	vec3 specular;
-
-	vec3 attenuation;
-
-	__device__ __host__ Light(){}
-	__device__ __host__ Light(const Light& lt):
-		t(lt.t), intensity(lt.intensity), ambient(lt.ambient), diffuse(lt.diffuse), specular(lt.specular), 
-		pos(lt.pos), dir(lt.dir), radius(lt.radius), spotExponent(lt.spotExponent), spotCutOff(lt.spotCutOff), attenuation(lt.attenuation){}
-	__device__ __host__ ~Light(){}
-
-	// point light
-	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position):
-		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position){}
-
-	// sphere light
-	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, float r = 1.0):
-		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), radius(r){}
-
-	// directional light
-	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, vec3 direction):
-		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), dir(direction.normalized()){}
-
-	// spot light
-	__device__ __host__ Light(LightType t, float intensity, vec3 ambient, vec3 diffuse, vec3 specular, vec3 position, vec3 direction, float expo, float cutoff):
-		t(t), intensity(intensity), ambient(ambient), diffuse(diffuse), specular(specular), pos(position), dir(direction), spotExponent(expo), spotCutOff(cutoff){}
-};
-
-struct d_Light {
-	__device__ void init(const d_Light& m) {
-		t = m.t;
-		intensity = m.intensity;
-		pos = m.pos;
-		dir = m.dir;
-		radius = m.radius;
-		spotExponent = m.spotExponent;
-		spotCutOff = m.spotCutOff;
-
-		ambient = m.ambient;
-		diffuse = m.diffuse;
-		specular = m.specular;
-		attenuation = m.attenuation;
-	}
-
-	__device__ void init(const Light& m) {
-		t = m.t;
-		intensity = m.intensity;
-		pos = m.pos.data;
-		dir = m.dir.data;
-		radius = m.radius;
-		spotExponent = m.spotExponent;
-		spotCutOff = m.spotCutOff;
-
-		ambient = m.ambient.data;
-		diffuse = m.diffuse.data;
-		specular = m.specular.data;
-		attenuation = m.attenuation.data;
-	}
-
-	Light::LightType t;
-	float intensity;
-	float3 pos;
-	float3 dir;
-	float radius;
-
-	float spotExponent;
-	float spotCutOff;
-
-	float3 ambient;
-	float3 diffuse;
-	float3 specular;
-
-	float3 attenuation;
-};
-
 class Material {
 public:
 	enum MaterialType {
@@ -182,22 +87,6 @@ public:
 		{
 			Ks = ks; Kr = kr; Kf = kf;
 		}
-	/*
-	__device__ __host__ Material(const Material& m):
-		t(m.t), emission(m.emission), ambient(m.ambient), diffuse(m.diffuse), specular(m.specular), shininess(m.shininess), eta(m.eta),
-		Ks(m.Ks), Kr(m.Kr), Kf(m.Kf), kcool(m.kcool), kwarm(m.kwarm), alpha(m.alpha), beta(m.beta), isSolidTex(m.isSolidTex), 
-		diffuseTex(m.diffuseTex), normalTex(m.normalTex), diffuseTexName(m.diffuseTexName), normalTexName(m.normalTexName)
-	{}
-	__device__ __host__ Material& operator=(const Material& m) {
-		t = m.t; emission = m.emission; ambient = m.ambient; diffuse = m.diffuse; specular = m.specular;
-		shininess = m.shininess; eta = m.eta; Ks = m.Ks; Kr = m.Kr; Kf = m.Kf; 
-		kcool = m.kcool; kwarm = m.kwarm; alpha = m.alpha; beta = m.beta;
-		isSolidTex = m.isSolidTex; diffuseTex = m.diffuseTex; normalTex = m.normalTex;
-		diffuseTexName = m.diffuseTexName; normalTexName = m.normalTexName;
-
-		return (*this);
-	}
-	*/
 
 	__device__ __host__ ~Material(){}
 
@@ -302,8 +191,22 @@ struct d_Material {
 };
 
 struct TriangleMeshInfo {
+	__device__ TriangleMeshInfo& operator=(const TriangleMeshInfo& info) {
+		nFaces = info.nFaces;
+		faceTex = info.faceTex;
+		normalTex = info.normalTex;
+		texCoordTex = info.texCoordTex;
+		return (*this);
+	}
+
+	int nFaces;
 	int faceTex;		// float4 texture of a list of faces, together with material indices
+	int normalTex;		// float3 texture of a list of normal vectors
 	int texCoordTex;	// float2 texture of texture coordinates, if exists
+};
+
+struct BoundingBox {
+	float3 maxPt, minPt;
 };
 
 class Shape {
@@ -330,18 +233,26 @@ public:
 		vec3 ratio1 = a1/r1;
 		vec3 ratio2 = a2/r2;
 		
-		if( t == ELLIPSOID ) m = outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
-		else if( t == CYLINDER ) m = outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
-		else if(t == HYPERBOLOID  || t == CONE) {
+
+		switch( t ) {
+		case ELLIPSOID:
+			m = outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
+			break;
+		case CYLINDER:
+			m = outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);
+			break;
+		case HYPERBOLOID:
+		case CONE:
 			m = -outerProduct(ratio0, ratio0) + outerProduct(ratio1, ratio1) + outerProduct(ratio2, ratio2);		
-		}
-		else if( t == HYPERBOLOID2 ) {
+			break;
+		case HYPERBOLOID2:
 			m = outerProduct(ratio0, ratio0) - outerProduct(ratio1, ratio1) - outerProduct(ratio2, ratio2);		
+			break;
 		}
 	}
 
 	__device__ __host__ Shape(const Shape& s):t(s.t), p(s.p), m(s.m), 
-		materialId(s.materialId){
+		materialId(s.materialId), trimesh(s.trimesh), bb(s.bb){
 		for(int i=0;i<3;i++) {
 			axis[i] = s.axis[i];
 			radius[i] = s.radius[i];
@@ -396,6 +307,8 @@ public:
 
 	// for triangular mesh	
 	TriangleMeshInfo trimesh;
+
+	BoundingBox bb;
 };
 
 struct d_Shape {
@@ -418,6 +331,8 @@ struct d_Shape {
 		materialId = s.materialId;
 
 		trimesh = s.trimesh;
+
+		bb = s.bb;
 
 		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
 		constant2 = (t==Shape::CONE)?0.0:1.0;
@@ -449,10 +364,11 @@ struct d_Shape {
 	float constant;
 	float constant2;
 	
-	d_Material material;
+	//d_Material material;
 	int materialId;
 
 	TriangleMeshInfo trimesh;
+	BoundingBox bb;
 };
 
 struct Ray {

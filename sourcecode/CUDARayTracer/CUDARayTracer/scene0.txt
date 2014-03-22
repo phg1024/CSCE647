@@ -3,22 +3,30 @@ camera 0 12.5 45 0 -2.5 -15 0 15 -2.5 0.5 1.0 0.75
 material light0 emissive 0.25 0.25 0.25 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material light1 emissive 0.5 0.5 0.5 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material light2 emissive 1. 1. 1. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
-material light3 emissive 10. 10. 10. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
-material light4 emissive 100. 100. 100. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
+material light3 emissive 5. 5. 5. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
+material light4 emissive 10. 10. 10. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
+material light5 emissive 100. 100. 100. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material red diffuse	0.5 0 0	0.1 0 0	1 0 0	1 1 1 	1 0 0 		50 			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material green diffuse	0 0 0	0 0 0	0 1 0	1 1 1	1 0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material gray diffuse	0 0 0	0 0 0	.5 .5 .5	1 1 1	1 0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material mirror specular 0.0 0.0 0.0 0.25 0.125 0.105 .95 .95 .95 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.005 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 chessboard 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
+material mirror specular 0.0 0.0 0.0 0.25 0.125 0.105 .95 .95 .95 1.0 1.0 1.0 1.0 0.0 0.0 50.0 2.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
+material redmirror specular 0.0 0.0 0.0 0.25 0.125 0.105 .95 .65 .65 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
+material jade specular 0.0 0.0 0.0 0.125 0.25 0.105 .25 .75 .25 1.0 1.0 1.0 1.0 0.0 0.0 50.0 3.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
+material whitejade specular 0.0 0.0 0.0 0.125 0.125 0.105 .75 .75 .75 1.0 1.0 1.0 1.0 0.0 0.0 50.0 3.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material redglass refractive 0.5 0 0	0.1 0 0	1 0 0	1 1 1 	1 0 0 		50 			1.05 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material earth diffuse  0 0 0 	0.125 0.125 0.125 0.995 0.995 0.995 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 1 ./textures/earth/earth_normalmap_4k.png
+material earth diffuse  0 0 0 	0.125 0.125 0.125 0.995 0.995 0.995 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 ./textures/earth/earthmap4k.png 0 ./textures/earth/earth_normalmap_4k.png
 material metal diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/metal1.jpg 0 ./textures/metal1_normalmap.jpg
 material julia2d diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 julia2d 0 none
-material stonewall diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/brick1.jpg 0 ./textures/wall_normal.jpg
+material chessboard2d diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 chessboard2d 0 none
+material chessboard diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 chessboard 0 none
+material marble diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 marble 0 ./textures/earth/earth_normalmap_4k.png
+material stonewall diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/brick1.jpg 1 ./textures/wall_normal.jpg
 material glossywhite glossy 0.0 0.0 0.0 0.075 0.185 0.25 0.95 0.965 0.995 1.0 1.0 1.0 1.0 0.15 0.0 50.0 1.25 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material glossygray glossy 0.0 0.0 0.0	0.075 0.185 0.25	0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.5 0.0 50.0 1.25 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 environment ./textures/alps.hdr
 # shape Tx Ty Tz Sx Sy Sz Rx Ry Rz material
 sphere -40.0 40.75 40.0 5.5 5.5 5.5 0.753 0.753 0.0 light4
+sphere 15.0 15.75 15.0 .5 .5 .5 0.753 0.753 0.0 light4
 #sphere 40.0 40.75 44.0 0.5 0.5 0.5 0.753 0.753 0.0 light0
 #sphere -40.0 40.75 44.0 0.5 0.5 0.5 0.753 0.753 0.0 light0
 #sphere 0.0 40.75 54.0 0.5 0.5 0.5 0.753 0.753 0.0 light1
@@ -30,12 +38,16 @@ sphere -40.0 40.75 40.0 5.5 5.5 5.5 0.753 0.753 0.0 light4
 #plane -15.0 15.0 15.0 5 5 5 0.0 0.0 0.75 emissive 0.25 0.5 0.25 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5
 #plane 0.0 15.0 -10.0 20.0 15.0 20.0 1.57 0.0 0.0 metal
 #plane 0.0 15.0 -10.0 20.0 15.0 20.0 1.57 0.0 0.0 julia2d
-plane 0.0 -10.0 0.0 30.0 30.0 30.0 0.0 0.0 0.0 glossygray
+plane 0.0 -12.0 0.0 30.0 30.0 30.0 0.0 0.0 0.0 gray
 #box 8.0 2.0 14.0 5.0 5.0 5.0 0.0 0.0 0.0 glossywhite
-sphere 10.0 1.5 5.5 8.75 8.75 8.75 0.0 0.0 0.0 mirror
-#mesh 10.0 1.5 5.5 8.75 8.75 8.75 0.0 0.0 0.0 diffuse 0.0 0.0 0.0 0.25 0.125 0.105 1.0 1.0 1.0 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.005 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 ./meshes/cube.obj none 0 none
+sphere 10.0 1.5 5.5 4.75 4.75 4.75 0.0 0.0 0.0 jade
+sphere 5.0 10.5 5.5 4.75 4.75 4.75 0.0 0.0 0.0 marble
+mesh 10.0 10.0 15.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj mirror
+#box 10.0 0.0 15.5 4.0 4.0 4.0 0.0 0.0 0.0 mirror
+mesh 0.0 0.0 25.5 75.0 75.0 75.0 0.0 0.0 0.0 ./meshes/bun_zipper_res3.obj mirror
+sphere 10.0 0.0 15.5 1.0 1.0 1.0 0.0 0.0 0.0 jade
 #sphere 2.5 4.5 5.5 1.75 1.75 1.75 0.0 0.0 0.0 glossy 0.0 0.0 0.0 0.25 0.125 0.105 1.0 1.0 1.0 1.0 1.0 1.0 1.0 0.25 0.0 50.0 1.005 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 ./textures/chessboard.png 0 ./textures/checkers-normal-map.png
-sphere -10.0 3.0 -1.0 12.5 8.5 17.0 0.17 0.375 0.75 redglass
+sphere -10.0 3.0 -1.0 12.5 8.5 17.0 0.17 0.375 0.75 redmirror
 #cone -2.0 3.0 -3.0 2.5 1.5 1.0 0.0 0.0 1.53 diffuse 0.0 0.0 0.0 0.25 0.25 0.125 0.995 0.995 0.55 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.75 0.75 0.75 0.15 0.75 0.5 0.5
 #hyperboloid 4.0 3.0 -3.0 2.5 1.5 1.0 0.0 0.0 1.53 specular 0.0 0.0 0.0 0.20 0.20 0.25 0.75 0.75 0.955 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.35 0.75 0.25 0.75 0.35 0.5 0.5
 #hyperboloid2 0.0 3.0 -4.0 0.5 0.25 0.25 0.0 0.0 1.53 diffuse 0.0 0.0 0.0 0.25 0.20 0.25 0.95 0.75 0.955 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5

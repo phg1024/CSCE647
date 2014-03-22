@@ -91,7 +91,7 @@ public:
 
 	__device__ float noise1(float arg) {
 		int bx0, bx1;
-		float rx0, rx1, sx, t, u, v, vec[1];
+		float rx0, rx1, sx, u, v, vec[1];
 
 		vec[0] = arg;
 		if (start) {

@@ -50,6 +50,36 @@ static int loadTexture(const char* filename, float** texAddr, int2* texSize, int
 	return textureCount++;
 }
 
+static int loadMeshTexture(const vector<float4>& tris, vector<TextureObject>& texObjs) {
+	if( tris.empty() ) return -1;
+
+	TextureObject texObj;
+	texObj.t = TextureObject::Mesh;
+	texObj.size = make_int2(tris.size(), 1);
+	const size_t sz_tex = tris.size() * sizeof(float4);
+	cudaMalloc((void**)&(texObj.addr), sz_tex);
+	cudaMemcpy(texObj.addr, &tris[0], sz_tex, cudaMemcpyHostToDevice);
+	showCUDAMemoryUsage();
+
+	texObjs.push_back(texObj);
+	return texObjs.size()-1;
+}
+
+static int loadTexcoordTexture(const vector<float2>& tris, vector<TextureObject>& texObjs) {
+	if( tris.empty() ) return -1;
+
+	TextureObject texObj;
+	texObj.t = TextureObject::Mesh;
+	texObj.size = make_int2(tris.size(), 1);
+	const size_t sz_tex = tris.size() * sizeof(float2);
+	cudaMalloc((void**)&(texObj.addr), sz_tex);
+	cudaMemcpy(texObj.addr, &tris[0], sz_tex, cudaMemcpyHostToDevice);
+	showCUDAMemoryUsage();
+
+	texObjs.push_back(texObj);
+	return texObjs.size()-1;
+}
+
 static int loadTexture(const char* filename, vector<TextureObject>& texObjs) {
 	cout << "loading texture " << filename << endl;
 	cv::Mat image = cv::imread(filename); 
@@ -68,11 +98,11 @@ static int loadTexture(const char* filename, vector<TextureObject>& texObjs) {
 
 	TextureObject texObj;
 	texObj.size = make_int2(width, height);
+	texObj.t = TextureObject::Image;
 	const size_t sz_tex = width * height * sizeof(uchar4);
 	cudaMalloc((void**)&(texObj.addr), sz_tex);
 	cudaMemcpy(texObj.addr, &buffer[0], sz_tex, cudaMemcpyHostToDevice);
 	showCUDAMemoryUsage();
-	texObj.isHDR = false;
 
 	texObjs.push_back(texObj);
 	return texObjs.size()-1;
@@ -105,12 +135,12 @@ static int loadHDRTexture(const string& filename, vector<TextureObject>& texObjs
 	}
 
 	TextureObject texObj;
+	texObj.t = TextureObject::HDRImage;
 	texObj.size = make_int2(width, height);
 	const size_t sz_tex = width * height * sizeof(float4);
 	cudaMalloc((void**)&(texObj.addr), sz_tex);
 	cudaMemcpy(texObj.addr, &buffer[0], sz_tex, cudaMemcpyHostToDevice);
 	showCUDAMemoryUsage();
-	texObj.isHDR = true;
 
 	texObjs.push_back(texObj);
 	return texObjs.size()-1;
@@ -168,7 +198,7 @@ __host__ __device__ __forceinline__ unsigned int myhash(unsigned int a){
 }
 
 __host__ __device__ __forceinline__ float generateRandomNumberFromThread1(int2 resolution, float time, int x, int y){
-	int index = x + (y * resolution.x);
+	int index = resolution.y + x + (y * resolution.x);
 
 	thrust::default_random_engine rng(myhash(index*time));
 	thrust::uniform_real_distribution<float> u01(0,1);
@@ -399,4 +429,14 @@ __device__ __forceinline__ float3 complex_mul(float3 z1, float3 z2) {
 
 __device__ __forceinline__ float complex_mag(float3 z) {
 	return z.x*z.x+z.y*z.y+z.z*z.z;
+}
+
+__host__ __forceinline__ ostream& operator<<(ostream& os, float3& v) {
+	os << "(" << v.x << ", " << v.y << ", " << v.z << ")\t";
+	return os;
+}
+
+__host__ __forceinline__ ostream& operator<<(ostream& os, float4& v) {
+	os << "(" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << ")\t";
+	return os;
 }

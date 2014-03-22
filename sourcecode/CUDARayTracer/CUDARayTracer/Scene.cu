@@ -96,11 +96,15 @@ void Scene::parse(const string& line)
 		// construct transformation matrix
 		mat3 mscl = mat3::scaling(S.x, S.y, S.z);
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
+		mat3 M = mscl * mrot;
 
 		vec3 n(0, 1, 0), u(1, 0, 0), v(0, 0, 1);
 		vec3 dim = mscl * vec3(1, 1, 1);
 
 		Shape sp = Shape::createPlane(T, dim.x, dim.y, dim.z, mrot*n, mrot*u, mrot*v, materialMap[matName]);
+
+		sp.bb.minPt = mrot * make_float3(-S.x, -1e-1, -S.z);
+		sp.bb.maxPt = mrot * make_float3(S.x, 1e-1, S.z);
 
 		shapes.push_back(sp);
 	}
@@ -152,6 +156,10 @@ void Scene::parse(const string& line)
 
 		Shape sp = Shape::createSphere(T, dim.x, materialMap[matName]);
 
+		S = S * 1.5;
+		sp.bb.maxPt = make_float3(T.x + S.x, T.y + S.y, T.z + S.z);
+		sp.bb.minPt = make_float3(T.x - S.x, T.y - S.y, T.z - S.z);
+
 		shapes.push_back(sp);
 	}
 	else if( tag == "ellipsoid") {
@@ -161,6 +169,7 @@ void Scene::parse(const string& line)
 		ss >> matName;
 
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
+
 
 		Shape sp = Shape::createEllipsoid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]);
 
@@ -209,8 +218,8 @@ void Scene::parse(const string& line)
 	else if( tag == "mesh" ) {
 		vec3 T, S, R;
 		ss >> T >> S >> R;
-		string matName;
-		ss >> matName;
+		string meshFile, matName;
+		ss >> meshFile >> matName;
 
 		mat3 mscl = mat3::scaling(S.x, S.y, S.z);
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
@@ -219,10 +228,6 @@ void Scene::parse(const string& line)
 		vec3 dim = mscl * vec3(1, 1, 1);
 
 		Shape sp = Shape::createMesh(T, S, mrot, materialMap[matName]);
-
-		string meshFile, texFile, normalFile;
-		int solidFlag;
-		ss >> meshFile >> texFile >> solidFlag >> normalFile;
 		
 		// load the mesh and convert it to a texture
 		vector<tinyobj::shape_t> objs;
@@ -230,28 +235,64 @@ void Scene::parse(const string& line)
 		cout << objs.size() << " shapes in total." << endl;
 		
 		vector<float4> triangles;
+		vector<float4> normals;
+		vector<float2> texcoords;
+
+		float3 maxPt = make_float3(-FLT_MAX), minPt = make_float3(FLT_MAX);
+
 		for(int i=0;i<objs.size();i++) {
 			const tinyobj::shape_t& shp = objs[i];
 
-			//
-		}
+			const tinyobj::mesh_t& msh = shp.mesh;
+			const tinyobj::material_t& mt = shp.material;
 
+			bool hasNormal = !msh.normals.empty();
+			bool hasTexCoords = !msh.texcoords.empty();
 
-		if( texFile != "none" ) {
-			sp.material.diffuseTex = TextureObject::parseType(texFile);
-			if( sp.material.diffuseTex == TextureObject::Image ){ 
-				// load texture from image file
-				if( solidFlag ) 
-					sp.material.diffuseTex += loadTexture(texFile.c_str(), texs);
-				else
-					sp.material.diffuseTex = loadTexture(texFile.c_str(), texs);
+			for(int j=0;j<msh.indices.size();j+=3) {
+				float3 v0 = make_float3(msh.positions[msh.indices[j]*3], msh.positions[msh.indices[j]*3+1], msh.positions[msh.indices[j]*3+2]);
+				float3 v1 = make_float3(msh.positions[msh.indices[j+1]*3], msh.positions[msh.indices[j+1]*3+1], msh.positions[msh.indices[j+1]*3+2]);
+				float3 v2 = make_float3(msh.positions[msh.indices[j+2]*3], msh.positions[msh.indices[j+2]*3+1], msh.positions[msh.indices[j+2]*3+2]);
+
+				v0 = M * v0 + T.data;
+				v1 = M * v1 + T.data;
+				v2 = M * v2 + T.data;
+
+				maxPt = fmaxf(v0, maxPt);
+				minPt = fminf(v0, minPt);
+
+				triangles.push_back(make_float4(v0, i));
+				triangles.push_back(make_float4(v1, i));
+				triangles.push_back(make_float4(v2, i));
+
+				if( hasNormal ) {
+					float3 n0 = make_float3(msh.normals[msh.indices[j]*3], msh.normals[msh.indices[j]*3+1], msh.normals[msh.indices[j]*3+2]);
+					float3 n1 = make_float3(msh.normals[msh.indices[j+1]*3], msh.normals[msh.indices[j+1]*3+1], msh.normals[msh.indices[j+1]*3+2]);
+					float3 n2 = make_float3(msh.normals[msh.indices[j+2]*3], msh.normals[msh.indices[j+2]*3+1], msh.normals[msh.indices[j+2]*3+2]);
+
+					n0 = normalize(mrot * n0);
+					n1 = normalize(mrot * n1);
+					n2 = normalize(mrot * n2);
+
+					normals.push_back(make_float4(n0, 0));
+					normals.push_back(make_float4(n1, 0));
+					normals.push_back(make_float4(n2, 0));
+				}
 			}
 		}
-		else sp.material.diffuseTex = -1;
-		if( normalFile != "none" ) {
-			sp.material.normalTex = loadTexture(normalFile.c_str(), texs);
-		}
-		else sp.material.normalTex = -1;
+
+		sp.bb.minPt = minPt;
+		sp.bb.maxPt = maxPt;
+
+		sp.trimesh.faceTex = loadMeshTexture(triangles, texs);
+		sp.trimesh.normalTex = loadMeshTexture(normals, texs);
+		sp.trimesh.texCoordTex = loadTexcoordTexture(texcoords, texs);
+		sp.trimesh.nFaces = triangles.size()/3;
+
+		cout << sp.trimesh.faceTex << ' '
+			 << sp.trimesh.normalTex << ' '
+			 << sp.trimesh.texCoordTex << ' '
+			 << sp.trimesh.nFaces << endl;
 
 		shapes.push_back(sp);
 	}

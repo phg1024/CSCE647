@@ -774,7 +774,11 @@ struct TextureObject {
 		Chessboard,
 		Marble,
 		WoodGrain,
-		Image
+		Image,
+		HDRImage,
+		Mesh,
+		Normal,
+		TextureCoordinates
 	};
 
 	static TextureType parseType(const string& str) {
@@ -789,7 +793,7 @@ struct TextureObject {
 		else return Image;
 	}
 
-	bool isHDR;
+	TextureType t;
 	float4 *addrf;
 	uchar4 *addr;
 	int2 size;

@@ -79,6 +79,33 @@ __global__ void bindTexture2(const cudaTextureObject_t *texs, int texCount) {
 	}
 }
 
+__device__ bool lightRayIntersectsBoundingBox( Ray r, BoundingBox bb ) {
+	float3 rdirinv = 1.0 / r.dir;
+	
+	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
+	rdirinv.y = (r.dir.y==0)?FLT_MAX:rdirinv.y;
+	rdirinv.z = (r.dir.z==0)?FLT_MAX:rdirinv.z;
+	
+	float tmin, tmax;
+
+	float l1   = (bb.minPt.x - r.origin.x) * rdirinv.x;
+	float l2   = (bb.maxPt.x - r.origin.x) * rdirinv.x;
+	tmin = fminf(l1,l2);
+	tmax = fmaxf(l1,l2);
+
+	l1   = (bb.minPt.y - r.origin.y) * rdirinv.y;
+	l2   = (bb.maxPt.y - r.origin.y) * rdirinv.y;
+	tmin = fmaxf(fminf(l1,l2), tmin);
+	tmax = fminf(fmaxf(l1,l2), tmax);
+
+	l1   = (bb.minPt.z - r.origin.z) * rdirinv.z;
+	l2   = (bb.maxPt.z - r.origin.z) * rdirinv.z;
+	tmin = fmaxf(fminf(l1,l2), tmin);
+	tmax = fminf(fmaxf(l1,l2), tmax);
+
+	return ((tmax >= tmin) && (tmax >= 0.0f));
+}
+
 // light ray intersection tests
 __device__ float lightRayIntersectsSphere( Ray r, d_Shape* shapes, int sid ) {
     float3 pq = r.origin - shapes[sid].p;
@@ -111,6 +138,7 @@ __device__ float lightRayIntersectsSphere( Ray r, d_Shape* shapes, int sid ) {
 }
 
 __device__ float lightRayIntersectsPlane( Ray r, d_Shape* shapes, int sid ) {
+	//if( !lightRayIntersectsBoundingBox(r, shapes[sid].bb ) ) return -1.0;
     float t = 1e10;
     float THRES = 1e-3;
     float3 pq = shapes[sid].p - r.origin;
@@ -306,6 +334,8 @@ __device__ float lightRayIntersectsCone(Ray r, d_Shape* shapes, int sid) {
 }
 
 __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int sid) {
+	if( !lightRayIntersectsBoundingBox(r, shapes[sid].bb ) ) return -1.0;
+
 	float3 pq = shapes[sid].p - r.origin;
 	float a = dot(r.dir, mul(shapes[sid].m, r.dir));
 	float b = -dot(pq, mul(shapes[sid].m, r.dir));
@@ -333,6 +363,128 @@ __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int 
     }
 }
 
+__device__ void getTriangleVertices(int tid, int fid, float4 &v1, float4 &v2, float4 &v3) {
+	
+	int foffset = fid*3;
+	v1 = tex1D<float4>(tex[tid], foffset + 0.5);
+	v2 = tex1D<float4>(tex[tid], foffset + 1.5);
+	v3 = tex1D<float4>(tex[tid], foffset + 2.5);
+}
+
+__device__ void getTriangleNormals(int tid, int fid, float4 &n1, float4 &n2, float4 &n3) {
+	int foffset = fid*3;
+	n1 = tex1D<float4>(tex[tid], foffset + 0.5);
+	n2 = tex1D<float4>(tex[tid], foffset + 1.5);
+	n3 = tex1D<float4>(tex[tid], foffset + 2.5);
+}
+
+__device__ void getTriangleTextureCoords(int tid, int fid, float2 &t1, float2 &t2, float2 &t3) {
+	int foffset = fid*3;
+	t1 = tex1D<float2>(tex[tid], foffset);
+	t2 = tex1D<float2>(tex[tid], foffset+1);
+	t3 = tex1D<float2>(tex[tid], foffset+2);
+}
+
+
+__device__ float rayIntersectsTriangle(Ray r, float3 v0, float3 v1, float3 v2) {
+	
+	float3 e1, e2;
+	e1 = v1 - v0;
+	e2 = v2 - v0;
+
+	float3 n = normalize(cross(e1, e2));
+
+	// check if ray and plane are parallel ?
+    float NdotRayDirection = dot(n, r.dir);
+    if (NdotRayDirection == 0)
+        return -1.0; // they are parallel so they don't intersect !
+
+    // compute d parameter using equation 2
+    float d = dot(n, v0);
+    // compute t (equation 3)
+	float t = -(dot(n, r.origin-v0)) / NdotRayDirection;
+
+    // check if the triangle is in behind the ray
+    if (t < 0)
+        return -1.0; // the triangle is behind 
+    // compute the intersection point using equation 1
+    float3 p = r.origin + t * r.dir;
+ 
+    //
+    // Step 2: inside-outside test
+    //
+ 
+    float3 c; // vector perpendicular to triangle's plane
+ 
+    // edge 0
+    float3 edge0 = v1 - v0;
+    float3 vp0 = p - v0;
+    c = cross(edge0, vp0);
+    if (dot(n, c) < 0)
+        return -1.0; // P is on the right side
+ 
+    // edge 1
+    float3 edge1 = v2 - v1;
+    float3 vp1 = p - v1;
+    c = cross(edge1, vp1);
+    if (dot(n, c) < 0)
+        return -1.0; // P is on the right side
+ 
+    // edge 2
+    float3 edge2 = v0 - v2;
+    float3 vp2 = p - v2;
+    c = cross(edge2, vp2);
+    if (dot(n, c) < 0)
+        return -1.0; // P is on the right side;
+ 
+    return t; // this ray hits the triangle
+}
+
+__device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, float3 q1, float3 q2, float3 q3) {
+	float3 e23 = q3 - q2, e21 = q1 - q2;
+	float3 d1 = q1 - p, d2 = q2 - p, d3 = q3 - p;
+	float3 oriN = cross(e23, e21);
+	float3 n = normalize(oriN);
+
+	float invBTN = 1.0 / dot(oriN, n);
+	float3 bcoord;
+	bcoord.x = dot(cross(d2, d3), n) * invBTN;
+	bcoord.y = dot(cross(d3, d1), n) * invBTN;
+	bcoord.z = 1 - bcoord.x - bcoord.y;
+
+	return bcoord;
+}
+
+__device__ float lightRayIntersectsMesh(Ray r, d_Shape* shapes, int sid, int& fid, float3& bcoords) {
+	const d_Shape& sp = shapes[sid];
+
+	if( !lightRayIntersectsBoundingBox(r, sp.bb) ) return -1.0;
+	
+	bool hit = false;
+	float t = FLT_MAX;
+	float4 q1, q2, q3;
+
+	// brute force search
+	for(int i=0;i<sp.trimesh.nFaces;i++) {
+		float4 v1, v2, v3;
+		getTriangleVertices(sp.trimesh.faceTex, i, v1, v2, v3);
+
+		float tmp = rayIntersectsTriangle(r, tofloat3(v1), tofloat3(v2), tofloat3(v3));
+		if( tmp > 0.0 && tmp < t ) {
+			hit = true;
+			t = tmp;
+			q1 = v1, q2 = v2, q3 = v3;
+			fid = i;
+		}
+	}
+
+	if( hit ){
+		bcoords = compute_barycentric_coordinates(r.origin + t * r.dir, tofloat3(q1), tofloat3(q2), tofloat3(q3));
+		return t;
+	}
+	else return -1.0;	
+}
+
 __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes, int sid) {
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
@@ -343,10 +495,10 @@ __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes
 	case Shape::CYLINDER:
 	case Shape::CONE:
 		return lightRayIntersectsQuadraticSurface(r, shapes, sid);
-	//case Shape::CONE:
-	//	return lightRayIntersectsCone(r, shapes, sid);
-	//case Shape::CYLINDER:
-	//	return lightRayIntersectsCylinder(r, shapes, sid);	
+	case Shape::TRIANGLE_MESH:
+		int fid;
+		float3 bc;
+		return lightRayIntersectsMesh(r, shapes, sid, fid, bc);
 	default:
 		return -1.0;
 	}
@@ -361,7 +513,6 @@ __device__ float lightRayIntersectsShapes(Ray r, d_Shape* shapes, int shapeCount
 
     for(int i=0;i<shapeCount;i++) {
 		// hack
-		if( hasRefraction && shapes[i].material.Kf != 0.0 ) continue;
         float hitT = lightRayIntersectsShape(r, shapes, i);
 		if( (hitT > -THRES) && (hitT < t) ) {
             t = hitT;
@@ -382,7 +533,6 @@ __device__ float lightRayIntersectsShapes2(Ray r, d_Shape* shapes, int shapeCoun
 
     for(int i=0;i<shapeCount;i++) {
 		// hack
-		if( hasRefraction && shapes[i].material.Kf != 0.0 ) continue;
 		if( i == sid ) continue;
         float hitT = lightRayIntersectsShape(r, shapes, i);
 		if( (hitT > -THRES) && (hitT < t) ) {
@@ -442,7 +592,7 @@ __device__ float travelPathLength(Ray r, d_Shape* shapes, int shapeCount, int si
 	return L;
 }
 
-
+/*
 __device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nShapes, d_Light* lights) {
 	switch( lights->t ) {
 	case Light::POINT:
@@ -471,6 +621,7 @@ __device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nS
 		return false;
 	}
 }
+*/
 
 __device__ bool checkLightVisibility2(float3 l, float3 p, float3 N, d_Shape* shapes, int nShapes, int sid) {
 	float dist = length(p - l);
@@ -538,361 +689,20 @@ __device__ float3 texturefunc(int texId, float2 t, float3 p = make_float3(0, 0, 
 
 }
 
-__device__ float3 phongShading(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int lightCount, int sid) {
-    //float3 c = make_float3(0, 0, 0);
-	float3 c = shapes[sid].material.emission;
-
-    // iterate through all lights
-    for(int i=0;i<lightCount;i++) {
-
-		if( lights[i].t == Light::SPHERE ) {
-			const int lightSamples = 1;
-			float3 contribution = make_float3(0, 0, 0);
-			d_Light tmpLt;
-			tmpLt.init(lights[i]);
-			float3 opos = tmpLt.pos;
-
-			float3 cc = make_float3(0.0);
-			for(int j=0;j<lightSamples;j++) {
-				float3 offset = generateRandomOffsetFromThread(res, time, x, y);
-				tmpLt.pos = opos + offset * lights[i].radius;
-				// determine if this light is visible
-				bool isVisible = checkLightVisibility(v, N, shapes, nShapes, &tmpLt);
-
-				//calculate Ambient Term:
-				float3 Iamb = shapes[sid].material.ambient * lights[i].ambient;
-
-				if( isVisible ) {
-					float3 L;
-					if( lights[i].t != Light::DIRECTIONAL)
-						L = normalize(lights[i].pos - v);
-					else
-						L = -lights[i].dir;
-
-					float3 E = normalize(r.origin-v);
-					float3 R = normalize(-reflect(L,N));
-
-					float NdotL, RdotE;
-					if( shapes[sid].material.normalTex != -1 ) {
-						/*
-						// normal defined in tangent space
-						vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
-
-						vec3 tangent = normalize(sphere_tangent(N));
-						vec3 bitangent = cross(N, tangent);
-
-						// find the mapping from tangent space to camera space
-						mat3 m_t = transpose(mat3(tangent, bitangent, N));
-
-						NdotL = dot(n_normalmap, normalize(m_t*L));
-						RdotE = dot(m_t*R, normalize(m_t*E));
-						*/
-					}
-					else {
-						NdotL = dot(N, L);
-						RdotE = dot(R, E);
-					}
-
-
-					//calculate Diffuse Term:
-					float3 Idiff = shapes[sid].material.diffuse * lights[i].diffuse * max(NdotL, 0.0);
-					Idiff = clamp(Idiff, 0.0, 1.0);
-
-					// calculate Specular Term:
-					float specFactor = pow(max(RdotE,0.0),0.3 * shapes[sid].material.shininess);
-					if( circularSpecular ) specFactor = step(0.8, specFactor);
-					if( rampedSpecular ) specFactor = toonify(specFactor, 4);
-					if( rectangularSpecular ) {
-						float3 pq = lights[i].pos - shapes[sid].p;
-						float3 uvec = normalize(cross(pq, N));
-						float3 vvec = normalize(cross(uvec, N));
-
-						float ufac = fabsf(dot(R-E, uvec));
-						float vfac = fabsf(dot(R-E, vvec));
-
-						specFactor = filter(ufac, 0.0, 0.25) * filter(vfac, 0.0, 0.25) * specFactor;
-					}
-
-					float3 Ispec = shapes[sid].material.specular * lights[i].specular
-						* specFactor;
-					Ispec = clamp(Ispec, 0.0, 1.0);
-
-					if( shapes[sid].material.diffuseTex != -1 ) {
-						float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
-						cc = cc + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
-					}
-					else{
-						if( cartoonShading )
-							cc = cc + toonify((Idiff + Ispec) + Iamb, 8) * lights[i].intensity;
-						else 
-							cc = cc + ((Idiff + Ispec) + Iamb) * lights[i].intensity;
-					}
-				}
-				else {
-					if( shapes[sid].material.diffuseTex != -1 ) {						
-						float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
-						cc = cc + Itexture * Iamb * lights[i].intensity;
-					}
-					else{
-						cc = cc + Iamb * lights[i].intensity;
-					}
-				}
-			}
-			c += (cc/lightSamples);
-		}
-		else {
-			// determine if this light is visible
-			bool isVisible = checkLightVisibility(v, N, shapes, nShapes, lights+i);
-
-			//calculate Ambient Term:
-			float3 Iamb = shapes[sid].material.ambient * lights[i].ambient;
-
-			if( isVisible ) {
-				float3 L;
-				if( lights[i].t != Light::DIRECTIONAL)
-					L = normalize(lights[i].pos - v);
-				else
-					L = -lights[i].dir;
-
-				float3 E = normalize(r.origin-v);
-				float3 R = normalize(-reflect(L,N));
-
-				float NdotL, RdotE;
-				if( shapes[sid].material.normalTex != -1 ) {
-					/*
-					// normal defined in tangent space
-					vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
-
-					vec3 tangent = normalize(sphere_tangent(N));
-					vec3 bitangent = cross(N, tangent);
-
-					// find the mapping from tangent space to camera space
-					mat3 m_t = transpose(mat3(tangent, bitangent, N));
-
-					NdotL = dot(n_normalmap, normalize(m_t*L));
-					RdotE = dot(m_t*R, normalize(m_t*E));
-					*/
-				}
-				else {
-					NdotL = dot(N, L);
-					RdotE = dot(R, E);
-				}
-
-
-				//calculate Diffuse Term:
-				float3 Idiff = shapes[sid].material.diffuse * lights[i].diffuse * max(NdotL, 0.0);
-				Idiff = clamp(Idiff, 0.0, 1.0);
-
-				// calculate Specular Term:
-				float specFactor = pow(max(RdotE,0.0),0.3 * shapes[sid].material.shininess);
-				if( circularSpecular ) specFactor = step(0.8, specFactor);
-				if( rampedSpecular ) specFactor = toonify(specFactor, 4);
-				if( rectangularSpecular ) {
-					float3 pq = lights[i].pos - shapes[sid].p;
-					float3 uvec = normalize(cross(pq, N));
-					float3 vvec = normalize(cross(uvec, N));
-
-					float ufac = fabsf(dot(R-E, uvec));
-					float vfac = fabsf(dot(R-E, vvec));
-
-					specFactor = filter(ufac, 0.0, 0.25) * filter(vfac, 0.0, 0.25) * specFactor;
-				}
-
-				float3 Ispec = shapes[sid].material.specular * lights[i].specular
-					* specFactor;
-				Ispec = clamp(Ispec, 0.0, 1.0);
-
-				if( shapes[sid].material.diffuseTex != -1 ) {
-					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
-					c = c + Itexture * ((Idiff + Ispec) + Iamb) * lights[i].intensity;
-				}
-				else{
-					if( cartoonShading )
-						c = c + toonify((Idiff + Ispec) + Iamb, 8) * lights[i].intensity;
-					else 
-						c = c + ((Idiff + Ispec) + Iamb) * lights[i].intensity;
-				}
-			}
-			else {
-				if( shapes[sid].material.diffuseTex != -1 ) {
-					float3 Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
-					c = c + Itexture * Iamb * lights[i].intensity;
-				}
-				else{
-					c = c + Iamb * lights[i].intensity;
-				}
-			}
-		}
-    }
-
-    return c;
-}
-
-__device__ float3 lambertShading(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int lightCount, int sid) {
+__device__ float3 phongShading2(int2 res, float time, int x, int y, 
+								float3 v, float3 N, float2 t, Ray r,
+								const d_Shape& sp, const d_Material& mater,
+								d_Shape* shapes, int nShapes, 
+								int* lights, int lightCount, 
+								d_Material* mats, int nMats,
+								int sid) {
     float3 c = make_float3(0, 0, 0);
 
-    // iterate through all lights
-    for(int i=0;i<lightCount;i++) {
-		if( lights[i].t == Light::SPHERE ) {
-			const int lightSamples = 1;
-			float3 contribution = make_float3(0, 0, 0);
-			d_Light tmpLt;
-			tmpLt.init(lights[i]);
-			float3 opos = tmpLt.pos;
-			for(int j=0;j<lightSamples;j++) {
-				float3 offset = generateRandomOffsetFromThread(res, time, x, y);
-				tmpLt.pos = opos + offset * lights[i].radius;
-				// determine if this light is visible
-				bool isVisible = checkLightVisibility(v, N, shapes, nShapes, &tmpLt);
-				if( isVisible ) {
-					float3 L;
-					if( lights[i].t != Light::DIRECTIONAL)
-						L = normalize(lights[i].pos - v);
-					else
-						L = -lights[i].dir;
-
-					float3 E = normalize(r.origin - v);
-
-					float NdotL;
-
-					// change the normal with normal map
-					if( shapes[sid].material.normalTex != -1 ) {
-						/*
-						// normal defined in tangent space
-						vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
-
-						vec3 tangent = normalize(sphere_tangent(N));
-						vec3 bitangent = cross(N, tangent);
-
-						// find the mapping from tangent space to camera space
-						mat3 m_t = transpose(mat3(tangent, bitangent, N));
-
-						// convert the normal to to camera space
-						NdotL = dot(n_normalmap, normalize(m_t*L));
-						*/
-					}
-					else {
-						NdotL = dot(N, L);
-					}
-
-					float diffuseFactor = max(NdotL, 0.0);
-					if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
-
-					float3 Idiff = clamp(shapes[sid].material.diffuse * tmpLt.diffuse * diffuseFactor, 0.0, 1.0);
-
-					contribution = contribution + Idiff * tmpLt.intensity;
-				}
-			}
-			float3 Itexture;
-			if( shapes[sid].material.diffuseTex != -1 ) {				
-				Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
-			}
-			else Itexture = make_float3(1.0);
-			c = c + Itexture * contribution / (float)lightSamples;
-
-			// restore position
-			lights[i].pos = opos;
-		}
-		else {
-			// determine if this light is visible
-			bool isVisible = checkLightVisibility(v, N, shapes, nShapes, lights+i);
-
-			if( isVisible ) {
-				float3 L;
-				if( lights[i].t != Light::DIRECTIONAL)
-					L = normalize(lights[i].pos - v);
-				else
-					L = -lights[i].dir;
-
-				float3 E = normalize(r.origin - v);
-
-				float NdotL;
-
-				// change the normal with normal map
-				if( shapes[sid].material.normalTex != -1 ) {
-					/*
-					// normal defined in tangent space
-					vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
-
-					vec3 tangent = normalize(sphere_tangent(N));
-					vec3 bitangent = cross(N, tangent);
-
-					// find the mapping from tangent space to camera space
-					mat3 m_t = transpose(mat3(tangent, bitangent, N));
-
-					// convert the normal to to camera space
-					NdotL = dot(n_normalmap, normalize(m_t*L));
-					*/
-				}
-				else {
-					NdotL = dot(N, L);
-				}
-
-				float3 Itexture;
-				if( shapes[sid].material.diffuseTex != -1 ) {
-					Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
-				}
-				else Itexture = make_float3(1, 1, 1);
-
-				float diffuseFactor = max(NdotL, 0.0);
-				if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
-
-				float3 Idiff = clamp(shapes[sid].material.diffuse * lights[i].diffuse * diffuseFactor, 0.0, 1.0);
-
-				c = c + Itexture * Idiff * lights[i].intensity;
-			}
-		}
-    }
-
-    return c;
-}
-
-__device__ float3 goochShading(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int lightCount, int sid) {
-
-    float3 c = make_float3(0, 0, 0);
-
-    for(int i=0;i<lightCount;i++) {
-		float3 L;
-		if( lights[i].t != Light::DIRECTIONAL)
-			L = normalize(lights[i].pos - v);
-		else
-			L = -lights[i].dir;
-
-        float3 E = normalize(r.origin - v);
-        float3 R = normalize(-reflect(L,N));
-        float NdotL = dot(N, L);
-
-		float3 diffuse;
-		if( shapes[sid].material.diffuseTex != -1 ) {
-			/*
-			diffuse = texture2D (shapes[sid].tex, t).rgb;
-			*/
-		}
-		else diffuse = shapes[sid].material.diffuse;
-
-        float3 Idiff = diffuse * NdotL;
-        float3 kcdiff = fminf(shapes[sid].material.kcool + shapes[sid].material.alpha * Idiff, 1.0f);
-        float3 kwdiff = fminf(shapes[sid].material.kwarm + shapes[sid].material.beta * Idiff, 1.0f);
-        float3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5);
-        // calculate Specular Term:
-        float3 Ispec = shapes[sid].material.specular
-                         * pow(max(dot(R,E),0.0),0.3*shapes[sid].material.shininess);
-        Ispec = step(make_float3(0.5, 0.5, 0.5), Ispec);
-        // edge effect
-            float EdotN = dot(E, N);
-        if( fabs(EdotN) >= 0.2 ) c = c + fminf(kfinal + Ispec, 1.0) * lights[i].intensity;
-    }
-    return c;
-}
-
-__device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, int* lights, int lightCount, int sid) {
-    float3 c = make_float3(0, 0, 0);
-
-	const d_Shape& sp = shapes[sid];
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
 		if( i == sid ) continue;
 		const d_Shape& lt = shapes[lights[i]];
+		const d_Material& ltmater = mats[lt.materialId];
 
 			// this is a light, create a shadow ray
 			float3 lpos;
@@ -905,7 +715,7 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 			bool isVisible = checkLightVisibility2(lpos, v, N, shapes, nShapes, i);
 
 			//calculate Ambient Term:
-			float3 Iamb = sp.material.ambient * lt.material.emission;
+			float3 Iamb = mater.ambient * ltmater.emission;
 
 
 			if( isVisible ) {
@@ -919,10 +729,10 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				float3 R = normalize(-reflect(L,N));
 
 				float NdotL, RdotE;
-				if( sp.material.normalTex != -1 ) {
+				if( mater.normalTex != -1 ) {
 					// normal defined in tangent space
-					float3 n_normalmap = texturefunc(sp.material.normalTex, t, v, 1)*2.0-1.0;
-					if(sp.material.normalTex == TextureObject::Perlin) n_normalmap += N;
+					float3 n_normalmap = texturefunc(mater.normalTex, t, v, 1)*2.0-1.0;
+					if(mater.normalTex == TextureObject::Perlin) n_normalmap += N;
 										
 					float3 tangent;
 					if( sp.t == Shape::PLANE )
@@ -961,7 +771,7 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				float3 Idiff;
 				float diffuseFactor = max(NdotL, 0.0);
 
-				if( lt.material.diffuseTex != -1 ) {
+				if( ltmater.diffuseTex != -1 ) {
 					// projective light
 					float3 lightDir = lt.axis[0], lightU = lt.axis[1], lightV = lt.axis[2];
 					float w = lt.radius[0], h = lt.radius[1], d = lt.radius[2];
@@ -972,21 +782,21 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 						float u = dot(pl - po, lightU) / w + 0.5;
 						float v = dot(pl - po, lightV) / h + 0.5;
 						if( u > 1.0 || u < 0.0 || v > 1.0 || v < 0.0 )
-							lightColor = lt.material.emission;
+							lightColor = ltmater.emission;
 						else
-							lightColor = texturefunc(lt.material.diffuseTex, make_float2(u, v));
+							lightColor = texturefunc(ltmater.diffuseTex, make_float2(u, v));
 					}
 					else {
-						lightColor = lt.material.emission;
+						lightColor = ltmater.emission;
 					}
 
-					Idiff = clamp(sp.material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
+					Idiff = clamp(mater.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
 				}
 				else
-					Idiff = clamp(sp.material.diffuse * lt.material.emission * diffuseFactor, 0.0, 1.0);
+					Idiff = clamp(mater.diffuse * ltmater.emission * diffuseFactor, 0.0, 1.0);
 
 				// calculate Specular Term:
-				float specFactor = pow(max(RdotE,0.0),0.3 * sp.material.shininess);
+				float specFactor = pow(max(RdotE,0.0),0.3 * mater.shininess);
 				if( circularSpecular ) specFactor = step(0.8, specFactor);
 				if( rampedSpecular ) specFactor = toonify(specFactor, 4);
 				if( rectangularSpecular ) {
@@ -1003,12 +813,12 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 					specFactor *= spotLightFactor;
 				}
 
-				float3 Ispec = sp.material.specular * lt.material.emission
+				float3 Ispec = mater.specular * ltmater.emission
 					* specFactor;
 				Ispec = clamp(Ispec, 0.0, 1.0);
 
-				if( sp.material.diffuseTex != -1 ) {					
-					float3 Itexture = texturefunc(sp.material.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
+				if( mater.diffuseTex != -1 ) {					
+					float3 Itexture = texturefunc(mater.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
 					c = c + Itexture * ((Idiff + Ispec) + Iamb);
 				}
 				else{
@@ -1019,8 +829,8 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
 				}
 			}
 			else {
-				if( sp.material.diffuseTex != -1 ) {					
-					float3 Itexture = texturefunc(sp.material.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
+				if( mater.diffuseTex != -1 ) {					
+					float3 Itexture = texturefunc(mater.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
 					c = c + Itexture * Iamb;
 				}
 				else{
@@ -1032,15 +842,20 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y, float3 v, fl
     return c;
 }
 
-__device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, int* lights, int lightCount, int sid) {
+__device__ float3 lambertShading2(int2 res, float time, int x, int y, 
+								  float3 v, float3 N, float2 t, Ray r, 
+								  const d_Shape& sp, const d_Material& mater,
+								  d_Shape* shapes, int nShapes, 
+								  int* lights, int lightCount, 
+								  d_Material* mats, int nMats,
+								  int sid) {
     float3 c = make_float3(0, 0, 0);
 
-	const d_Shape& sp = shapes[sid];
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
 		if( i == sid ) continue;
 		const d_Shape& lt = shapes[lights[i]];
-
+		const d_Material& ltmater = mats[lt.materialId];
 			// this is a light, create a shadow ray
 			float3 lpos;
 			if( isRayTracing )
@@ -1052,7 +867,7 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 			bool isVisible = checkLightVisibility2(lpos, v, N, shapes, nShapes, i);
 
 			//calculate Ambient Term:
-			float3 Iamb = sp.material.ambient * lt.material.emission;
+			float3 Iamb = mater.ambient * ltmater.emission;
 
 			if( isVisible || fakeSoftShadow ) {
 				float3 L;
@@ -1065,10 +880,10 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				float NdotL;
 
 				// change the normal with normal map
-				if( sp.material.normalTex != -1 ) {					
+				if( mater.normalTex != -1 ) {					
 					// normal defined in tangent space
-					float3 n_normalmap = texturefunc(sp.material.normalTex, t, v, 1)*2.0-1.0;
-					if(sp.material.normalTex == TextureObject::Perlin) n_normalmap += N;
+					float3 n_normalmap = texturefunc(mater.normalTex, t, v, 1)*2.0-1.0;
+					if(mater.normalTex == TextureObject::Perlin) n_normalmap += N;
 										
 					float3 tangent;
 					if( sp.t == Shape::PLANE )
@@ -1098,8 +913,8 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 
 
 				float3 Itexture;
-				if( sp.material.diffuseTex != -1 ) {
-					Itexture = texturefunc(sp.material.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
+				if( mater.diffuseTex != -1 ) {
+					Itexture = texturefunc(mater.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -1109,10 +924,10 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 				float3 Idiff;
 				if( rainbowLight ) {
 					float3 lightColor = mix(make_float3(1, 0.5, 0.5), make_float3(0.5, 1, 0.5), make_float3(0.5, 0.5, 1), diffuseFactor);
-					Idiff = clamp(sp.material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
+					Idiff = clamp(mater.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
 				}
 				else{
-					if( lt.material.diffuseTex != -1 ) {
+					if( ltmater.diffuseTex != -1 ) {
 						// projective light
 						float3 lightDir = lt.axis[0], lightU = lt.axis[1], lightV = lt.axis[2];
 						float w = lt.radius[0], h = lt.radius[1], d = lt.radius[2];
@@ -1123,18 +938,18 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 							float u = dot(pl - po, lightU) / w + 0.5;
 							float v = dot(pl - po, lightV) / h + 0.5;
 							if( u > 1.0 || u < 0.0 || v > 1.0 || v < 0.0 )
-								lightColor = lt.material.emission;
+								lightColor = ltmater.emission;
 							else
-								lightColor = texturefunc(lt.material.diffuseTex, make_float2(u, v));
+								lightColor = texturefunc(ltmater.diffuseTex, make_float2(u, v));
 						}
 						else {
-							lightColor = lt.material.emission;
+							lightColor = ltmater.emission;
 						}
 
-						Idiff = clamp(sp.material.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
+						Idiff = clamp(mater.diffuse * lightColor * diffuseFactor, 0.0, 1.0);
 					}
 					else
-						Idiff = clamp(sp.material.diffuse * lt.material.emission * diffuseFactor, 0.0, 1.0);
+						Idiff = clamp(mater.diffuse * ltmater.emission * diffuseFactor, 0.0, 1.0);
 				}
 								
 				float shadowFactor = 1.0;
@@ -1152,8 +967,8 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
 			}
 			else {
 				float3 Itexture;
-				if( sp.material.diffuseTex != -1 ) {
-					Itexture = texturefunc(sp.material.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
+				if( mater.diffuseTex != -1 ) {
+					Itexture = texturefunc(mater.diffuseTex, t, (v-sp.p)/make_float3(sp.radius[0], sp.radius[1], sp.radius[2]));
 				}
 				else Itexture = make_float3(1, 1, 1);
 
@@ -1164,10 +979,15 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y, float3 v, 
     return c;
 }
 
-__device__ float3 goochShading2(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, int* lights, int lightCount, int sid) {
+__device__ float3 goochShading2(int2 res, float time, int x, int y, 
+								float3 v, float3 N, float2 t, Ray r, 
+								const d_Shape& sp, const d_Material& mater,
+								d_Shape* shapes, int nShapes, 
+								int* lights, int lightCount, 
+								d_Material* mats, int nMats,
+								int sid) {
 
     float3 c = make_float3(0, 0, 0);
-	d_Shape& sp = shapes[sid];
 
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
@@ -1195,12 +1015,12 @@ __device__ float3 goochShading2(int2 res, float time, int x, int y, float3 v, fl
 		float NdotL = dot(N, L);
 
 		float3 diffuse;
-		if( sp.material.diffuseTex != -1 ) {
+		if( mater.diffuseTex != -1 ) {
 			/*
 			diffuse = texture2D (shapes[sid].tex, t).rgb;
 			*/
 		}
-		else diffuse = sp.material.diffuse;
+		else diffuse = mater.diffuse;
 
 		float shadowFactor = 1.0;
 		if( fakeSoftShadow ) {
@@ -1217,12 +1037,12 @@ __device__ float3 goochShading2(int2 res, float time, int x, int y, float3 v, fl
 		}
 
 		float3 Idiff = diffuse * NdotL * shadowFactor;
-		float3 kcdiff = fminf(sp.material.kcool + sp.material.alpha * Idiff, 1.0f);
-		float3 kwdiff = fminf(sp.material.kwarm + sp.material.beta * Idiff, 1.0f);
-		float3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5) * shapes[i].material.emission;
+		float3 kcdiff = fminf(mater.kcool + mater.alpha * Idiff, 1.0f);
+		float3 kwdiff = fminf(mater.kwarm + mater.beta * Idiff, 1.0f);
+		float3 kfinal = mix(kcdiff, kwdiff, (NdotL+1.0)*0.5);
 		// calculate Specular Term:
-		float3 Ispec = sp.material.specular * sp.material.emission
-			* pow(max(dot(R,E),0.0),0.3*sp.material.shininess) * (isVisible?1.0:0.0);
+		float3 Ispec = mater.specular * mater.emission
+			* pow(max(dot(R,E),0.0),0.3*mater.shininess) * (isVisible?1.0:0.0);
 		Ispec = step(make_float3(0.5, 0.5, 0.5), Ispec);
 		// edge effect
 		//float EdotN = dot(E, N);
@@ -1239,27 +1059,19 @@ __device__ __forceinline__ Hit background() {
 	return h;
 }
 
-__device__ float3 computeShading(int2 res, float time, int x, int y, float3 p, float3 n, float2 t, Ray r, d_Shape* shapes, int nShapes, d_Light* lights, int nLights, int sid) {
+__device__ float3 computeShading2(int2 res, float time, int x, int y, 
+								  float3 p, float3 n, float2 t, Ray r, 
+								  d_Shape* shapes, int nShapes, 
+								  int* lights, int nLights, 
+								  d_Material* mats, int nMats,
+								  int sid) {
     switch( shadingMode ) {
 	case 1:
-        return lambertShading(res, time, x, y, p, n, t, r, shapes, nShapes, lights, nLights, sid);
+        return lambertShading2(res, time, x, y, p, n, t, r, shapes[sid], mats[shapes[sid].materialId], shapes, nShapes, lights, nLights, mats, nMats, sid);
 	case 2:
-        return phongShading(res, time, x, y, p, n, t, r, shapes, nShapes, lights, nLights, sid);
+        return phongShading2(res, time, x, y, p, n, t, r, shapes[sid], mats[shapes[sid].materialId], shapes, nShapes, lights, nLights, mats, nMats, sid);
 	case 3:
-        return goochShading(res, time, x, y, p, n, t, r, shapes, nShapes, lights, nLights, sid);
-	default:
-		return make_float3(0, 0, 0);
-	}
-}
-
-__device__ float3 computeShading2(int2 res, float time, int x, int y, float3 p, float3 n, float2 t, Ray r, d_Shape* shapes, int nShapes, int* lights, int nLights, int sid) {
-    switch( shadingMode ) {
-	case 1:
-        return lambertShading2(res, time, x, y, p, n, t, r, shapes, nShapes, lights, nLights, sid);
-	case 2:
-        return phongShading2(res, time, x, y, p, n, t, r, shapes, nShapes, lights, nLights, sid);
-	case 3:
-        return goochShading2(res, time, x, y, p, n, t, r, shapes, nShapes, lights, nLights, sid);
+        return goochShading2(res, time, x, y, p, n, t, r, shapes[sid], mats[shapes[sid].materialId], shapes, nShapes, lights, nLights, mats, nMats, sid);
 	default:
 		return make_float3(0, 0, 0);
 	}
@@ -1329,8 +1141,11 @@ __device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes
 		h.t = ti;
 		// hit point
 		h.p = h.t * r.dir + r.origin;
+
         // normal at hit point
 		h.n = normalize(2.0 * mul(shapes[sid].m, (h.p - shapes[sid].p)) * shapes[sid].constant);
+
+		// apply normal map
 		
 		h.tex = spheremap(h.n);
 		
@@ -1383,6 +1198,47 @@ __device__ Hit rayIntersectsCylinder(Ray r, d_Shape* shapes, int nShapes, int si
 	else return background();
 }
 
+__device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, int sid) {
+	int faceIdx = -1;
+	float3 bcoords;
+	float ti = lightRayIntersectsMesh(r, shapes, sid, faceIdx, bcoords);
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+		
+		// hit point
+		h.p = h.t * r.dir + r.origin;
+
+        // normal at hit point
+		if( shapes[sid].trimesh.normalTex == -1 ) {
+			float4 v1, v2, v3;
+			getTriangleVertices(shapes[sid].trimesh.faceTex, faceIdx, v1, v2, v3);
+			h.n = normalize(cross(tofloat3(v2-v1), tofloat3(v3-v1)));
+		}
+		else {
+			float4 n1, n2, n3;
+			getTriangleNormals(shapes[sid].trimesh.normalTex, faceIdx, n1, n2, n3);
+			h.n = tofloat3(bcoords.x * n1 + bcoords.y * n2 + bcoords.z * n3);
+
+			// apply normal map
+
+		}
+		
+		if( shapes[sid].trimesh.texCoordTex == -1 ) {
+			h.tex = spheremap(normalize(h.p - shapes[sid].p));
+		}
+		else {
+			float2 t1, t2, t3;	
+			getTriangleTextureCoords(shapes[sid].trimesh.texCoordTex, faceIdx, t1, t2, t3);
+			h.tex = bcoords.x * t1 + bcoords.y * t2 + bcoords.z * t3;
+		}
+
+		h.objIdx = sid;
+        return h;
+	}
+	else return background();
+}
+
 __device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
@@ -1393,10 +1249,8 @@ __device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nS
 	case Shape::CYLINDER:
 	case Shape::CONE:
 		return rayIntersectsQuadraticSurface(r, shapes, nShapes, sid);
-	//case Shape::CONE:
-	//	return rayIntersectsCone(r, shapes, nShapes, sid);
-	//case Shape::CYLINDER:
-	//	return rayIntersectsCylinder(r, shapes, nShapes, sid);	
+	case Shape::TRIANGLE_MESH:
+		return rayIntersectsTriangleMesh(r, shapes, nShapes, sid);
 	default:
 		return background();
 	}
@@ -1417,7 +1271,7 @@ __device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes) {
 	return h;
 }
 
-__device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, int* lights) {
+__device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
 	Hit h = rayIntersectsShapes(r, nShapes, shapes);
 	if( h.objIdx == -1 ) {
 		// no hit, sample environment map
@@ -1429,20 +1283,23 @@ __device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int
 			return make_float3(0, 0, 0);
 	}
 	else {
+		const d_Material& mater = mats[shapes[h.objIdx].materialId];
 		// hit a light
-		if( shapes[h.objIdx].material.emission.x != 0 || shapes[h.objIdx].material.emission.y != 0 || shapes[h.objIdx].material.emission.z != 0 )
+		if( mater.emission.x != 0 || mater.emission.y != 0 || mater.emission.z != 0 )
 		{
-			return shapes[h.objIdx].material.emission;
+			return mater.emission;
 		}
 		else {
-			return computeShading2(res, time, x, y, h.p, h.n, h.tex, r, shapes, nShapes, lights, nLights, h.objIdx);
+			return computeShading2(res, time, x, y, h.p, h.n, h.tex, r, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
 		}
 	}
 }
 
-__device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, int* lights, int lightCount, int sid) {
+__device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, float3 N, float2 t, Ray r, d_Shape* shapes, int nShapes, int* lights, int lightCount, d_Material* mats, int nMats, int sid) {
     float3 c = make_float3(0, 0, 0);
 
+	const d_Shape& sp = shapes[sid];
+	const d_Material& mater = mats[sp.materialId];
     // iterate through all lights
     for(int i=0;i<lightCount;i++) {
 		if( i == sid ) continue;
@@ -1460,7 +1317,7 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 			float NdotL;
 
 			// change the normal with normal map
-			if( shapes[sid].material.normalTex != -1 ) {
+			if( mater.normalTex != -1 ) {
 				/*
 				// normal defined in tangent space
 				vec3 n_normalmap = normalize(texture2D(shapes[sid].nTex, t).rgb * 2.0 - 1.0);
@@ -1480,15 +1337,15 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 			}
 
 			float3 Itexture;
-			if( shapes[sid].material.diffuseTex != -1 ) {
-				Itexture = tofloat3(tex2D<float4>(tex[shapes[sid].material.diffuseTex], t.x, t.y));
+			if( mater.diffuseTex != -1 ) {
+				Itexture = tofloat3(tex2D<float4>(tex[mater.diffuseTex], t.x, t.y));
 			}
 			else Itexture = make_float3(1, 1, 1);
 
 			float diffuseFactor = max(NdotL, 0.0);
 			if( cartoonShading ) diffuseFactor = toonify(diffuseFactor, 8);
 
-			float3 Idiff = clamp(shapes[sid].material.diffuse * shapes[i].material.emission * diffuseFactor, 0.0, 1.0);
+			float3 Idiff = clamp(mater.diffuse * mats[shapes[i].materialId].emission * diffuseFactor, 0.0, 1.0);
 
 			c += Itexture * Idiff;
 		}
@@ -1498,7 +1355,7 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 }
 
 __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
-	const int maxBounces = 10;
+	const int maxBounces = 20;
 	float3 accumulatedColor = make_float3(0.0);
 	float3 colormask = make_float3(1.0);
 
@@ -1514,18 +1371,20 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				float2 t = spheremap(ray.dir);
 				colormask *= tofloat3(tex2D<float4>(tex[envMapIdx], -t.x, t.y));
 			}
+			else colormask *= make_float3(.75, .75, .75);
 			break;
 		}
 
-		switch( shapes[h.objIdx].material.t ) {
+		const d_Material& mater = mats[shapes[h.objIdx].materialId];
+		switch( mater.t ) {
 		case Material::Emissive:
 			{				
 				//float maxf = fmaxf(shapes[h.objIdx].material.emission.x, shapes[h.objIdx].material.emission.y);
 				//maxf = fmaxf(shapes[h.objIdx].material.emission.z, maxf);				
 
 				// hit a light
-				accumulatedColor += shapes[h.objIdx].material.emission * colormask;
-				colormask *= shapes[h.objIdx].material.emission;
+				accumulatedColor += mater.emission * colormask;
+				colormask *= mater.emission;
 
 				// send it out again
 				ray.origin = h.p + 1e-3 * h.n;
@@ -1538,17 +1397,18 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 		case Material::Diffuse:
 			{
 				// direct lighting
-				//float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx);
+				//float3 shading = computeShading2(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
 				//accumulatedColor += shading * colormask;
 
-				accumulatedColor += shapes[h.objIdx].material.emission * colormask;
 
-				if( shapes[h.objIdx].material.diffuseTex != -1 ) {
-					color = tofloat3(tex2D<float4>(tex[shapes[h.objIdx].material.diffuseTex], h.tex.x, h.tex.y));
+				accumulatedColor += mater.emission * colormask;
+
+				if( mater.diffuseTex != -1 ) {
+					color = texturefunc(mater.diffuseTex, h.tex, h.p);
 				}
-				else color = shapes[h.objIdx].material.diffuse;
+				else color = mater.diffuse;
 				
-				colormask *= color * 0.5;
+				colormask *= color;
 
 				ray.origin = h.p;
 				float2 uv = generateRandomNumberFromThread2(res, time, x, y);
@@ -1563,11 +1423,11 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				//accumulatedColor += shading * colormask;
 
 				float3 color;
-				if( shapes[h.objIdx].material.diffuseTex != -1 ) {
-					color = tofloat3(tex2D<float4>(tex[shapes[h.objIdx].material.diffuseTex], h.tex.x, h.tex.y));
+				if( mater.diffuseTex != -1 ) {
+					color = tofloat3(tex2D<float4>(tex[mater.diffuseTex], h.tex.x, h.tex.y));
 					
 				}
-				else color = shapes[h.objIdx].material.diffuse;
+				else color = mater.diffuse;
 
 				colormask *= color;
 
@@ -1575,23 +1435,23 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				ray.dir = reflect(ray.dir, h.n);
 				float2 uv = generateRandomNumberFromThread2(res, time, x, y);
 				
-				ray.dir = mix(calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), ray.dir, shapes[h.objIdx].material.Kr);
+				ray.dir = mix(calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), ray.dir, mater.Kr);
 				ray.dir = normalize(ray.dir);
 				break;
 			}
 		case Material::DiffuseScatter:
 			{
 				// direct lighting
-				float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx);
-				accumulatedColor += shading * colormask * (1.0 - shapes[h.objIdx].material.Kr);
+				float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
+				accumulatedColor += shading * colormask * (1.0 - mater.Kr);
 
 				// get a random number
 				float Xi = generateRandomNumberFromThread1(res, time, x, y);
 
-				if( Xi > shapes[h.objIdx].material.Kr ) { 
+				if( Xi > mater.Kr ) { 
 					// emission is zero, no need to add it
 					//accumulatedColor += shapes[h.objIdx].material.emission * colormask;
-					colormask *= shapes[h.objIdx].material.diffuse;
+					colormask *= mater.diffuse;
 
 					ray.origin = h.p + 1e-3 * h.n;
 					float2 uv = generateRandomNumberFromThread2(res, time, x, y);
@@ -1599,7 +1459,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 					ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
 				}
 				else {
-					colormask *= shapes[h.objIdx].material.diffuse;
+					colormask *= mater.diffuse;
 
 					// get the reflected ray
 					ray.origin = h.p + 1e-3 * h.n;
@@ -1609,17 +1469,45 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 			}
 		case Material::Specular:
 			{
-				// direct lighting
-				colormask *= shapes[h.objIdx].material.diffuse;
+				/*
+				float R0 = (1-mater.eta)/(1+mater.eta);
+				R0 *= R0;
 
-				// get the reflected ray
-				ray.origin = h.p + 1e-3 * h.n;
-				ray.dir = reflect(ray.dir, h.n);
+				float3 view = h.p - r.origin;
+				float3 halfway = normalize(view + h.n);
+				float cosTheta = cosf(dot(halfway, view));
+				float R = R0 + (1-R0)*powf(1-cosTheta, 5.0);
+				*/
+
+				/*
+				float randVal = generateRandomNumberFromThread1(res, time, x, y);
+				if( randVal > R ) {
+					// diffuse term
+					accumulatedColor += mater.emission * colormask;
+
+					if( mater.diffuseTex != -1 ) {
+						color = tofloat3(tex2D<float4>(tex[mater.diffuseTex], h.tex.x, h.tex.y));
+					}
+					else color = mater.diffuse;
+					colormask *= color;
+
+					ray.origin = h.p;
+					float2 uv = generateRandomNumberFromThread2(res, time, x, y);
+					ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
+				}
+				else {
+				*/
+					// specular term
+					colormask *= mater.diffuse;
+					// get the reflected ray
+					ray.origin = h.p + 1e-3 * h.n;
+					ray.dir = reflect(ray.dir, h.n);
+				//}
 				break;
 			}
 		case Material::Refractive:
 			{
-				color = shapes[h.objIdx].material.diffuse;
+				color = mater.diffuse;
 				colormask *= color;
 
 				// get the reflected ray
@@ -1629,7 +1517,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				double dDn = dot(h.n, ray.dir);
 				float3 n1 = dDn<0?h.n:-h.n;
 				bool into = dDn<0;
-				double nc=1.0, nt=shapes[h.objIdx].material.eta;
+				double nc=1.0, nt=mater.eta;
 				double nnt=into?nc/nt:nt/nc, ddn = dot(ray.dir, n1);
 				double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
 
@@ -1667,19 +1555,6 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 	accumulatedColor += colormask;
 
 	return accumulatedColor;
-}
-
-__device__ d_Light dev_lights[16];
-__device__ d_Shape dev_shapes[256];
-
-__global__ void initScene(int nLights, Light* lights, 
-						  int nShapes, Shape* shapes) 
-{
-	int tidx = threadIdx.x;
-	int tidy = threadIdx.y;
-	int tid = tidy * blockDim.x + tidx;
-	if( tid < nLights )	dev_lights[tid].init(lights[tid]);
-	if( tid < nShapes )	dev_shapes[tid].init(shapes[tid]);
 }
 
 __global__ void clearCumulatedColor(float3* color, int w, int h) {
@@ -1741,7 +1616,7 @@ __global__ void raytrace(float time, float3 *color, Camera* cam,
 	if( tid < nMaterials )	inMaterial[tid].init(materials[tid]);
 	if( tid < nShapes ){
 		inShapes[tid].init(shapes[tid]);
-		inShapes[tid].material = inMaterial[inShapes[tid].materialId];
+		//inShapes[tid].material = inMaterial[inShapes[tid].materialId];
 	}
 	
 	__syncthreads();
@@ -1772,10 +1647,10 @@ __global__ void raytrace(float time, float3 *color, Camera* cam,
 
 		Ray r = generateRay(cam, u, v);
 
-		//if( isRayTracing ) {
-			c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights);
-		//}
-		//else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights);
+		if( isRayTracing ) {
+			c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
+		}
+		else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 	}
 
 	c /= (float)AASamples;
@@ -1814,7 +1689,6 @@ __global__ void raytrace2(float time, float3 *color, Camera* cam,
 	if( tid < nMaterials )	inMaterial[tid].init(materials[tid]);
 	if( tid < nShapes ){
 		inShapes[tid].init(shapes[tid]);
-		inShapes[tid].material = inMaterial[inShapes[tid].materialId];
 	}
 	__syncthreads();
 	
@@ -1850,7 +1724,7 @@ __global__ void raytrace2(float time, float3 *color, Camera* cam,
 				Ray r = generateRay(cam, u, v);
 
 				if( isRayTracing ) {
-					c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights);
+					c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 				}
 				else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 			}
@@ -1914,7 +1788,6 @@ __global__ void raytrace3(float time, float3 *color, Camera* cam,
 	if( tid < nMaterials )	inMaterial[tid].init(materials[tid]);
 	if( tid < nShapes ){
 		inShapes[tid].init(shapes[tid]);
-		inShapes[tid].material = inMaterial[inShapes[tid].materialId];
 	}
 	__syncthreads();
 
@@ -1953,7 +1826,7 @@ __global__ void raytrace3(float time, float3 *color, Camera* cam,
 		Ray r = generateRay(cam, u, v);
 
 		if( isRayTracing ) {
-			c = traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights);
+			c = traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 		}
 		else c = traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 

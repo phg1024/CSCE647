@@ -159,7 +159,7 @@ int AASamples = 1;
 int sMode = 1;
 int kernelIdx = 0;
 int specType = 0;
-int tracingType = 0;
+int tracingType = 2;
 int iterations = 0;
 float gamma = 1.0;
 
@@ -175,9 +175,9 @@ void init_scene()
 		shapes = scene.getShapes();
 		materials = scene.getMaterials();
 		lights = scene.getLights();
-		cout << "scene loaded. " 
-			 << shapes.size() << " shapes in total." 
-			 << materials.size() << " materials in total." 
+		cout << "scene loaded. " << endl
+			 << shapes.size() << " shapes in total."  << endl
+			 << materials.size() << " materials in total."  << endl
 			 << scene.getTextures().size() << " textures in total." 
 			 << endl;
 	}
@@ -210,19 +210,43 @@ void init_scene()
 	for(int i=0;i<texs.size();i++) {
 		// Allocate CUDA array in device memory
 		cudaChannelFormatDesc channelDesc;
-		if( texs[i].isHDR )
+		size_t elemSize;
+		cudaTextureReadMode tMode;
+		int nMode;
+
+		switch( texs[i].t ) {
+		case TextureObject::Mesh:		// v0 v1 v2 mid
+		case TextureObject::HDRImage:	// rgba
+			nMode = (texs[i].t==TextureObject::Mesh)?0:1;
 			channelDesc = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
-		else
+			elemSize = sizeof(float4);
+			tMode = cudaReadModeElementType;
+			break;
+		case TextureObject::Normal:	// st
+			nMode = 0;
+			channelDesc = cudaCreateChannelDesc(32, 32, 32, 0, cudaChannelFormatKindFloat);
+			elemSize = sizeof(float3);
+			tMode = cudaReadModeElementType;
+			break;
+		case TextureObject::TextureCoordinates:	// st
+			nMode = 0;
+			channelDesc = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
+			elemSize = sizeof(float2);
+			tMode = cudaReadModeElementType;
+			break;
+		case TextureObject::Image:
+			nMode = 1;
 			channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+			elemSize = sizeof(uchar4);
+			tMode = cudaReadModeNormalizedFloat;
+			break;
+		}
+
 		cudaArray* cuArray;
 		cudaMallocArray(&cuArray, &channelDesc, texs[i].size.x, texs[i].size.y);
 
-		// Copy to device memory some data located at address h_data
-		// in host memory
-		if( texs[i].isHDR )
-			cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*sizeof(float4), cudaMemcpyDeviceToDevice);
-		else
-			cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*sizeof(uchar4), cudaMemcpyDeviceToDevice);
+		// Copy texture data to device side
+		cudaMemcpyToArray(cuArray, 0, 0, texs[i].addr, texs[i].size.x*texs[i].size.y*elemSize, cudaMemcpyDeviceToDevice);
 
 		// create texture object
 		cudaResourceDesc resDesc;
@@ -236,11 +260,8 @@ void init_scene()
 		texDesc.addressMode[0]   = cudaAddressModeWrap;
 		texDesc.addressMode[1]   = cudaAddressModeWrap;
 		texDesc.filterMode       = cudaFilterModeLinear;
-		if( texs[i].isHDR )
-			texDesc.readMode         = cudaReadModeElementType;
-		else
-			texDesc.readMode         = cudaReadModeNormalizedFloat;
-		texDesc.normalizedCoords = 1;
+		texDesc.readMode         = tMode;
+		texDesc.normalizedCoords = nMode;
 
 		// create texture object: we only have to do this once!
 		cudaTextureObject_t tex=0;
@@ -251,6 +272,8 @@ void init_scene()
 	size_t sz_texobjs = sizeof(cudaTextureObject_t)*texobjs.size();
 	cudaMalloc((void**)&d_texobjs, sz_texobjs);
 	cudaMemcpy(d_texobjs, &(texobjs[0]), sz_texobjs, cudaMemcpyHostToDevice);
+	
+	cout << d_texobjs << endl;
 
 	cout << "scene initialized." << endl;
 }

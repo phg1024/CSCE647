@@ -117,7 +117,7 @@ __device__ float turbulence(float3 p, float size) {
 __device__ float3 marble(float3 p) {
 	const float scale = 32.0;
 
-	float x = (cosf(p.x * 15.0 + turbulence(p*scale*16.0, scale) * 15.0)+1.0)*0.5;
+	float x = (cosf(p.x * 5.0 + turbulence(p*scale*4.0, scale) * 15.0)+1.0)*0.5;
 	return make_float3(x, x, x);
 }
 
