@@ -1,0 +1,11 @@
+- name: bunny.png
+  des: Cube, tetrahedron and bunny, with textures.
+  id: "1"
+
+- name: bunnydragon.png
+  des: Bunny and dragon.
+  id: "2"
+
+- name: lamb1857.png
+  des: Lamborghini aventador.
+  id: "3"
