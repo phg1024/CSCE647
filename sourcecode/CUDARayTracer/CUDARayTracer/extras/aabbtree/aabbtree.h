@@ -105,7 +105,7 @@ public:
 	float3 maxPt;
 };
 
-static const int MAX_TRIS_PER_NODE = 64;
+static const int MAX_TRIS_PER_NODE = 4;
 
 struct AABBNode_Serial {
 	enum NodeType {

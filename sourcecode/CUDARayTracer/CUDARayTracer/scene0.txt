@@ -22,7 +22,7 @@ material bluejade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .85 .9 .98 1.0 1.0 1.
 material yellowjade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .98 .98 .1 1.0 1.0 1.0 2.0 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material redjade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .98 .7 .7 1.0 1.0 1.0 1.05 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material redglass refractive 0.5 0 0	0.1 0 0	.99 .75 .75	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material yellowglass refractive 0.5 0 0	0.1 0 0	.995 .995 .005	1 1 1 	0 0 0 		50 			1.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material yellowglass refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0 		50 			1.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material greenglass refractive 0 0 0	0.1 0 0	.9 .99 .9	1 1 1 	0 0 0 		50 			1.62 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material earth diffuse  0 0 0 	0.125 0.125 0.125 0.995 0.995 0.995 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 ./textures/earth/earthmap4k.png 0 ./textures/earth/earth_normalmap_4k.png
 material metal diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/metal1.jpg 0 ./textures/metal1_normalmap.jpg
@@ -38,12 +38,12 @@ material glossygray glossy 0.0 0.0 0.0	0.075 0.185 0.25	0.5 0.5 0.5 1.0 1.0 1.0 
 #environment ./textures/alps.hdr
 #environment ./textures/room2.jpg
 # shape Tx Ty Tz Sx Sy Sz Rx Ry Rz material
-#sphere -40.0 80 40 30 30 30 0.753 0.753 0.0 light2
+sphere -40.0 80 40 50 50 50 0.753 0.753 0.0 light2
 #sphere -40.0 40.75 40.0 5.5 5.5 5.5 0.753 0.753 0.0 light3
 #sphere 15.0 15.75 15.0 .5 .5 .5 0.753 0.753 0.0 light4
 sphere 40.0 40.75 44.0 5.5 5.5 5.5 0.753 0.753 0.0 light0
-sphere -40.0 40.75 44.0 5.5 5.5 5.5 0.753 0.753 0.0 light0
-sphere 0.0 40.75 54.0 10.5 10.5 10.5 0.753 0.753 0.0 light1
+#sphere -40.0 40.75 44.0 5.5 5.5 5.5 0.753 0.753 0.0 light0
+#sphere 0.0 40.75 54.0 10.5 10.5 10.5 0.753 0.753 0.0 light1
 #plane 0.0 17.75 24.0 1.0 -0.75 0.75 0.753 0.0 0.0 light2
 #plane 0.0 10.75 24.0 1.0 -0.75 1.0 0.753 0.0 0.0 light1
 #sphere -8.0 8.0 16.0 0.05 0.05 0.05 0.7535 0.7535 0.0 light0
@@ -59,7 +59,7 @@ plane 0.0 -10.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray	# bottom
 #plane 30.0 0.0 0.0 80.0 80.0 80.0 0.0 0.0 -1.571 green		# right
 #plane 0.0 0.0 -40.0 80.0 80.0 80.0 1.571.0 0.0 0.0 lightgray	# back
 #box 8.0 2.0 14.0 5.0 5.0 5.0 0.0 0.0 0.0 glossywhite
-sphere 10.0 -5.0 -10.0 15 15 15 0.0 0.0 0.0 mirror
+#sphere 10.0 -5.0 -10.0 15 15 15 0.0 0.0 0.0 mirror
 #sphere 0.0 -7 35 3 3 3 0.0 0.0 0.0 greenglass
 # sphere tower
 #sphere 9.0 -4.5 25.5 4.5 4.5 4.5 0.0 0.0 0.0 redjade
@@ -68,14 +68,18 @@ sphere 10.0 -5.0 -10.0 15 15 15 0.0 0.0 0.0 mirror
 #sphere 9.0 8.125 25.5 .625 .625 .625 0.0 0.0 0.0 redjade
 #sphere 9.0 9.0625 25.5 .3125 .3125 .3125 0.0 0.0 0.0 redjade
 # other stuff
-#mesh -7.5 -5.0 25.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj marble
-mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
-mesh 10.0 -5.0 25.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj chessboard2d
-mesh 0 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj marbleimg
-#mesh -10.0 -10.0 25.5 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/dragon_vrip_res2.obj marble yellowjade
+#mesh -7.5 -5.0 25.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj bluejade
+#mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
+#mesh 10.0 -5.0 25.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj chessboard2d
+#mesh -12 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/teapot.obj yellowglass
+mesh -12 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper_res2.obj yellowglass
+#mesh 0 -10 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj lightgray
+#mesh 0 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/avent/Avent.obj lightgray
+#mesh 0 -10 35 15.0 15.0 15.0 0.0 0.753 0.0 ./meshes/buddha.obj lightgray
+#mesh 0 -1 35 .8 .8 .8 0.0 0.0 0.0 ./meshes/bigguy2.obj lightgray
 #sphere 10.0 0.0 25.5 4.0 4.0 4.0 0.0 0.0 0.0 jade
 #sphere 2.5 4.5 5.5 1.75 1.75 1.75 0.0 0.0 0.0 glossy 0.0 0.0 0.0 0.25 0.125 0.105 1.0 1.0 1.0 1.0 1.0 1.0 1.0 0.25 0.0 50.0 1.005 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 ./textures/chessboard.png 0 ./textures/checkers-normal-map.png
-sphere -2.5 3.0 10.0 6 6 6 0.17 0.375 0.75 bluejade
+#sphere -2.5 3.0 10.0 6 6 6 0.17 0.375 0.75 bluejade
 #cone -2.0 3.0 -3.0 2.5 1.5 1.0 0.0 0.0 1.53 diffuse 0.0 0.0 0.0 0.25 0.25 0.125 0.995 0.995 0.55 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.75 0.75 0.75 0.15 0.75 0.5 0.5
 #hyperboloid 4.0 3.0 -3.0 2.5 1.5 1.0 0.0 0.0 1.53 specular 0.0 0.0 0.0 0.20 0.20 0.25 0.75 0.75 0.955 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.35 0.75 0.25 0.75 0.35 0.5 0.5
 #hyperboloid2 0.0 3.0 -4.0 0.5 0.25 0.25 0.0 0.0 1.53 diffuse 0.0 0.0 0.0 0.25 0.20 0.25 0.95 0.75 0.955 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5

@@ -7,6 +7,7 @@
 #include "utils.h"
 #include "randvec.h"
 #include "proceduralTexture.cuh"
+#include "extras/containers/cudaContainers.h"
 
 __device__ int shadingMode;
 __device__ bool circularSpecular = false;
@@ -80,6 +81,33 @@ __global__ void bindTexture2(const cudaTextureObject_t *texs, int texCount) {
 }
 
 __device__ bool lightRayIntersectsBoundingBox( Ray r, BoundingBox bb ) {
+	float3 rdirinv = 1.0 / r.dir;
+	
+	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
+	rdirinv.y = (r.dir.y==0)?FLT_MAX:rdirinv.y;
+	rdirinv.z = (r.dir.z==0)?FLT_MAX:rdirinv.z;
+	
+	float tmin, tmax;
+
+	float l1   = (bb.minPt.x - r.origin.x) * rdirinv.x;
+	float l2   = (bb.maxPt.x - r.origin.x) * rdirinv.x;
+	tmin = fminf(l1,l2);
+	tmax = fmaxf(l1,l2);
+
+	l1   = (bb.minPt.y - r.origin.y) * rdirinv.y;
+	l2   = (bb.maxPt.y - r.origin.y) * rdirinv.y;
+	tmin = fmaxf(fminf(l1,l2), tmin);
+	tmax = fminf(fmaxf(l1,l2), tmax);
+
+	l1   = (bb.minPt.z - r.origin.z) * rdirinv.z;
+	l2   = (bb.maxPt.z - r.origin.z) * rdirinv.z;
+	tmin = fmaxf(fminf(l1,l2), tmin);
+	tmax = fminf(fmaxf(l1,l2), tmax);
+
+	return ((tmax >= tmin) && (tmax >= 0.0f));
+}
+
+__device__ bool lightRayIntersectsBoundingBox( Ray r, const aabbtree::AABB& bb ) {
 	float3 rdirinv = 1.0 / r.dir;
 	
 	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
@@ -456,7 +484,8 @@ __device__ float rayIntersectsTriangle(Ray r, float3 v0, float3 v1, float3 v2) {
 	float t = dot(edge2, qvec) * inv_det;
 
 	bool hit = (u >= 0.0f && v >= 0.0f && (u + v) <= 1.0f);
-	if( hit ) return t;
+	const float EPS = 1e-3;
+	if( hit ) return t-EPS;
 	else return -1.0;
 #endif
 }
@@ -474,6 +503,66 @@ __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, floa
 	bcoord.z = 1 - bcoord.x - bcoord.y;
 
 	return bcoord;
+}
+
+__device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Serial& node, aabbtree::Triangle& tri, float3& bcoords) {
+	float t = FLT_MAX;	
+	int hitIdx = -1;
+	// leaf node, test all primitives
+	for(int i=0;i<node.ntris;i++) {
+		const aabbtree::Triangle& trii = node.tri[i];
+
+		float tmp = rayIntersectsTriangle(r, trii.v0, trii.v1, trii.v2);
+		if( tmp > 0.0 && tmp < t ) {
+			t = tmp;
+			hitIdx = i;
+		}
+	}
+
+	if( hitIdx >= 0 ){
+		tri = node.tri[hitIdx];
+		bcoords = compute_barycentric_coordinates(r.origin + t * r.dir, tri.v0, tri.v1, tri.v2);				
+		return t;
+	}
+	else return -1.0;
+}
+
+__device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_Serial* tree, int nidx, aabbtree::Triangle& tri, float3& bcoords) {
+	typedef aabbtree::AABBNode_Serial& node_t;
+
+	float t = FLT_MAX;
+	bool hashit = false;
+
+	device::stack<int> Q;
+	Q.clear();
+
+	Q.push(0);
+
+	while( !Q.empty() ) {
+		node_t node = tree[Q.pop()];
+		if( node.type == aabbtree::AABBNode_Serial::LEAF_NODE ) {
+			// test intersection
+			float tmp;
+			aabbtree::Triangle tmptri;
+			float3 tmpbc;
+			tmp = lightRayIntersectsTriangles(r, node, tmptri, tmpbc);
+			if( tmp > 0 && tmp < t ) {
+				t = tmp;
+				tri = tmptri;
+				bcoords = tmpbc;
+				hashit = true;
+			}
+		}
+		else if( node.type == aabbtree::AABBNode_Serial::INTERNAL_NODE ) {
+			// push children to the stack
+			int leftIdx = node.leftChild, rightIdx = node.rightChild;
+			if( lightRayIntersectsBoundingBox(r, tree[rightIdx].aabb) ) Q.push(rightIdx);
+			if( lightRayIntersectsBoundingBox(r, tree[leftIdx].aabb) ) Q.push(leftIdx);
+		}
+	}
+
+	if( hashit ) return t;
+	else return -1.0;
 }
 
 __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tree, int nidx, aabbtree::Triangle& tri, float3& bcoords) {
@@ -544,24 +633,7 @@ __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tr
 	}
 	else
 	{
-		int hitIdx = -1;
-		// leaf node, test all primitives
-		for(int i=0;i<node.ntris;i++) {
-			const aabbtree::Triangle& trii = node.tri[i];
-
-			float tmp = rayIntersectsTriangle(r, trii.v0, trii.v1, trii.v2);
-			if( tmp > 0.0 && tmp < t ) {
-				t = tmp;
-				hitIdx = i;
-			}
-		}
-
-		if( hitIdx >= 0 ){
-			tri = node.tri[hitIdx];
-			bcoords = compute_barycentric_coordinates(r.origin + t * r.dir, tri.v0, tri.v1, tri.v2);				
-			return t;
-		}
-		else return -1.0;
+		return lightRayIntersectsTriangles(r, node, tri, bcoords);
 	}
 }
 
@@ -609,7 +681,8 @@ __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes
 	case Shape::TRIANGLE_MESH:
 		aabbtree::Triangle tri;
 		float3 bcoords;
-		return lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+		//return lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+		return lightRayIntersectsAABBTree_Iterative(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
 	default:
 		return -1.0;
 	}
@@ -817,9 +890,11 @@ __device__ float3 phongShading2(int2 res, float time, int x, int y,
 
 			// this is a light, create a shadow ray
 			float3 lpos;
+#if 0
 			if( isRayTracing )
 				lpos = lt.p;
 			else
+#endif
 				lpos = lt.randomPointOnSurface(res, time, x, y);
 
 			// determine if this light is visible
@@ -969,9 +1044,11 @@ __device__ float3 lambertShading2(int2 res, float time, int x, int y,
 		const d_Material& ltmater = mats[lt.materialId];
 			// this is a light, create a shadow ray
 			float3 lpos;
+#if 0
 			if( isRayTracing )
 				lpos = lt.p;
 			else
+#endif
 				lpos = lt.randomPointOnSurface(res, time, x, y);
 
 			// determine if this light is visible
@@ -1352,7 +1429,8 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 #else
 	aabbtree::Triangle tri;
 	float3 bcoords;
-	float ti = lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+	float ti = lightRayIntersectsAABBTree_Iterative(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+	//float ti = lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
@@ -1841,10 +1919,10 @@ __global__ void raytrace(float time, float3 *color, Camera* cam,
 
 		Ray r = generateRay(cam, u, v);
 
-		//if( isRayTracing ) {
+		if( isRayTracing ) {
 			c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
-		//}
-		//else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
+		}
+		else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 	}
 
 	c /= (float)AASamples;

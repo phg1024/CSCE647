@@ -60,8 +60,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 // constants
 unsigned int edgeX = 8, edgeY = 8;
-unsigned int window_width  = 1024 + edgeX;
-unsigned int window_height = 768 + edgeY;
+unsigned int window_width  = 800 + edgeX;
+unsigned int window_height = 600 + edgeY;
 
 // vbo variables
 GLuint vbo = 0;
@@ -161,7 +161,7 @@ int AASamples = 1;
 int sMode = 1;
 int kernelIdx = 0;
 int specType = 0;
-int tracingType = 1;
+int tracingType = 0;
 int iterations = 0;
 float gamma = 1.0;
 
@@ -497,9 +497,9 @@ void resize(int w, int h)
 
 	//if( w == window_width &&  h == window_height ) return;
 
-	window_width = w, window_height = h;
+	//window_width = w, window_height = h;
 	// camera
-	cam.h = h / (float) w;
+	//cam.h = h / (float) w;
 
 	//createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
 	//showCUDAMemoryUsage();
@@ -726,6 +726,7 @@ void display()
 	// run CUDA kernel to generate vertex positions
 	runCuda(&cuda_vbo_resource);
 
+	glClearColor(0, 0, 0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// set view matrix

@@ -147,6 +147,7 @@ void AABBTree::printNodeStats()
 vector<AABBNode_Serial> AABBTree::toArray() const {
 	cout << "Serializing the AABB tree ..." << endl;
 	vector<AABBNode_Serial> A;
+	A.reserve(nodeCount[2]*2);
 		
 	queue<AABBNode*> nodeset;
 	nodeset.push(mRoot);

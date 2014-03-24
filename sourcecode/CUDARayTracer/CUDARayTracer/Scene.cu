@@ -232,13 +232,20 @@ void Scene::parse(const string& line)
 		
 		// load the mesh and convert it to a texture
 		vector<tinyobj::shape_t> objs;
-		cout << tinyobj::LoadObj(objs, meshFile.c_str(), "./meshes/") << endl;
+		int lastSlashPos = meshFile.find_last_of("/");
+		string basePath = meshFile.substr(0, lastSlashPos+1);
+		cout << "base path: " << basePath << endl;
+		cout << tinyobj::LoadObj(objs, meshFile.c_str(), basePath.c_str()) << endl;
 		cout << objs.size() << " shapes in total." << endl;
 		
 		vector<float4> triangles;
+		triangles.reserve(65536);
 		vector<aabbtree::Triangle> tris;		// for building AABB tree
+		tris.reserve(65536);
 		vector<float4> normals;
+		normals.reserve(65536);
 		vector<float2> texcoords;
+		texcoords.reserve(65536);
 
 		float3 maxPt = make_float3(-FLT_MAX), minPt = make_float3(FLT_MAX);
 
