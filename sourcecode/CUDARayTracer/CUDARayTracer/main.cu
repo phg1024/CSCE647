@@ -49,6 +49,8 @@ using namespace std;
 #include "Scene.h"
 #include "trackball.h"
 
+#include "extras/aabbtree/aabbtree.h"
+
 #include "FreeImagePlus.h"
 
 #define MAX_EPSILON_ERROR 10.0f
@@ -159,7 +161,7 @@ int AASamples = 1;
 int sMode = 1;
 int kernelIdx = 0;
 int specType = 0;
-int tracingType = 2;
+int tracingType = 1;
 int iterations = 0;
 float gamma = 1.0;
 
@@ -177,6 +179,7 @@ void init_scene()
 		lights = scene.getLights();
 		cout << "scene loaded. " << endl
 			 << shapes.size() << " shapes in total."  << endl
+			 << lights.size() << " lights in total."  << endl
 			 << materials.size() << " materials in total."  << endl
 			 << scene.getTextures().size() << " textures in total." 
 			 << endl;
@@ -194,7 +197,7 @@ void init_scene()
 	const size_t sz_mats = materials.size() * sizeof(Material);
 	cudaMalloc((void**)&d_materials, sz_mats);
 	cudaMemcpy(d_materials, &(materials[0]), sz_mats, cudaMemcpyHostToDevice);
-
+		
 	const size_t sz_lights = lights.size() * sizeof(int);
 	cudaMalloc((void**)&d_lights, sz_lights);
 	cudaMemcpy(d_lights, &(lights[0]), sz_lights, cudaMemcpyHostToDevice);
@@ -492,23 +495,22 @@ void resize(int w, int h)
 	//return;
 	cout << w << "x" << h << " vs " << window_width << "x" << window_height << endl;
 
-	if( w == window_width &&  h == window_height ) return;
+	//if( w == window_width &&  h == window_height ) return;
 
 	window_width = w, window_height = h;
 	// camera
 	cam.h = h / (float) w;
 
-	createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
-
-	showCUDAMemoryUsage();
+	//createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
+	//showCUDAMemoryUsage();
 
 	// viewport
-	glViewport(0, 0, window_width, window_height);
+	glViewport(0, 0, w, h);
 
 	// projection
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho(0, window_width, 0, window_height, 0.1, 10.0);
+	glOrtho(0, w, 0, h, 0.1, 10.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -589,14 +591,14 @@ bool runTest(int argc, char **argv, char *ref_file)
 		cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
 	}
 
-	
-	//size_t nStack;
-	//cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
-	//cout << "stack size = " << nStack << endl;
-	//cudaDeviceSetLimit(cudaLimitStackSize, 65536);
-	//cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
-	//cout << "stack size = " << nStack << endl;
-	
+#if 1
+	size_t nStack;
+	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
+	cout << "stack size = " << nStack << endl;
+	cudaDeviceSetLimit(cudaLimitStackSize, 65536);
+	cudaDeviceGetLimit(&nStack, cudaLimitStackSize);
+	cout << "stack size = " << nStack << endl;
+#endif
 
 	// create VBO
 	createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);

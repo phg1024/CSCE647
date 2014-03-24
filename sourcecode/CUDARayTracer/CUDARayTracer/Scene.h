@@ -23,7 +23,7 @@ public:
 	const vector<int>& getLights() const { 
 		lights.clear();
 		for(int i=0;i<shapes.size();i++) {
-			if( shapes[i].material.t == Material::Emissive ) lights.push_back(i);
+			if( materials[shapes[i].materialId].t == Material::Emissive ) lights.push_back(i);
 		}
 		return lights;
 	}

@@ -387,7 +387,7 @@ __device__ void getTriangleTextureCoords(int tid, int fid, float2 &t1, float2 &t
 
 
 __device__ float rayIntersectsTriangle(Ray r, float3 v0, float3 v1, float3 v2) {
-	
+#if 0
 	float3 e1, e2;
 	e1 = v1 - v0;
 	e2 = v2 - v0;
@@ -438,6 +438,27 @@ __device__ float rayIntersectsTriangle(Ray r, float3 v0, float3 v1, float3 v2) {
         return -1.0; // P is on the right side;
  
     return t; // this ray hits the triangle
+#else
+	float3 edge1 = v1 - v0;
+	float3 edge2 = v2 - v0;
+
+	float3 pvec = cross(r.dir, edge2);
+	float det = dot(edge1, pvec);
+	if(det == 0.f)
+		return -1.0;
+	float inv_det = 1.0f / det;
+
+	float3 tvec = r.origin - v0;
+	float u = dot(tvec, pvec) * inv_det;
+
+	float3 qvec = cross(tvec, edge1);
+	float v = dot(r.dir, qvec) * inv_det;
+	float t = dot(edge2, qvec) * inv_det;
+
+	bool hit = (u >= 0.0f && v >= 0.0f && (u + v) <= 1.0f);
+	if( hit ) return t;
+	else return -1.0;
+#endif
 }
 
 __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, float3 q1, float3 q2, float3 q3) {
@@ -455,6 +476,95 @@ __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, floa
 	return bcoord;
 }
 
+__device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tree, int nidx, aabbtree::Triangle& tri, float3& bcoords) {
+
+	// traverse the tree to look for a intersection
+	aabbtree::AABBNode_Serial& node = tree[nidx];
+	BoundingBox bb;
+	bb.minPt = node.aabb.minPt;
+	bb.maxPt = node.aabb.maxPt;
+
+	/*
+	printf("%d %f %f %f %f %f %f %d %d %d\n", 
+		nidx, bb.minPt.x, bb.minPt.y, bb.minPt.z, 
+		bb.maxPt.x, bb.maxPt.y, bb.maxPt.z,
+		node.type, node.leftChild, node.rightChild);
+		*/
+
+	if( node.type == aabbtree::AABBNode_Serial::EMPTY_NODE ) return -1.0;
+
+	float t = FLT_MAX;
+	if( !lightRayIntersectsBoundingBox(r, bb) ) return -1.0;
+
+	if( node.type == aabbtree::AABBNode_Serial::INTERNAL_NODE )
+	{			
+		bool hashit = false;
+		float tleft = -1.0, tright = -1.0;
+		aabbtree::Triangle trileft, triright;
+		float3 bcleft, bcright;
+
+		if( node.leftChild != -1 )
+		{
+			//printf("try left @ %d\n", node.leftChild);
+			tleft = lightRayIntersectsAABBTree(r, tree, node.leftChild, trileft, bcleft);
+		}
+		if( node.rightChild != -1 )
+		{
+			//printf("try right @ %d\n", node.rightChild);
+			tright = lightRayIntersectsAABBTree(r, tree, node.rightChild, triright, bcright);
+		}
+
+		bool hitleft = tleft>0.0, hitright = tright>0.0;		
+		hashit = hitleft || hitright;
+		if( hashit ) {
+			if( hitleft && hitright ) {
+				if( tleft < tright ) {
+					tri = trileft;
+					bcoords = bcleft;
+					return tleft;
+				}
+				else {
+					tri = triright;
+					bcoords = bcright;
+					return tright;
+				}
+			}
+			else if( hitleft ) {
+				tri = trileft;
+				bcoords = bcleft;
+				return tleft;
+			}
+			else {
+				tri = triright;
+				bcoords = bcright;
+				return tright;
+			}
+		}
+		else return -1.0; 
+	}
+	else
+	{
+		int hitIdx = -1;
+		// leaf node, test all primitives
+		for(int i=0;i<node.ntris;i++) {
+			const aabbtree::Triangle& trii = node.tri[i];
+
+			float tmp = rayIntersectsTriangle(r, trii.v0, trii.v1, trii.v2);
+			if( tmp > 0.0 && tmp < t ) {
+				t = tmp;
+				hitIdx = i;
+			}
+		}
+
+		if( hitIdx >= 0 ){
+			tri = node.tri[hitIdx];
+			bcoords = compute_barycentric_coordinates(r.origin + t * r.dir, tri.v0, tri.v1, tri.v2);				
+			return t;
+		}
+		else return -1.0;
+	}
+}
+
 __device__ float lightRayIntersectsMesh(Ray r, d_Shape* shapes, int sid, int& fid, float3& bcoords) {
 	const d_Shape& sp = shapes[sid];
 
@@ -465,6 +575,7 @@ __device__ float lightRayIntersectsMesh(Ray r, d_Shape* shapes, int sid, int& fi
 	float4 q1, q2, q3;
 
 	// brute force search
+
 	for(int i=0;i<sp.trimesh.nFaces;i++) {
 		float4 v1, v2, v3;
 		getTriangleVertices(sp.trimesh.faceTex, i, v1, v2, v3);
@@ -482,7 +593,7 @@ __device__ float lightRayIntersectsMesh(Ray r, d_Shape* shapes, int sid, int& fi
 		bcoords = compute_barycentric_coordinates(r.origin + t * r.dir, tofloat3(q1), tofloat3(q2), tofloat3(q3));
 		return t;
 	}
-	else return -1.0;	
+	else return -1.0;
 }
 
 __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes, int sid) {
@@ -496,9 +607,9 @@ __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes
 	case Shape::CONE:
 		return lightRayIntersectsQuadraticSurface(r, shapes, sid);
 	case Shape::TRIANGLE_MESH:
-		int fid;
-		float3 bc;
-		return lightRayIntersectsMesh(r, shapes, sid, fid, bc);
+		aabbtree::Triangle tri;
+		float3 bcoords;
+		return lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
 	default:
 		return -1.0;
 	}
@@ -1199,6 +1310,7 @@ __device__ Hit rayIntersectsCylinder(Ray r, d_Shape* shapes, int nShapes, int si
 }
 
 __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, int sid) {
+#if 0
 	int faceIdx = -1;
 	float3 bcoords;
 	float ti = lightRayIntersectsMesh(r, shapes, sid, faceIdx, bcoords);
@@ -1237,6 +1349,39 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
         return h;
 	}
 	else return background();
+#else
+	aabbtree::Triangle tri;
+	float3 bcoords;
+	float ti = lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+	if( ti > 0.0 ) {
+		Hit h;
+		h.t = ti;
+		
+		// hit point
+		h.p = h.t * r.dir + r.origin;
+
+        // normal at hit point
+		if( shapes[sid].trimesh.normalTex == -1 ) {
+			h.n = normalize(cross(tri.v1-tri.v0, tri.v2-tri.v0));
+		}
+		else {			
+			h.n = bcoords.x * tri.n0 + bcoords.y * tri.n1 + bcoords.z * tri.n2;
+			//printf("%f %f %f %f %f %f\n", bcoords.x, bcoords.y, bcoords.z, h.n.x, h.n.y, h.n.z);
+			// apply normal map
+		}
+		
+		if( shapes[sid].trimesh.texCoordTex == -1 ) {
+			h.tex = spheremap(normalize(h.p - shapes[sid].p));
+		}
+		else {
+			h.tex = bcoords.x * tri.t0 + bcoords.y * tri.t1 + bcoords.z * tri.t2;
+		}
+
+		h.objIdx = sid;
+        return h;
+	}
+	else return background();
+#endif
 }
 
 __device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, int sid) {
@@ -1355,13 +1500,20 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 }
 
 __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
-	const int maxBounces = 20;
+	const int maxBounces = 32;
 	float3 accumulatedColor = make_float3(0.0);
-	float3 colormask = make_float3(1.0);
+	float3 colormask = make_float3(1.0);		// not absorbed color
+
+	int pixelIdx = y*res.x+x;
+
+	AbsorptionAndScatteringProp asprop;
 
 	Ray ray = r;
 	int bounces = 0;
 	for(;bounces<maxBounces;bounces++) {
+		thrust::default_random_engine rng( myhash(time) * myhash(pixelIdx) * myhash(bounces) );
+		thrust::uniform_real_distribution<float> uniformDistribution(0,1);
+
 		Hit h = rayIntersectsShapes(ray, nShapes, shapes);		
 		float3 color = make_float3(0.0f);
 
@@ -1371,11 +1523,45 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				float2 t = spheremap(ray.dir);
 				colormask *= tofloat3(tex2D<float4>(tex[envMapIdx], -t.x, t.y));
 			}
-			else colormask *= make_float3(.75, .75, .75);
+			else {
+				const float3 bgcolor = make_float3(.90, .95, .975);
+				colormask *= bgcolor;
+			}
+
+			accumulatedColor += colormask;
 			break;
 		}
 
 		const d_Material& mater = mats[shapes[h.objIdx].materialId];
+
+		// process scattering and absorption
+		const float ZERO_ABSOPTION_THRESHOLD = 0.00001;
+		if ( asprop.reducedScatteringCoeffs > 0 || dot(asprop.absortionCoeffs, asprop.absortionCoeffs) >= ZERO_ABSOPTION_THRESHOLD ) {
+			float randomFloatForScatteringDistance = uniformDistribution(rng);
+			float scatteringDistance = -log(randomFloatForScatteringDistance) / asprop.reducedScatteringCoeffs;
+			if (scatteringDistance < h.t) {
+				// printf("SS: %f %f %f %f\n", asprop.reducedScatteringCoeffs, asprop.absortionCoeffs.x, asprop.absortionCoeffs.y, asprop.absortionCoeffs.z);
+				// Both absorption and scattering - subsurface scattering
+				// Scatter the ray:
+				Ray nextRay;
+				nextRay.origin = hitpoint(ray, scatteringDistance);
+				float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+				nextRay.dir = calculateRandomDirectionInSphere(uv.x, uv.y); // Isoptropic scattering!
+
+				ray = nextRay;
+
+				// Compute how much light was absorbed along the ray before it was scattered:
+				colormask *= transmission(asprop.absortionCoeffs, scatteringDistance);
+
+				// That's it for this iteration!
+				continue;
+			} else {
+				// Just absorption.
+				float3 trans = transmission(asprop.absortionCoeffs, h.t);
+				colormask *= trans;
+			}
+		}
+
 		switch( mater.t ) {
 		case Material::Emissive:
 			{				
@@ -1388,10 +1574,9 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 				// send it out again
 				ray.origin = h.p + 1e-3 * h.n;
-				float2 uv = generateRandomNumberFromThread2(res, time, x, y);
+				float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
 				
 				ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
-
 				break;
 			}
 		case Material::Diffuse:
@@ -1411,7 +1596,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				colormask *= color;
 
 				ray.origin = h.p;
-				float2 uv = generateRandomNumberFromThread2(res, time, x, y);
+				float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
 				
 				ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
 				break;
@@ -1424,8 +1609,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 				float3 color;
 				if( mater.diffuseTex != -1 ) {
-					color = tofloat3(tex2D<float4>(tex[mater.diffuseTex], h.tex.x, h.tex.y));
-					
+					color = texturefunc(mater.diffuseTex, h.tex, h.p);
 				}
 				else color = mater.diffuse;
 
@@ -1433,9 +1617,11 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 				ray.origin = h.p + 1e-3 * h.n;
 				ray.dir = reflect(ray.dir, h.n);
-				float2 uv = generateRandomNumberFromThread2(res, time, x, y);
+
+				float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
 				
-				ray.dir = mix(calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), ray.dir, mater.Kr);
+				ray.dir = mix(ray.dir, calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), mater.Kr);
+
 				ray.dir = normalize(ray.dir);
 				break;
 			}
@@ -1454,7 +1640,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 					colormask *= mater.diffuse;
 
 					ray.origin = h.p + 1e-3 * h.n;
-					float2 uv = generateRandomNumberFromThread2(res, time, x, y);
+					float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
 				
 					ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
 				}
@@ -1469,47 +1655,6 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 			}
 		case Material::Specular:
 			{
-				/*
-				float R0 = (1-mater.eta)/(1+mater.eta);
-				R0 *= R0;
-
-				float3 view = h.p - r.origin;
-				float3 halfway = normalize(view + h.n);
-				float cosTheta = cosf(dot(halfway, view));
-				float R = R0 + (1-R0)*powf(1-cosTheta, 5.0);
-				*/
-
-				/*
-				float randVal = generateRandomNumberFromThread1(res, time, x, y);
-				if( randVal > R ) {
-					// diffuse term
-					accumulatedColor += mater.emission * colormask;
-
-					if( mater.diffuseTex != -1 ) {
-						color = tofloat3(tex2D<float4>(tex[mater.diffuseTex], h.tex.x, h.tex.y));
-					}
-					else color = mater.diffuse;
-					colormask *= color;
-
-					ray.origin = h.p;
-					float2 uv = generateRandomNumberFromThread2(res, time, x, y);
-					ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
-				}
-				else {
-				*/
-					// specular term
-					colormask *= mater.diffuse;
-					// get the reflected ray
-					ray.origin = h.p + 1e-3 * h.n;
-					ray.dir = reflect(ray.dir, h.n);
-				//}
-				break;
-			}
-		case Material::Refractive:
-			{
-				color = mater.diffuse;
-				colormask *= color;
-
 				// get the reflected ray
 				Ray rf;
 				rf.origin = h.p; rf.dir = normalize(reflect(ray.dir, h.n));
@@ -1535,24 +1680,73 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 					float a = nt-nc, b = nt+nc, R0 = a*a/(b*b), c = 1.0 - (into?-ddn:dot(rr.dir, h.n));
 					float Re = R0 + (1-R0)*powf(c, 5.0), Tr =1.0 - Re, P=0.25+0.5*Re, RP = Re/P, TP = Tr/(1.0-P);
 
-					float Xi = generateRandomNumberFromThread1(res, time, x, y);
+					float Xi = uniformDistribution(rng);
 
-					if( Xi < P ) {
+					if( Xi < Re ) {
 						ray = rf;
-						//colormask *= RP;
+						colormask *= mater.specular;
+					}
+					else {
+						float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+						ray = rr;
+						ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
+						colormask *= mater.diffuse;
+					}
+				}
+				break;
+			}
+		case Material::Refractive:
+			{
+				// get the reflected ray
+				Ray rf;
+				rf.origin = h.p; rf.dir = normalize(reflect(ray.dir, h.n));
+				
+				double dDn = dot(h.n, ray.dir);
+				float3 n1 = dDn<0?h.n:-h.n;
+				bool into = dDn<0;
+				double nc=1.0, nt=mater.eta;
+				double nnt=into?nc/nt:nt/nc, ddn = dot(ray.dir, n1);
+				double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
+
+				if( cos2t<0.0 ) {
+					// total internal reflection
+					rf.origin -= 1e-3 * h.n;
+					ray = rf;
+				}
+				else {
+					// choose either reflection or refraction
+					Ray rr;
+					rr.origin = h.p - 1e-3 * n1; 
+					rr.dir = normalize(nnt*ray.dir-(into?1.0:-1.0)*(ddn*nnt+sqrtf(cos2t))*h.n);
+
+					float a = nt-nc, b = nt+nc, R0 = a*a/(b*b), c = 1.0 - (into?-ddn:dot(rr.dir, h.n));
+					float Re = R0 + (1-R0)*powf(c, 5.0), Tr =1.0 - Re, P=0.25+0.5*Re, RP = Re/P, TP = Tr/(1.0-P);
+
+					float Xi = uniformDistribution(rng);
+
+					if( Xi < Re ) {
+						ray = rf;
+						colormask *= mater.specular;
 					}
 					else {
 						ray = rr;
-						//colormask *= TP;
+
+						if(into) {
+							//printf("in\n");
+							asprop.absortionCoeffs = 1.0 - mater.diffuse;
+							asprop.reducedScatteringCoeffs = mater.Ks;
+						}
+						else {
+							//printf("out\n");
+							asprop.absortionCoeffs = make_float3(0.0);
+							asprop.reducedScatteringCoeffs = 0.0;
+						}
 					}
 				}
 				break;
 			}
 		}
 	}
-
-	// finally, collect it
-	accumulatedColor += colormask;
 
 	return accumulatedColor;
 }
@@ -1647,10 +1841,10 @@ __global__ void raytrace(float time, float3 *color, Camera* cam,
 
 		Ray r = generateRay(cam, u, v);
 
-		if( isRayTracing ) {
+		//if( isRayTracing ) {
 			c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
-		}
-		else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
+		//}
+		//else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 	}
 
 	c /= (float)AASamples;

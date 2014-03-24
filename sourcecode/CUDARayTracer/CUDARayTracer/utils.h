@@ -3,6 +3,8 @@
 #include <cuda_runtime.h>
 #include "helper_math.h"
 #include "element.h"
+#include "ray.h"
+#include "props.h"
 #include <thrust/random.h>
 
 #include <opencv2/core/core.hpp>
@@ -10,6 +12,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include "FreeImagePlus.h"
+#include "mathutils.h"
 
 inline void showCUDAMemoryUsage() {
 	size_t free_byte ;
@@ -198,27 +201,30 @@ __host__ __device__ __forceinline__ unsigned int myhash(unsigned int a){
 }
 
 __host__ __device__ __forceinline__ float generateRandomNumberFromThread1(int2 resolution, float time, int x, int y){
-	int index = resolution.y + x + (y * resolution.x);
+	int index = x + (y * resolution.x);
+	int seed = time;
 
-	thrust::default_random_engine rng(myhash(index*time));
+	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed));
 	thrust::uniform_real_distribution<float> u01(0,1);
 
 	return (float) u01(rng);
 }
 
 __host__ __device__ __forceinline__ float2 generateRandomNumberFromThread2(int2 resolution, float time, int x, int y){
-	int index = resolution.y + x + (y * resolution.x);
+	int index = x + (y * resolution.x);
+	int seed = time;
 
-	thrust::default_random_engine rng(myhash(index*time));
+	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed));
 	thrust::uniform_real_distribution<float> u01(0,1);
 
 	return make_float2((float) u01(rng), (float) u01(rng));
 }
 
 __host__ __device__ __forceinline__ float2 generateRandomOffsetFromThread2(int2 resolution, float time, int x, int y){
-	int index = resolution.y + x + (y * resolution.x);
+	int index = x + (y * resolution.x);
+	int seed = time;
 
-	thrust::default_random_engine rng(myhash(index*time));
+	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed));
 	thrust::uniform_real_distribution<float> u01(-0.5,0.5);
 
 	return make_float2((float) u01(rng), (float) u01(rng));
@@ -226,8 +232,9 @@ __host__ __device__ __forceinline__ float2 generateRandomOffsetFromThread2(int2 
 
 __host__ __device__ __forceinline__ float3 generateRandomNumberFromThread(int2 resolution, float time, int x, int y){
 	int index = x + (y * resolution.x);
+	int seed = time;
 
-	thrust::default_random_engine rng(myhash(index*time));
+	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed));
 	thrust::uniform_real_distribution<float> u01(0,1);
 
 	return make_float3((float) u01(rng), (float) u01(rng), (float) u01(rng));
@@ -235,8 +242,9 @@ __host__ __device__ __forceinline__ float3 generateRandomNumberFromThread(int2 r
 
 __host__ __device__ __forceinline__ float3 generateRandomOffsetFromThread(int2 resolution, float time, int x, int y){
 	int index = x + (y * resolution.x);
+	int seed = time;
 
-	thrust::default_random_engine rng(myhash(index*time));
+	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed));
 	thrust::uniform_real_distribution<float> u01(-0.5,0.5);
 
 	return make_float3((float) u01(rng), (float) u01(rng), (float) u01(rng));
@@ -261,44 +269,39 @@ __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere_
 }
 
 __host__ __device__ __forceinline__ float3 calculateRandomDirectionInHemisphere(float3 normal, float xi1, float xi2) {
-
-	//return calculateRandomDirectionInHemisphere_uniform(normal, xi1, xi2);
 	
+	/*
 	double r1=2*3.1415926535897932384626433832795*xi1, r2=xi2, r2s=sqrt(r2);
 	float3 w = normalize(normal);
 	float3 u = normalize(cross((fabs(w.x)>1e-6?make_float3(0, 1, 0):make_float3(w.x>0?-1:1, 0, 0)), w));
 	float3 v = normalize(cross(w, u));
 	return normalize(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2));		
+	*/
 
-	/*
-	//crucial difference between this and calculateRandomDirectionInSphere: THIS IS COSINE WEIGHTED!
-	const float TWO_PI = 2.0 * 3.14159265;
+	const double SQRT_OF_ONE_THIRD = 0.5773502691896257645091487805019574556476;
+	const double TWO_PI = 6.2831853071795864769252867665590057683943;
 	float up = sqrt(xi1); // cos(theta)
 	float over = sqrt(1 - up * up); // sin(theta)
 	float around = xi2 * TWO_PI;
 
-	//Find a direction that is not the normal based off of whether or not the normal's components are all equal to sqrt(1/3) or whether or not at least one component is less than sqrt(1/3). Learned this trick from Peter Kutz.
-	const float SQRT_OF_ONE_THIRD = sqrtf(1.0/3.0);
+	// Find any two perpendicular directions:
+	// Either all of the components of the normal are equal to the square root of one third, or at least one of the components of the normal is less than the square root of 1/3.
 	float3 directionNotNormal;
-	
-	if (fabsf(normal.x) < SQRT_OF_ONE_THIRD) {
+	if (abs(normal.x) < SQRT_OF_ONE_THIRD) { 
 		directionNotNormal = make_float3(1, 0, 0);
-	} else if (fabsf(normal.y) < SQRT_OF_ONE_THIRD) {
+	} else if (abs(normal.y) < SQRT_OF_ONE_THIRD) { 
 		directionNotNormal = make_float3(0, 1, 0);
 	} else {
 		directionNotNormal = make_float3(0, 0, 1);
 	}
+	float3 perpendicular1 = normalize( cross(normal, directionNotNormal) );
+	float3 perpendicular2 =            cross(normal, perpendicular1); // Normalized by default.
 
-	//Use not-normal direction to generate two perpendicular directions
-	float3 perpendicularDirection1 = normalize(cross(normal, directionNotNormal));
-	float3 perpendicularDirection2 = normalize(cross(normal, perpendicularDirection1));
-
-	return ( up * normal ) + ( cos(around) * over * perpendicularDirection1 ) + ( sin(around) * over * perpendicularDirection2 );
-	*/
+	return ( up * normal ) + ( cos(around) * over * perpendicular1 ) + ( sin(around) * over * perpendicular2 );
 }
 
 __host__ __device__ __forceinline__ float3 random3(int idx) {
-	thrust::default_random_engine rng(idx);
+	thrust::default_random_engine rng(myhash(idx)*myhash(idx));
 	thrust::uniform_real_distribution<float> u01(0,1);	
 	return make_float3(float(u01(rng))-0.5f, float(u01(rng))-0.5f, float(u01(rng))-0.5f);
 }
@@ -315,7 +318,9 @@ __host__ __device__ __forceinline__ float3 mul(float m[9], float3 v) {
 		);
 }
 
-__host__ __device__ __forceinline__ float3 refract(float3 i, float3 n, float eta) {
+__device__ __forceinline__ float3 hitpoint(const Ray& r, float t) { return r.origin + t * r.dir; }
+
+__device__ __forceinline__ float3 refract(float3 i, float3 n, float eta) {
 	float nDi = dot(n, i);
 	float k = 1.0 - eta * eta * (1.0 - nDi * nDi);
 	if (k < 0.0)
@@ -324,19 +329,52 @@ __host__ __device__ __forceinline__ float3 refract(float3 i, float3 n, float eta
 		return normalize(eta * i - (eta * nDi + sqrtf(k)) * n);
 }
 
-__host__ __device__ __forceinline__ float3 fminf(float3 v, float f) {
+__device__ __forceinline__ Fresnel fresnel(const float3 & normal, const float3 & incident, float refractiveIndexIncident, float refractiveIndexTransmitted, const float3 & reflectionDirection, const float3 & transmissionDirection) {
+	Fresnel f;
+
+	// First, check for total internal reflection:
+	if ( length(transmissionDirection) <= 0.12345 || dot(normal, transmissionDirection) > 0 ) { // The length == 0 thing is how we're handling TIR right now.
+		// Total internal reflection!
+		f.reflectionCoeffs = 1;
+		f.tranmissionCoeffs = 0;
+		return f;
+	}
+
+	// Real Fresnel equations:
+	// Copied from Photorealizer.
+	float cosThetaIncident = dot(normal, incident);
+	float cosThetaTransmitted = dot(-1 * normal, transmissionDirection);
+	float reflectionCoefficientSPolarized = pow(   (refractiveIndexIncident * cosThetaIncident - refractiveIndexTransmitted * cosThetaTransmitted)   /   (refractiveIndexIncident * cosThetaIncident + refractiveIndexTransmitted * cosThetaTransmitted)   , 2);
+	float reflectionCoefficientPPolarized = pow(   (refractiveIndexIncident * cosThetaTransmitted - refractiveIndexTransmitted * cosThetaIncident)   /   (refractiveIndexIncident * cosThetaTransmitted + refractiveIndexTransmitted * cosThetaIncident)   , 2);
+	float reflectionCoefficientUnpolarized = (reflectionCoefficientSPolarized + reflectionCoefficientPPolarized) / 2.0; // Equal mix.
+	//
+	f.reflectionCoeffs = reflectionCoefficientUnpolarized;
+	f.tranmissionCoeffs = 1 - f.reflectionCoeffs;
+	return f;
+}
+
+__device__ __forceinline__ float3 transmission(float3 absortionCoeff, float distance) {
+	float3 transmitted;
+	const float E = 2.7182818284590452353602874713526624977572;
+	transmitted.x = pow(E, (float)(-1 * absortionCoeff.x * distance));
+	transmitted.y = pow(E, (float)(-1 * absortionCoeff.y * distance));
+	transmitted.z = pow(E, (float)(-1 * absortionCoeff.z * distance));
+	return transmitted;
+}
+
+__device__ __forceinline__ float3 fminf(float3 v, float f) {
 	return make_float3(fminf(v.x, f), fminf(v.y, f), fminf(v.z, f));
 }
 
-__host__ __device__ __forceinline__ float3 fmaxf(float3 v, float f) {
+__device__ __forceinline__ float3 fmaxf(float3 v, float f) {
 	return make_float3(fmaxf(v.x, f), fmaxf(v.y, f), fmaxf(v.z, f));
 }
 
-__host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float f) {
+__device__ __forceinline__ float3 mix(float3 u, float3 v, float f) {
 	return u * (1.0f-f) + v * f;
 }
 
-__host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, float f) {
+__device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, float f) {
 	if( f > 0.5 ) {
 		float r = (f - 0.5) * 2.0;
 		return u * r + v * (1.0 - r);
@@ -347,33 +385,33 @@ __host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, flo
 	}
 }
 
-__host__ __device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, float alpha, float beta, float gamma) {
+__device__ __forceinline__ float3 mix(float3 u, float3 v, float3 w, float alpha, float beta, float gamma) {
 	return alpha * u + beta * v + gamma * w;
 }
 
-__host__ __device__ __forceinline__ float step(float edge, float v) {
+__device__ __forceinline__ float step(float edge, float v) {
 	return (v > edge)?1.0f:0.0;
 }
 
-__host__ __device__ __forceinline__ float3 step(float3 edge, float3 u) {
+__device__ __forceinline__ float3 step(float3 edge, float3 u) {
 	return make_float3(u.x>edge.x?1.0f:0.0, u.y>edge.y?1.0f:0.0, u.z>edge.z?1.0f:0.0);
 }
 
-__host__ __device__ __forceinline__ float filter(float v, float lower, float upper) {
+__device__ __forceinline__ float filter(float v, float lower, float upper) {
 	if(v>=lower && v<=upper) return 1.0;
 	else return 0.0;
 }
 
-__host__ __device__ __forceinline__ float toonify(float v, int steps) {
+__device__ __forceinline__ float toonify(float v, int steps) {
 	float s = 1.0 / steps;
 	return floor(v / s) * s;
 }
 
-__host__ __device__ __forceinline__ float intensity(float3 c) {
+__device__ __forceinline__ float intensity(float3 c) {
 	return 0.2989 * c.x + 0.5870 * c.y + 0.1140 * c.z;
 }
 
-__host__ __device__ __forceinline__ float3 toonify(float3 v, int steps) {
+__device__ __forceinline__ float3 toonify(float3 v, int steps) {
 	float I = intensity(v);
 	float Iout = toonify(I, steps);
 	return v * Iout / I;

@@ -1,6 +1,7 @@
 #include "Scene.h"
 #include "utils.h"
 #include "extras/tinyobjloader/tiny_obj_loader.h"
+#include "extras/aabbtree/aabbtree.h"
 
 Scene::Scene(void)
 {
@@ -235,6 +236,7 @@ void Scene::parse(const string& line)
 		cout << objs.size() << " shapes in total." << endl;
 		
 		vector<float4> triangles;
+		vector<aabbtree::Triangle> tris;		// for building AABB tree
 		vector<float4> normals;
 		vector<float2> texcoords;
 
@@ -258,17 +260,19 @@ void Scene::parse(const string& line)
 				v1 = M * v1 + T.data;
 				v2 = M * v2 + T.data;
 
-				maxPt = fmaxf(v0, maxPt);
-				minPt = fminf(v0, minPt);
-
+				maxPt = fmaxf(v0, maxPt); minPt = fminf(v0, minPt);
+				maxPt = fmaxf(v1, maxPt); minPt = fminf(v1, minPt);
+				maxPt = fmaxf(v2, maxPt); minPt = fminf(v2, minPt);
+				
 				triangles.push_back(make_float4(v0, i));
 				triangles.push_back(make_float4(v1, i));
 				triangles.push_back(make_float4(v2, i));
 
+				float3 n0 = aabbtree::zero3, n1 = aabbtree::zero3, n2 = aabbtree::zero3;
 				if( hasNormal ) {
-					float3 n0 = make_float3(msh.normals[msh.indices[j]*3], msh.normals[msh.indices[j]*3+1], msh.normals[msh.indices[j]*3+2]);
-					float3 n1 = make_float3(msh.normals[msh.indices[j+1]*3], msh.normals[msh.indices[j+1]*3+1], msh.normals[msh.indices[j+1]*3+2]);
-					float3 n2 = make_float3(msh.normals[msh.indices[j+2]*3], msh.normals[msh.indices[j+2]*3+1], msh.normals[msh.indices[j+2]*3+2]);
+					n0 = make_float3(msh.normals[msh.indices[j]*3], msh.normals[msh.indices[j]*3+1], msh.normals[msh.indices[j]*3+2]);
+					n1 = make_float3(msh.normals[msh.indices[j+1]*3], msh.normals[msh.indices[j+1]*3+1], msh.normals[msh.indices[j+1]*3+2]);
+					n2 = make_float3(msh.normals[msh.indices[j+2]*3], msh.normals[msh.indices[j+2]*3+1], msh.normals[msh.indices[j+2]*3+2]);
 
 					n0 = normalize(mrot * n0);
 					n1 = normalize(mrot * n1);
@@ -278,6 +282,7 @@ void Scene::parse(const string& line)
 					normals.push_back(make_float4(n1, 0));
 					normals.push_back(make_float4(n2, 0));
 				}
+				tris.push_back(aabbtree::Triangle(v0, v1, v2, n0, n1, n2));
 			}
 		}
 
@@ -293,6 +298,18 @@ void Scene::parse(const string& line)
 			 << sp.trimesh.normalTex << ' '
 			 << sp.trimesh.texCoordTex << ' '
 			 << sp.trimesh.nFaces << endl;
+				
+		aabbtree::AABBTree tree(tris);
+		tree.printNodeStats();
+		auto treearray = tree.toArray();
+
+		cout << "uploading aabb tree to device ..." << endl;
+		// upload the tree to device
+		size_t treesize = sizeof(aabbtree::AABBNode_Serial)*treearray.size();
+		cout << "tree size = " << treesize << endl;
+		cudaMalloc(&sp.trimesh.tree, treesize);		
+		cudaMemcpy(sp.trimesh.tree, &treearray[0], treesize, cudaMemcpyHostToDevice);
+		cout << "done." << endl;
 
 		shapes.push_back(sp);
 	}

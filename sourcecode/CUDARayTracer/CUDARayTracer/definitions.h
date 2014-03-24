@@ -2,6 +2,9 @@
 
 #include "element.h"
 #include "utils.h"
+#include "ray.h"
+#include "props.h"
+#include "extras/aabbtree/aabbtree.h"
 
 class Camera {
 public:
@@ -9,8 +12,10 @@ public:
     vec3 pos;
     vec3 up, dir, right;
 
-    float f;
-    float w, h;
+    float f;		// focal length
+    float w, h;		// canvas size
+
+	float apertureRadius;
 };
 
 class Material {
@@ -126,7 +131,10 @@ public:
 
 	float Ks, Kr, Kf;
 	float shininess;
-	float eta;
+	float eta;			// index of refraction, ior
+						// IOR for air: 1.000293
+
+	AbsorptionAndScatteringProp asprop;
 
 	vec3 kcool, kwarm;
 	float alpha, beta;
@@ -191,18 +199,22 @@ struct d_Material {
 };
 
 struct TriangleMeshInfo {
+	
 	__device__ TriangleMeshInfo& operator=(const TriangleMeshInfo& info) {
 		nFaces = info.nFaces;
 		faceTex = info.faceTex;
 		normalTex = info.normalTex;
 		texCoordTex = info.texCoordTex;
+		tree = info.tree;
 		return (*this);
 	}
+	
 
 	int nFaces;
 	int faceTex;		// float4 texture of a list of faces, together with material indices
 	int normalTex;		// float3 texture of a list of normal vectors
 	int texCoordTex;	// float2 texture of texture coordinates, if exists
+	aabbtree::AABBNode_Serial* tree;
 };
 
 struct BoundingBox {
@@ -369,11 +381,6 @@ struct d_Shape {
 
 	TriangleMeshInfo trimesh;
 	BoundingBox bb;
-};
-
-struct Ray {
-	float3 origin;
-	float3 dir;
 };
 
 struct Hit {
