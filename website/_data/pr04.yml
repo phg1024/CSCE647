@@ -1,11 +1,23 @@
-- name: bunny.png
-  des: Cube, tetrahedron and bunny, with textures.
+- name: 120faces_5k.png
+  des: Polygon mesh.
   id: "1"
 
 - name: bunnydragon.png
   des: Bunny and dragon.
   id: "2"
 
+- name: bunny.png
+  des: Cube, tetrahedron and bunny, with textures.
+  id: "3"
+
 - name: lamb1857.png
   des: Lamborghini aventador.
-  id: "3"
+  id: "4"
+
+- name: glassbunny.png
+  des: Glass bunny.
+  id: "5"
+
+- name: error.png
+  des: Interesting error of KD tree.
+  id: "6"
