@@ -43,7 +43,7 @@ material glossygray glossy 0.0 0.0 0.0	0.075 0.185 0.25	0.5 0.5 0.5 1.0 1.0 1.0 
 #environment ./textures/room.jpg
 # shape Tx Ty Tz Sx Sy Sz Rx Ry Rz material
 sphere -40.0 80 40 50 50 50 0.753 0.753 0.0 light2
-sphere 0 10 75 15 15 4.5 0 0 0 light2
+#sphere 0 10 75 15 15 4.5 0 0 0 light2
 #sphere -2.0 10 70 2 2 2 0.753 0.753 0.0 light2
 #sphere -40.0 40.75 40.0 5.5 5.5 5.5 0.753 0.753 0.0 light3
 #sphere 15.0 15.75 15.0 .5 .5 .5 0.753 0.753 0.0 light4
@@ -78,10 +78,10 @@ plane 0.0 -10.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray	# bottom
 #mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
 #mesh 10.0 -5.0 25.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj chessboard2d
 #mesh -12 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/teapot.obj yellowglass
-mesh -12 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj marble3
+mesh -12 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellow marble3
 #mesh 0 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellowglass1
-mesh 12 -10 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj wood
-mesh 0 -10 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj metal
+#mesh 12 -10 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj wood
+mesh 0 -10 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj whitejade metal
 #mesh 0 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/avent/Avent.obj jade
 #mesh 0 0 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj whitejade
 #mesh 0 -2.5 35 2.5 2.5 2.5 0.0 1.51 0.0 ./meshes/dabrovic-sponza/sponza.obj whitejade
