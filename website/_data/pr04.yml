@@ -1,9 +1,9 @@
 - name: 120faces_5k.png
-  des: Polygon mesh.
+  des: Polygon mesh, 120 triangles, rendered in 22 seconds.
   id: "1"
 
 - name: bunnydragon.png
-  des: Bunny and dragon.
+  des: Bunny (69451 triangles) and dragon (871414 triangles), took about 9 minutes to render.
   id: "2"
 
 - name: bunny.png
@@ -11,13 +11,28 @@
   id: "3"
 
 - name: lamb1857.png
-  des: Lamborghini aventador.
+  des: Lamborghini aventador, 183309 triangles, rendered in 17 minutes.
   id: "4"
 
-- name: glassbunny.png
-  des: Glass bunny.
+- name: buddha.png
+  des: Buddha, 1087474 triangles, rendered in 5 minutes 41 seconds.
   id: "5"
 
 - name: error.png
-  des: Interesting error of KD tree.
+  des: Interesting error of KD tree. Turned out the conversion from pointer based tree to array based tree caused this problem. Some non-existing nodes are added to the tree during the conversion, resulting in the visible holes in the rendered mesh.
   id: "6"
+
+- name: glassbunny.png
+  des: Cool effects - Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds.
+  id: "7"
+
+- name: translucency.png
+  des: Cool effects - Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right.
+  id: "8"
+
+- name: jadedragon_1k.png
+  des: Cool effects - Jade dragon, 871414 triangles, rendered in about an hour.
+  id: "9"
+
+- name: msw.png
+  des: Cool effects - Marble bunny, silver dragon and wood teapot, rendered in about an hour.
