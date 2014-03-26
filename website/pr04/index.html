@@ -6,6 +6,28 @@ title: Project 04 - Ray Casting Triangles
 <article>
 <div class="maincontent">
     <h2>{{ page.title }}</h2>
+    <div class="projectbrief">
+        <p>
+            Rendering polygon meshes are far more fun than planes and quadratics, but also more challenging. I need to include
+            K-D tree to achieve reasonable performance, even with GPU implementation.
+        </p>
+        <p>
+            All images below are rendered with <b>1024 shadow rays per pixel</b> to generate soft shadow, since I simply could not bear to look at
+            hard shadow images anymore :/. The rendering a while, but the images are definitely worth the waiting.
+            In fact, most of the images below can be generated in <b>real time</b> if rendered with fewer shadow rays (special thanks
+            to my Nvidia GTX-750 GPU).
+        </p>
+        <p>
+            The K-D tree I implemented now is probably a low quality one, since I used the primitive median separation method.
+        Adding surface area heuristic for the construction of K-D tree should produce much better trees and further boost
+        the rendering performance.
+        </p>
+
+        <p>
+            The source code of this project is available <a href="https://github.com/phg1024/CSCE647/tree/master/sourcecode/CUDARayTracer/CUDARayTracer">here</a>.
+            It is a bit messy currently, but I will try to clean it up later.
+        </p>
+    </div>
     <div class="results">
         <h2>Images</h2>
         <p class="note">Click on the images to view full size version.</p>
