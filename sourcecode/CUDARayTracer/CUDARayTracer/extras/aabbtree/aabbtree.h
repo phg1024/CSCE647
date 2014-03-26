@@ -136,12 +136,11 @@ struct AABBNode_Serial {
 	friend ostream& operator<<(ostream& os, const AABBNode_Serial& n);
 
 	NodeType type;
-	AABB aabb;
-	Triangle tri[MAX_TRIS_PER_NODE];
-	int ntris;
-
+	unsigned char ntris;	
+	Triangle tri[MAX_TRIS_PER_NODE];	
 	int leftChild;
 	int rightChild;
+	AABB aabb;
 };
 
 inline ostream& operator<<(ostream& os, const AABBNode_Serial& n) {

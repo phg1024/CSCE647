@@ -1878,6 +1878,12 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 					}
 					else {
 						ray = rr;
+						
+						// purturb the refraction direction a little bit
+						float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+						float3 pdir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
+
+						ray.dir = normalize(mix(ray.dir, pdir, mater.Kf));
 
 						if(into) {
 							//printf("in\n");
