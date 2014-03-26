@@ -108,11 +108,14 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, BoundingBox bb ) {
 }
 
 __device__ bool lightRayIntersectsBoundingBox( Ray r, const aabbtree::AABB& bb ) {
+#if 1
 	float3 rdirinv = 1.0 / r.dir;
 	
+	/*
 	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
 	rdirinv.y = (r.dir.y==0)?FLT_MAX:rdirinv.y;
 	rdirinv.z = (r.dir.z==0)?FLT_MAX:rdirinv.z;
+	*/
 	
 	float tmin, tmax;
 
@@ -132,6 +135,71 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, const aabbtree::AABB& bb )
 	tmax = fminf(fmaxf(l1,l2), tmax);
 
 	return ((tmax >= tmin) && (tmax >= 0.0f));
+#else
+	float3 rdirinv = 1.0 / r.dir;
+	
+	/*
+	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
+	rdirinv.y = (r.dir.y==0)?FLT_MAX:rdirinv.y;
+	rdirinv.z = (r.dir.z==0)?FLT_MAX:rdirinv.z;
+	*/
+
+	float tmin, tmax, tymin, tymax, tzmin, tzmax;
+
+    if( r.dir.x >= 0 )
+    {
+		tmin = (bb.minPt.x - r.origin.x) * rdirinv.x;
+		tmax = (bb.maxPt.x - r.origin.x) * rdirinv.x;
+    }
+    else
+    {
+		tmin = (bb.maxPt.x - r.origin.x) * rdirinv.x;
+		tmax = (bb.minPt.x - r.origin.x) * rdirinv.x;
+    }
+
+    if( r.dir.y >= 0 )
+    {
+		tymin = (bb.minPt.y - r.origin.y) * rdirinv.y;
+		tymax = (bb.maxPt.y - r.origin.y) * rdirinv.y;
+    }
+    else
+    {
+		tymin = (bb.maxPt.y - r.origin.y) * rdirinv.y;
+		tymax = (bb.minPt.y - r.origin.y) * rdirinv.y;
+    }
+
+    if( tmin > tymax || tymin > tmax )
+        return false;
+
+    if( tymin > tmin )
+        tmin = tymin;
+
+    if( tymax < tmax )
+        tmax = tymax;
+
+    if( r.dir.z >= 0 )
+    {
+		tzmin = (bb.minPt.z - r.origin.z) * rdirinv.z;
+		tzmax = (bb.maxPt.z - r.origin.z) * rdirinv.z;
+    }
+    else
+    {
+		tzmax = (bb.minPt.z - r.origin.z) * rdirinv.z;
+		tzmin = (bb.maxPt.z - r.origin.z) * rdirinv.z;
+    }
+
+    if( tmin > tzmax || tzmin > tmax )
+        return false;
+
+    if( tzmin > tmin )
+        tmin = tzmin;
+
+    if( tzmax < tmax )
+        tmax = tzmax;
+
+    // survived all tests
+    return ((tmin < FLT_MAX) && (tmax > 0));
+#endif
 }
 
 // light ray intersection tests
@@ -533,7 +601,7 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 	float t = FLT_MAX;
 	bool hashit = false;
 
-	device::stack<int> Q;
+	device::stack<int, 32> Q;
 	Q.clear();
 
 	Q.push(0);
@@ -556,8 +624,10 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 		else if( node.type == aabbtree::AABBNode_Serial::INTERNAL_NODE ) {
 			// push children to the stack
 			int leftIdx = node.leftChild, rightIdx = node.rightChild;
-			if( lightRayIntersectsBoundingBox(r, tree[rightIdx].aabb) ) Q.push(rightIdx);
-			if( lightRayIntersectsBoundingBox(r, tree[leftIdx].aabb) ) Q.push(leftIdx);
+			if( lightRayIntersectsBoundingBox(r, tree[rightIdx].aabb) ) 
+				Q.push(rightIdx);
+			if( lightRayIntersectsBoundingBox(r, tree[leftIdx].aabb) ) 
+				Q.push(leftIdx);
 		}
 	}
 

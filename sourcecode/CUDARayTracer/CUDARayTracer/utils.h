@@ -469,12 +469,12 @@ __device__ __forceinline__ float complex_mag(float3 z) {
 	return z.x*z.x+z.y*z.y+z.z*z.z;
 }
 
-__host__ __forceinline__ ostream& operator<<(ostream& os, float3& v) {
+__host__ __forceinline__ ostream& operator<<(ostream& os, const float3& v) {
 	os << "(" << v.x << ", " << v.y << ", " << v.z << ")\t";
 	return os;
 }
 
-__host__ __forceinline__ ostream& operator<<(ostream& os, float4& v) {
+__host__ __forceinline__ ostream& operator<<(ostream& os, const float4& v) {
 	os << "(" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << ")\t";
 	return os;
 }

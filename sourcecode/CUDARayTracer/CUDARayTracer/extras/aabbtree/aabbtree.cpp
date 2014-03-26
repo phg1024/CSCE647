@@ -1,9 +1,12 @@
 #include "aabbtree.h"
 
+#include <fstream>
 #include <queue>
 #include <list>
 using std::queue;
 using std::list;
+using std::ofstream;
+using std::endl;
 
 namespace aabbtree {
 
@@ -146,8 +149,10 @@ void AABBTree::printNodeStats()
 
 vector<AABBNode_Serial> AABBTree::toArray() const {
 	cout << "Serializing the AABB tree ..." << endl;
+	cout << "reserving " << sizeof(AABBNode_Serial)*(nodeCount[2]*2+1) << " bytes ..." << endl;
 	vector<AABBNode_Serial> A;
-	A.reserve(nodeCount[2]*2);
+	A.reserve(nodeCount[2]*2+1);
+	cout << "done." << endl;
 		
 	queue<AABBNode*> nodeset;
 	nodeset.push(mRoot);
@@ -173,13 +178,30 @@ vector<AABBNode_Serial> AABBTree::toArray() const {
 			}
 			A.push_back(node->serialize(leftIdx, rightIdx));
 		}
-		else
+		else if( node->type == AABBNode_Serial::LEAF_NODE )
 		{
-			// empty node, simply push it to the array
+			// leaf node, simply push it to the array
 			A.push_back(node->serialize(-1, -1));
-			totalNode++;
+			
+			// bug, no need to add this anymore, because the space is already counted before
+			//totalNode++;
+		}
+		else {
+			// not suppose to see this
+			cout << "empty node." << endl;
 		}
 	}
+
+#define WRITE_TREE 0
+#if WRITE_TREE
+
+	ofstream fout("tree.txt");
+	for(int i=0;i<A.size();i++) {
+		fout << "idx = " << i << ": " << A[i] << endl;
+	}
+	fout.close();
+
+#endif
 
 	cout << "Serialized. Total nodes = " << A.size() << endl;
 	return A;
@@ -199,12 +221,7 @@ AABBNode* AABBTree::buildAABBTree(const vector<Triangle>& inTris, int level)
 
     if( tris.empty() )
     {
-        // empty node
-		nodeCount[0]++;
-        node->type = AABBNode_Serial::EMPTY_NODE;
-        node->leftChild = nullptr;
-        node->rightChild = nullptr;
-        return node;
+        return nullptr;
     }    
     else if( tris.size() <= MAX_TRIS_PER_NODE )
     {

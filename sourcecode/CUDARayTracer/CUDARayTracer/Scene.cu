@@ -305,7 +305,12 @@ void Scene::parse(const string& line)
 			 << sp.trimesh.normalTex << ' '
 			 << sp.trimesh.texCoordTex << ' '
 			 << sp.trimesh.nFaces << endl;
-				
+		
+		// release some memory
+		triangles.clear();
+		normals.clear();
+		texcoords.clear();
+
 		aabbtree::AABBTree tree(tris);
 		tree.printNodeStats();
 		auto treearray = tree.toArray();

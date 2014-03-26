@@ -75,7 +75,7 @@ public:
 	}
 
 	AABB(const Triangle& tri) {
-		const float3 bias = make_float3(1e-4);
+		const float3 bias = make_float3(1e-3);
 		minPt = fminf(fminf(tri.v0, tri.v1), tri.v2)-bias;
 		maxPt = fmaxf(fmaxf(tri.v0, tri.v1), tri.v2)+bias;
 	}
@@ -105,7 +105,7 @@ public:
 	float3 maxPt;
 };
 
-static const int MAX_TRIS_PER_NODE = 4;
+static const int MAX_TRIS_PER_NODE = 2;
 
 struct AABBNode_Serial {
 	enum NodeType {
@@ -133,6 +133,8 @@ struct AABBNode_Serial {
 		}
 	}
 
+	friend ostream& operator<<(ostream& os, const AABBNode_Serial& n);
+
 	NodeType type;
 	AABB aabb;
 	Triangle tri[MAX_TRIS_PER_NODE];
@@ -141,6 +143,14 @@ struct AABBNode_Serial {
 	int leftChild;
 	int rightChild;
 };
+
+inline ostream& operator<<(ostream& os, const AABBNode_Serial& n) {
+	os << n.type << '\t'
+		<< n.aabb.minPt.x << ", " << n.aabb.minPt.y << ", " << n.aabb.minPt.z << '\t' 
+		<< n.aabb.maxPt.x << ", " << n.aabb.maxPt.y << ", " << n.aabb.maxPt.z << '\t' 
+		<< '(' << n.leftChild << ", " << n.rightChild << ')' << '\t' << n.ntris;
+	return os;
+}
 
 /// @brief a binary tree
 struct AABBNode
