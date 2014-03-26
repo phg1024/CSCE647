@@ -1838,7 +1838,14 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 						float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
 						ray = rr;
 						ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
-						colormask *= mater.diffuse;
+
+						float3 Idiff;
+						if( mater.diffuseTex != -1 ) {
+							Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
+						}
+						else Idiff = mater.diffuse;
+
+						colormask *= Idiff;
 					}
 				}
 				break;
@@ -1887,7 +1894,14 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 						if(into) {
 							//printf("in\n");
-							asprop.absortionCoeffs = 1.0 - mater.diffuse;
+
+							float3 Idiff;
+							if( mater.diffuseTex != -1 ) {
+								Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
+							}
+							else Idiff = mater.diffuse;
+
+							asprop.absortionCoeffs = 1.0 - Idiff;
 							asprop.reducedScatteringCoeffs = mater.Ks;
 						}
 						else {
