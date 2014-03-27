@@ -147,20 +147,29 @@ void TrackBall::motion_rotate(int u, int v)
 
 	v = m_height - v;
 
-	if (u<0 || u>m_width || v<0 || v>m_height) return;
+	if (u<0 || u>m_width || v<0 || v>m_height) {
+		//cout << "out 1" << endl;
+		return;
+	}
 
 	v0.x = (m_x - m_width/2.f);
 	v0.y = (m_y - m_height/2.f);
 	v0.z = (0.f);
 
-	if (v0.length() < 2) return;
+	if (v0.length() < 2){
+		//cout << "out 2" << endl;
+		return;
+	}
 	v0.z = (m_r*m_r/2.f / v0.length());
 
 	v1.x = (u - m_width/2.f);
 	v1.y = (v - m_height/2.f);
 	v1.z = (0.f);
 
-	if (v1.length() < 2) return;
+	if (v1.length() < 2){
+		//cout << "out 3" << endl;
+		return;
+	}
 	v1.z = (m_r*m_r/2.f / v1.length());
 
 	v0.normalize();
