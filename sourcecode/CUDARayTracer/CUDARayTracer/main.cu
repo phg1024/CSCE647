@@ -57,6 +57,8 @@ using namespace std;
 
 #include "FreeImagePlus.h"
 
+#include "extras/hdr/rgbe.h"
+
 #define MAX_EPSILON_ERROR 10.0f
 #define THRESHOLD         0.30f
 #define REFRESH_DELAY     25 //ms
@@ -114,17 +116,10 @@ void clearColor();
 
 // rendering callbacks
 void display();
-#if USE_GLFW
 static void keyboard(GLFWwindow*, int, int, int, int);
 static void mouse(GLFWwindow*, int, int, int);
 static void cursor_pos(GLFWwindow*, double, double);
 static void resize(GLFWwindow*, int, int);
-#else
-void keyboard(unsigned char key, int x, int y);
-void mouse(int button, int state, int x, int y);
-void motion(int x, int y);
-void timerEvent(int value);
-#endif
 
 // Cuda functionality
 extern __global__ void setParams(int, int, int);
@@ -173,7 +168,7 @@ vector<int> lights;
 int* d_lights;
 vector<Material> materials;
 Material* d_materials;
-float3* cumulatedColor = 0;
+float3* cumulatedColor = 0;		// ray traced HDR image
 int AASamples = 1;
 int sMode = 1;
 int kernelIdx = 0;
@@ -505,14 +500,9 @@ void computeFPS()
 	char fps[256];
 	sprintf(fps, "CUDA Ray Tracer: %3.4f fps - Iteration %d - Elapsed time %3.2f s.", avgFPS, iterations, totalTime);
 
-#if USE_GLFW
 	glfwSetWindowTitle(window, fps);
-#else
-	glutSetWindowTitle(fps);
-#endif
 }
 
-#if USE_GLFW
 void resize(GLFWwindow* window, int w, int h) {
 	
 	tball.reshape(w, h);
@@ -534,36 +524,10 @@ void resize(GLFWwindow* window, int w, int h) {
 	glLoadIdentity();
 	glOrtho(0, w, 0, h, 0.1, 10.0);
 }
-#else
-void resize(int w, int h) 
-{
-	tball.reshape(w, h);
-	//return;
-	cout << w << "x" << h << " vs " << window_width << "x" << window_height << endl;
-
-	//if( w == window_width &&  h == window_height ) return;
-
-	//window_width = w, window_height = h;
-	// camera
-	//cam.h = h / (float) w;
-
-	//createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
-	//showCUDAMemoryUsage();
-
-	// viewport
-	glViewport(0, 0, w, h);
-
-	// projection
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, w, 0, h, 0.1, 10.0);
-}
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Initialize GL
 ////////////////////////////////////////////////////////////////////////////////
-#if USE_GLFW
 bool initGL(int *argc, char **argv) {
 
 	if( !glfwInit() ) return false;
@@ -609,48 +573,6 @@ bool initGL(int *argc, char **argv) {
 
 	return true;
 }
-#else
-bool initGL(int *argc, char **argv)
-{
-	glutInit(argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE );
-	glutInitWindowSize(window_width, window_height);
-	glutCreateWindow("CUDA Ray Tracer");
-	glutDisplayFunc(display);
-	glutKeyboardFunc(keyboard);
-	glutMotionFunc(motion);
-	//glutTimerFunc(REFRESH_DELAY, timerEvent,0);
-
-	// initialize necessary OpenGL extensions
-	glewInit();
-
-	if (! glewIsSupported("GL_VERSION_2_0 "))
-	{
-		fprintf(stderr, "ERROR: Support for necessary OpenGL extensions missing.");
-		fflush(stderr);
-		return false;
-	}
-
-	// default initialization
-	glClearColor(0.0, 0.0, 0.0, 1.0);
-	glDisable(GL_DEPTH_TEST);
-
-	// viewport
-	glViewport(0, 0, window_width, window_height);
-
-	// projection
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, window_width, 0, window_height, 0.1, 10.0);
-
-	tball.init();
-	tball.setSceneScale(1.0);
-
-	SDK_CHECK_ERROR_GL();
-
-	return true;
-}
-#endif
 
 void refresh() {
 	//system("pause");
@@ -703,7 +625,6 @@ bool runTest(int argc, char **argv, char *ref_file)
 	
 	clearColor();
 
-#if USE_GLFW
 	/* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
@@ -719,25 +640,6 @@ bool runTest(int argc, char **argv, char *ref_file)
 
     glfwTerminate();
     return true;
-#else
-	// register callbacks
-	glutDisplayFunc(display);
-	glutKeyboardFunc(keyboard);
-	glutMouseFunc(mouse);
-	glutMotionFunc(motion);	
-
-	glutReshapeFunc(resize);
-	glutIdleFunc(refresh);
-
-	// run the cuda part
-	runCuda(&cuda_vbo_resource);
-
-	// start rendering mainloop
-	glutMainLoop();
-	atexit(cleanup);
-
-	return true;
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -809,7 +711,7 @@ void createVBO(GLuint *vbo, struct cudaGraphicsResource **vbo_res,
 
 	SDK_CHECK_ERROR_GL();
 
-	// allocate memory
+	// allocate memory for the RGB HDR image
 	if( cumulatedColor ) cudaFree(cumulatedColor);
 	int sz = window_width * window_height * sizeof(float3);
 	cudaMalloc((void**)&cumulatedColor, sz);
@@ -906,12 +808,25 @@ void screenshot() {
 	cv::flip(m, m, 0);
 	cv::imwrite("screenshot.png", m);
 	delete[] pixels;
+
+	vector<float3> buffer(width*height);
+	vector<float3> flipped(width*height);
+	cudaMemcpy(&buffer[0], cumulatedColor, sizeof(float3)*width*height, cudaMemcpyDeviceToHost);
+	for(int i=0,idx=0;i<height;++i) {
+		int offset = (height-1-i)*width;
+		for(int j=0;j<width;++j,++idx,++offset) {
+			flipped[offset] = buffer[idx];
+		}
+	}
+	FILE* f = fopen("screenshot.hdr","wb");
+	RGBE_WriteHeader(f,width,height,NULL);
+	RGBE_WritePixels(f,&(flipped[0].x),width*height);
+	fclose(f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Keyboard events handler
 ////////////////////////////////////////////////////////////////////////////////
-#if USE_GLFW
 static void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if( action != GLFW_PRESS ) return;
 	switch (key)
@@ -950,64 +865,11 @@ static void keyboard(GLFWwindow* window, int key, int scancode, int action, int 
 		break;
 	}
 }
-#else
-void keyboard(unsigned char key, int /*x*/, int /*y*/)
-{
-	switch (key)
-	{
-	case '1':
-	case '2':
-	case '3':
-		sMode = key - '0';
-		glutPostRedisplay();
-		break;
-	case 'g':
-	case 'G':
-		cout << "input gamma value: " << endl;
-		cin >> gamma;
-		glutPostRedisplay();
-		break;
-	case 'a':
-	case 'A':
-		cout << "Please input number of samples:" << endl;
-		cin >> AASamples;
-		glutPostRedisplay();
-		break;
-	case 'k':
-	case 'K':
-		kernelIdx = (kernelIdx + 1) % 3;
-		cout << "using kernel #" << kernelIdx << endl;
-		glutPostRedisplay();
-		break;
-	case 't':
-	case 'T':
-		tracingType = (tracingType + 1) % 3;
-		cout << "tracing type = " << tracingType << endl;
-		clearColor();
-		glutPostRedisplay();
-		break;
-	case 's':
-	case 'S':
-		specType = (specType + 1) % 5;
-		glutPostRedisplay();
-		break;
-	case 'c':
-	case 'C':
-		screenshot();
-		break;
-	case (27) :
-		cleanup();
-		glutLeaveMainLoop();
-		break;
-	}
-}
-#endif
 
 int AASamples_old;
 ////////////////////////////////////////////////////////////////////////////////
 //! Mouse event handlers
 ////////////////////////////////////////////////////////////////////////////////
-#if USE_GLFW
 void mouse(GLFWwindow* window, int button, int action, int mods) {
 	if( action == GLFW_PRESS ) {
 		AASamples_old = AASamples; AASamples = 1;
@@ -1034,38 +896,7 @@ void mouse(GLFWwindow* window, int button, int action, int mods) {
 	}
 	clearColor();
 }
-#else
-void mouse(int button, int state, int x, int y)
-{
-	if (state == GLUT_DOWN)
-	{
-		mouse_buttons |= 1<<button;
-		AASamples_old = AASamples;
-		AASamples = 1;
-	}
-	else if (state == GLUT_UP)
-	{
-		mouse_buttons = 0;
-		AASamples = AASamples_old;
-	}
 
-	if (mouse_buttons & 1)
-	{
-		tball.mouse_rotate(x, y);
-	}
-	else if (mouse_buttons & 4)
-	{		
-	}
-
-	clearColor();
-
-	mouse_old_x = x;
-	mouse_old_y = y;
-	glutPostRedisplay();
-}
-#endif
-
-#if USE_GLFW
 void cursor_pos(GLFWwindow* window, double x, double y) {
 	double dx, dy;
 	dx = x - mouseState.x();
@@ -1082,26 +913,3 @@ void cursor_pos(GLFWwindow* window, double x, double y) {
 		clearColor();
 	}
 }
-#else
-void motion(int x, int y)
-{
-	float dx, dy;
-	dx = (float)(x - mouse_old_x);
-	dy = (float)(y - mouse_old_y);
-
-	if (mouse_buttons & 1)
-	{
-		tball.motion_rotate(x, y);
-	}
-	else if (mouse_buttons & 4)
-	{
-		tball.wheel( y - mouse_old_y );
-	}
-
-	mouse_old_x = x;
-	mouse_old_y = y;
-
-	clearColor();
-	glutPostRedisplay();
-}
-#endif
