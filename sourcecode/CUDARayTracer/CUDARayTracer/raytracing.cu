@@ -101,10 +101,8 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, BoundingBo
 	return ((tmax >= tmin) && (tmax >= t0) && tmin < t1);
 }
 
-__device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, const aabbtree::AABB& bb, float t0 = 0.0, float t1 = FLT_MAX ) {
+__device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, const aabbtree::AABB& bb, float& tmin, float& tmax, float t0 = 0.0, float t1 = FLT_MAX ) {
 #if 1
-	float tmin, tmax;
-
 	float l1   = (bb.minPt.x - r.origin.x) * rdirinv.x;
 	float l2   = (bb.maxPt.x - r.origin.x) * rdirinv.x;
 	tmin = fminf(l1,l2);
@@ -559,7 +557,7 @@ __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, floa
 	return bcoord;
 }
 
-__device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Serial& node, aabbtree::Triangle& tri, float3& bcoords, float tmax = FLT_MAX) {
+__device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Serial& node, aabbtree::Triangle& tri, float3& bcoords, float tmin = 0.0, float tmax = FLT_MAX) {
 	float t = tmax;	
 	int hitIdx = -1;
 	// leaf node, test all primitives
@@ -567,7 +565,7 @@ __device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Ser
 		const aabbtree::Triangle& trii = node.tri[i];
 
 		float tmp = rayIntersectsTriangle(r, trii.v0, trii.v1, trii.v2);
-		if( tmp > 0.0 && tmp < t ) {
+		if( tmp > tmin && tmp < t ) {
 			t = tmp;
 			hitIdx = i;
 		}
@@ -581,6 +579,13 @@ __device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Ser
 	else return -1.0;
 }
 
+struct TraverseInfo {
+	__device__ TraverseInfo(){}
+	__device__ TraverseInfo(int idx, float t0, float t1):idx(idx), tmin(t0), tmax(t1){}
+	int idx;
+	float tmin, tmax;
+};
+
 __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_Serial* tree, int nidx, aabbtree::Triangle& tri, float3& bcoords) {
 	typedef aabbtree::AABBNode_Serial& node_t;
 
@@ -589,17 +594,20 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 
 	float3 rdirinv = 1.0 / r.dir;
 
-	device::stack<int, 16> Q;
-	Q.push(0);
+	device::stack<TraverseInfo, 16> Q;
+	Q.push(TraverseInfo(0, 0, FLT_MAX));
+
+	float tmin, tmax;
 
 	while( !Q.empty() ) {
-		node_t node = tree[Q.pop()];
+		TraverseInfo info = Q.pop();
+		node_t node = tree[info.idx];
 		if( node.type == aabbtree::AABBNode_Serial::LEAF_NODE ) {
 			// test intersection
 			float tmp;
 			aabbtree::Triangle tmptri;
 			float3 tmpbc;
-			tmp = lightRayIntersectsTriangles(r, node, tmptri, tmpbc, t);
+			tmp = lightRayIntersectsTriangles(r, node, tmptri, tmpbc, 0.0, t);
 			if( tmp > 0 && tmp < t ) {
 				t = tmp;
 				tri = tmptri;
@@ -615,16 +623,16 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 			float dr = dot(0.5 * (tree[rightIdx].aabb.minPt + tree[rightIdx].aabb.maxPt) - r.origin, r.dir);
 			
 			if( dl < dr ) {
-				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, 0.0, t) ) 
-					Q.push(rightIdx);
-				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, 0.0, t) ) 
-					Q.push(leftIdx);
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tmin, tmax, 0, t) ) 
+					Q.push(TraverseInfo(rightIdx, tmin, tmax));
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tmin, tmax, 0, t) ) 
+					Q.push(TraverseInfo(leftIdx, tmin, tmax));
 			}
 			else {
-				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, 0.0, t) ) 
-					Q.push(leftIdx);
-				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, 0.0, t) ) 
-					Q.push(rightIdx);
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tmin, tmax, 0, t) ) 
+					Q.push(TraverseInfo(leftIdx, tmin, tmax));
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tmin, tmax, 0, t) ) 
+					Q.push(TraverseInfo(rightIdx, tmin, tmax));
 			}
 		}
 	}

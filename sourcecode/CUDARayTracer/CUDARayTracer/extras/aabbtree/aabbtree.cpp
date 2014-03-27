@@ -482,7 +482,7 @@ inline float lambda(int NL, int NR, float PL, float PR) {
 // cost C of a complete tree approximated using the cost CV of subdividing the voxel V with a plane p
 inline float C(float PL, float PR, int NL, int NR) {
 	const float KT = 1.0;
-	const float KI = 2.5;//1.0;
+	const float KI = 1.25;//1.0;
 	return(lambda(NL, NR, PL, PR) * (KT + KI * (PL * NL + PR * NR)));
 }
 

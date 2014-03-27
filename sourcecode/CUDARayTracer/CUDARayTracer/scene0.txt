@@ -81,14 +81,14 @@ plane 0.0 -5.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray	# bottom
 #mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
 #mesh 10.0 -5.0 25.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj chessboard2d
 #mesh -12 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/teapot.obj yellowglass
-#mesh -12 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj marble3
-#mesh 0 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper_res3.obj yellowglass1
-#mesh 12 -10 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj wood
-#mesh 0 -10 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj whitejade metal
+mesh -12 -5 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj marble3
+#mesh 0 -9.5 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper_res3.obj yellowglass1
+mesh 12 -5 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj wood
+mesh 0 -5 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj metal
 #mesh 0 -5 20 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/avent/Avent.obj jade
 #mesh 0 0 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj whitejade
 #mesh 0 -2.5 35 2.5 2.5 2.5 0.0 1.51 0.0 ./meshes/dabrovic-sponza/sponza.obj whitejade
-mesh -742.5 22 260 1 1 1 1.68 3.14 0 ./meshes/T000/T000.obj whitejade
+#mesh -742.5 22 260 1 1 1 1.68 3.14 0 ./meshes/T000/T000.obj whitejade
 #mesh 0 -2.5 35 .1 .1 .1 0.0 1.51 0.0 ./meshes/lost-empire/lost_empire.obj whitejade
 #mesh 0 -1 35 .8 .8 .8 0.0 0.0 0.0 ./meshes/bigguy2.obj lightgray
 #sphere 10.0 0.0 25.5 4.0 4.0 4.0 0.0 0.0 0.0 jade

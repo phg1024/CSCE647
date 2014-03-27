@@ -775,7 +775,7 @@ void display()
 
 void clearColor() {
 	dim3 block(32, 32, 1);
-	dim3 grid(window_width / block.x, window_height / block.y, 1);
+	dim3 grid(ceil(window_width / (float)block.x), ceil(window_height / (float)block.y), 1);
 	clearCumulatedColor<<<grid,block>>>(cumulatedColor, window_width, window_height);
 	iterations = 0;
 	cudaThreadSynchronize();
