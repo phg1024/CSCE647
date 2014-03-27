@@ -54,7 +54,13 @@ public:
 		return (v0 + v1 + v2) * inv3;
 	}
 	bool intersectionTest(const float3& origin, const float3& dest, float &t) {
+		// not implemented here
 		return true;
+	}
+
+	float area() {
+		float3 e1 = v1-v0, e2 = v2-v0;
+		return 0.5 * length(cross(e1, e2));
 	}
 
 	float3 v0, v1, v2;
@@ -90,6 +96,18 @@ public:
 		}
 	}
 
+	// clip a triangle's bounding box
+	AABB clip(const Triangle& tri) const {
+		AABB bb(tri);
+		bb.minPt = fmaxf(minPt, bb.minPt);
+		bb.maxPt = fminf(maxPt, bb.maxPt);
+		return bb;
+	}
+
+	bool isPlanar() const {
+		return minPt.x == maxPt.x || minPt.y == maxPt.y || minPt.z == maxPt.z;
+	}
+
 	/// @brief intersection test with a finite length ray
 	bool intersectTest(const float3& orig, const float3& dir, const float3& invDir);
 
@@ -97,15 +115,36 @@ public:
 		return (&(maxPt - minPt).x)[axis];
 	}
 
+	float surfaceArea() const {
+		float3 r = range();
+		return 2.0 * (r.x * r.y + r.y * r.z + r.z * r.x);
+	}
+
 	float3 range() const {
 		return maxPt - minPt;
+	}
+	float range(int axis) const {
+		return (&(maxPt - minPt).x)[axis];
+	}
+
+	float minPos(int axis) const {
+		return (&(minPt.x))[axis];
+	}
+	float maxPos(int axis) const {
+		return (&(maxPt.x))[axis];
+	}
+	float& minPos(int axis) {
+		return (&(minPt.x))[axis];
+	}
+	float& maxPos(int axis) {
+		return (&(maxPt.x))[axis];
 	}
 
 	float3 minPt;
 	float3 maxPt;
 };
 
-static const int MAX_TRIS_PER_NODE = 4;
+static const int MAX_TRIS_PER_NODE = 8;
 
 struct AABBNode_Serial {
 	enum NodeType {
@@ -176,6 +215,42 @@ struct AABBNode
 	AABBNode* rightChild;
 };
 
+struct SplittingPlane {
+	SplittingPlane(){}
+	SplittingPlane(int axis, float pe):axis(axis), pe(pe){}
+
+	bool operator==(const SplittingPlane& sp) { return (axis == sp.axis) && (pe == sp.pe); }
+
+	int axis;
+	float pe;
+};
+
+enum PlaneSide { Left = -1, Right = 1 };
+
+struct SplitEvent {
+	enum Type {
+		EndingOnPlane = 0,// primitive lying entirely to the right of the splitting plane
+		LyingOnPlane = 1,			// primitive lying on exactly on the plane
+		StartingOnPlane = 2,	// primitive lying entirely to the left of the splitting plane
+	};
+
+	SplittingPlane p;
+	Type type;
+	Triangle t;
+
+	SplitEvent(){}
+	SplitEvent(const Triangle& t, int axis, float ee, Type type):
+		t(t), type(type)
+	{
+		p = SplittingPlane(axis, ee);
+	}
+
+	bool operator<(const SplitEvent& e) {
+		return (p.pe < e.p.pe) || (p.pe == e.p.pe && type < e.type);
+	}
+};
+
+
 class AABBTree : public Tree<AABBNode>
 {
 public:
@@ -190,7 +265,13 @@ public:
 
 private:
 	AABBNode* buildAABBTree(const vector<Triangle>& tris, int level=0);
-	void releaseTree(AABBNode* node);
+
+	void SAH(const SplittingPlane& p, const AABB& V, int NL, int NR, int NP, float& CP, PlaneSide& pside);
+	AABBNode* buildAABBTree_SAH(const vector<Triangle>& inTris, const SplittingPlane& pprev, int level=0);
+	void findBestPlane(	const vector<Triangle>& T, const AABB& V, SplittingPlane& p, float& Cp, PlaneSide& pside);
+	void splitVoxel( const AABB& V, const SplittingPlane& p, AABB& VL, AABB& VR );
+	void sortTrianglesToVoxel( const vector<Triangle>& T, const SplittingPlane& p, const PlaneSide& pside, 
+		vector<Triangle>& TL, vector<Triangle>& TR );
 
 	size_t nodeCount[3];
 	size_t nodeCountLevel[128];
@@ -200,6 +281,8 @@ private:
 	// non-copyable
 	AABBTree(const AABBTree&);
 	AABBTree& operator=(const AABBTree&);
+
+	void releaseTree(AABBNode* node);
 };
 
 }

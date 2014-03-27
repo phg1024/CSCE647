@@ -57,8 +57,14 @@ void Scene::parse(const string& line)
 			envmap = loadTexture(texFile.c_str(), texs);
 		}
 	}
+	else if( tag == "maxiters" ) {
+		ss >> maxiters;
+	}
+	else if( tag == "canvas" ) {
+		ss >> w >> h;
+	}
 	else if( tag == "camera" ) {
-		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.w >> cam.h;
+		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov;
 		cam.dir = cam.dir.normalized();
 		cam.up = cam.up.normalized();
 	}

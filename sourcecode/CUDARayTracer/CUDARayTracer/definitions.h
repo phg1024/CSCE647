@@ -13,6 +13,8 @@ public:
     vec3 up, dir, right;
 
     float f;		// focal length
+	float fov;
+
     float w, h;		// canvas size
 
 	float apertureRadius;

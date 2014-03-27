@@ -33,10 +33,18 @@ public:
 	const int getEnvironmentMap() const {
 		return envmap;
 	}
+
+	int width() const { return w; }
+	int height() const { return h; }
+	int maxIters() const { return maxiters; }
+
 protected:
 	void parse(const string& line);
 
 private:
+	int maxiters;
+	int w, h;
+
 	Camera cam;
 	vector<Shape> shapes;
 	vector<Material> materials;

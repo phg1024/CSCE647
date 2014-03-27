@@ -115,7 +115,11 @@ AABBTree::AABBTree(const vector<Triangle>& tris)
 	memset(nodeCountLevel, 0, sizeof(size_t)*128);
 	maxDepth = 0;
     cout << "building AABB tree ..." << endl;
+#if 1
     mRoot = buildAABBTree(tris);
+#else
+	mRoot = buildAABBTree_SAH(tris, SplittingPlane());
+#endif
     cout << "AABB tree built." << endl;
 }
 
@@ -243,6 +247,17 @@ AABBNode* AABBTree::buildAABBTree(const vector<Triangle>& inTris, int level)
 		node->ntris = 0;
 		node->aabb = AABB(&(tris[0]), tris.size());
 
+		if( level == 0 ) {
+			// top level bounding box
+			cout << node->aabb.minPt.x << ", "
+				<< node->aabb.minPt.y << ", "
+				<< node->aabb.minPt.z << "; " 
+				<< node->aabb.maxPt.x << ", "
+				<< node->aabb.maxPt.y << ", "
+				<< node->aabb.maxPt.z
+				<< endl;
+		}
+
 		// sort the pairs along the longest axis
 		float3 ranges = node->aabb.range();
 
@@ -284,6 +299,214 @@ AABBNode* AABBTree::buildAABBTree(const vector<Triangle>& inTris, int level)
 		node->rightChild = buildAABBTree(rightSet, level+1);
 
 		return node;
+	}
+}
+
+// build a tree with surface area heuristics
+AABBNode* AABBTree::buildAABBTree_SAH(const vector<Triangle>& inTris, const SplittingPlane& pprev, int level )
+{
+	// some constants
+	const float minCv = 6.0;
+	const float Ci = 1.0, Cs = 3.0;
+
+	auto tris = inTris;
+	if( tris.empty() ) return nullptr;
+	// build an AABB Tree from a triangle mesh
+
+	// for all faces in the indices set, compute their centers
+	// also get the AABB of these faces
+
+	AABBNode* node = new AABBNode;
+	nodeCountLevel[level]++;
+	maxDepth = max(level, maxDepth);
+
+	// best cost for this node
+	float Cp;
+	SplittingPlane p;
+	PlaneSide pside;
+
+	AABB bb(&tris[0], tris.size());
+	findBestPlane(tris,  bb, p, Cp, pside);
+
+	if( tris.size() < MAX_TRIS_PER_NODE || Cp < Ci*tris.size() || p == pprev )
+	{
+		if( tris.size() < MAX_TRIS_PER_NODE ) {
+			// create a leaf node
+			nodeCount[2]++;
+			node->type = AABBNode_Serial::LEAF_NODE;
+
+			for(int i=0;i<tris.size();i++) {
+				node->tri[i] = tris[i];
+			}
+			node->ntris = tris.size();
+			node->aabb = AABB(&(tris[0]), tris.size());
+			node->leftChild = nullptr;
+			node->rightChild = nullptr;
+			return node;
+		}
+		else {
+			// build a naive tree instead
+			return buildAABBTree(tris, level);
+		}
+	}
+	else {
+		AABB bbl, bbr;
+		splitVoxel(bb, p, bbl, bbr);
+		vector<Triangle> leftSet, rightSet;
+		sortTrianglesToVoxel(tris, p, pside, leftSet, rightSet);
+
+		// create an internal node
+
+		nodeCount[1]++;
+		node->type = AABBNode_Serial::INTERNAL_NODE;
+		node->ntris = 0;
+		node->aabb = bb;
+
+		// sort the pairs along the longest axis
+		float3 ranges = node->aabb.range();
+		
+		node->leftChild = buildAABBTree_SAH(leftSet, p, level+1);
+		node->rightChild = buildAABBTree_SAH(rightSet, p, level+1);
+
+		return node;
+	}
+}
+
+void AABBTree::findBestPlane(const vector<Triangle>& T, const AABB& V, SplittingPlane& p_est, float& C_est, PlaneSide& pside_est)
+{
+	C_est = numeric_limits<float>::max();
+
+	for(int axis=0;axis<3;axis++) {
+		vector<SplitEvent> events;
+		events.reserve(T.size()*2);
+
+		for(int i=0;i<T.size();++i) {
+			auto ti = T[i];
+			AABB tibb = V.clip(ti);
+
+			if(tibb.isPlanar()) {
+				events.push_back(SplitEvent(ti, axis, tibb.minPos(axis), SplitEvent::LyingOnPlane));
+			}
+			else {
+				events.push_back(SplitEvent(ti, axis, tibb.minPos(axis), SplitEvent::StartingOnPlane));
+				events.push_back(SplitEvent(ti, axis, tibb.maxPos(axis), SplitEvent::EndingOnPlane));
+			}
+		}
+
+		// sort the events
+		sort(events.begin(), events.end());
+
+		// test every candidate plane
+		int NL = 0, NP = 0, NR = T.size();
+		for(int i=0;i<events.size();++i) {
+			auto p = events[i].p;
+			
+			int tLyingOnPlane = 0, tEndingOnPlane=0, tStartingOnPlane=0;
+			while( i<events.size() && events[i].p.pe == p.pe && events[i].type == SplitEvent::EndingOnPlane ) {
+				++tEndingOnPlane;
+				i++;
+			}
+			while( i<events.size() && events[i].p.pe == p.pe && events[i].type == SplitEvent::LyingOnPlane ) {
+				++tLyingOnPlane;
+				i++;
+			}
+			while( i<events.size() && events[i].p.pe == p.pe && events[i].type == SplitEvent::StartingOnPlane ) {
+				++tStartingOnPlane;
+				i++;
+			}
+
+			NP = tLyingOnPlane;
+			NR -= tLyingOnPlane;
+			NR -= tEndingOnPlane;
+
+			float C;
+			PlaneSide ps;
+			SAH(p, V, NL, NR, NP, C, ps);
+
+			if(C < C_est) {
+				C_est = C;
+				p_est = p;
+				pside_est = ps;
+			}
+			NL += tStartingOnPlane;
+			NL += tLyingOnPlane;
+			NP = 0;
+		}
+	}
+}
+
+void AABBTree::splitVoxel(const AABB& V, const SplittingPlane& p, AABB& VL, AABB& VR)
+{
+	VL = V;
+	VR = V;
+	VL.maxPos(p.axis) = p.pe;
+	VR.minPos(p.axis) = p.pe;
+}
+
+void AABBTree::sortTrianglesToVoxel(const vector<Triangle>& T, const SplittingPlane& p, const PlaneSide& pside, vector<Triangle>& TL, vector<Triangle>& TR)
+{
+	for(int i=0;i<T.size();++i) {
+		AABB tbox(T[i]);
+
+		// the triangle is on the splitting plane exactly
+		if(tbox.minPos(p.axis) == p.pe && tbox.maxPos(p.axis) == p.pe) {
+			if(pside == PlaneSide::Left)
+				TL.push_back(T[i]);
+			else if(pside == PlaneSide::Right)
+				TR.push_back(T[i]);
+		} else {
+			if(tbox.minPos(p.axis) < p.pe)
+				TL.push_back(T[i]);
+			if(tbox.maxPos(p.axis) > p.pe)
+				TR.push_back(T[i]);
+		}
+	}
+}
+
+// probability of hitting the subvoxel Vsub given that the voxel V was hit
+inline float P_Vsub_given_V(const AABB& Vsub, const AABB& V) {
+	float SA_Vsub = Vsub.surfaceArea();
+	float SA_V = V.surfaceArea();
+	return(SA_Vsub/SA_V);
+}
+
+// bias for the cost function s.t. it is reduced if NL or NR becomes zero
+inline float lambda(int NL, int NR, float PL, float PR) {
+	if((NL == 0 || NR == 0) &&
+		!(PL == 1 || PR == 1) // NOT IN PAPER
+		)
+		return 0.8f;
+	return 1.0f;
+}
+
+// cost C of a complete tree approximated using the cost CV of subdividing the voxel V with a plane p
+inline float C(float PL, float PR, int NL, int NR) {
+	const float KT = 1.0;
+	const float KI = 2.5;//1.0;
+	return(lambda(NL, NR, PL, PR) * (KT + KI * (PL * NL + PR * NR)));
+}
+
+void AABBTree::SAH(const SplittingPlane& p, const AABB& V, int NL, int NR, int NP, float& CP, PlaneSide& pside)
+{
+	CP = numeric_limits<float>::max();
+	AABB VL, VR;
+	splitVoxel(V, p, VL, VR);
+	float PL, PR;
+	PL = P_Vsub_given_V(VL, V);
+	PR = P_Vsub_given_V(VR, V);
+	if(PL == 0 || PR == 0) // NOT IN PAPER
+		return;
+	if(V.range(p.axis) == 0) // NOT IN PAPER
+		return;
+	float CPL, CPR;
+	CPL = C(PL, PR, NL + NP, NR);
+	CPR = C(PL, PR, NL, NP + NR );
+	if(CPL < CPR) {
+		CP = CPL;
+		pside = PlaneSide::Left;
+	} else {
+		CP = CPR;
+		pside = PlaneSide::Right;
 	}
 }
 

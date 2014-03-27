@@ -65,9 +65,9 @@ using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
 // constants
-unsigned int edgeX = 8, edgeY = 8;
-unsigned int window_width  = 800;
-unsigned int window_height = 600;
+//unsigned int edgeX = 8, edgeY = 8;
+unsigned int window_width  = 640;
+unsigned int window_height = 480;
 
 GLFWwindow* window;
 MouseState mouseState;
@@ -198,6 +198,7 @@ void init_scene()
 	}
 
 	cam = scene.camera();
+	glfwSetWindowSize(window, scene.width(), scene.height());
 
 	cudaMalloc((void**)&d_cam, sizeof(Camera));
 	cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice);
@@ -510,8 +511,11 @@ void resize(GLFWwindow* window, int w, int h) {
 	cout << w << "x" << h << " vs " << window_width << "x" << window_height << endl;
 	if( w == window_width && h == window_height ) return;	// no need to change anything
 	window_width = w, window_height = h;
+
 	// camera
-	cam.h = h / (float) w;
+	cam.h = atan(0.5 * cam.fov / 180.0 * MathUtils::PI) * cam.f;
+	cam.w = w / (float)h * cam.h;
+
 
 	createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
 	showCUDAMemoryUsage();

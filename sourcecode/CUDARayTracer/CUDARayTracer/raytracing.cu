@@ -80,13 +80,7 @@ __global__ void bindTexture2(const cudaTextureObject_t *texs, int texCount) {
 	}
 }
 
-__device__ bool lightRayIntersectsBoundingBox( Ray r, BoundingBox bb ) {
-	float3 rdirinv = 1.0 / r.dir;
-	
-	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
-	rdirinv.y = (r.dir.y==0)?FLT_MAX:rdirinv.y;
-	rdirinv.z = (r.dir.z==0)?FLT_MAX:rdirinv.z;
-	
+__device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, BoundingBox bb, float t0 = 0.0, float t1 = FLT_MAX ) {
 	float tmin, tmax;
 
 	float l1   = (bb.minPt.x - r.origin.x) * rdirinv.x;
@@ -104,19 +98,11 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, BoundingBox bb ) {
 	tmin = fmaxf(fminf(l1,l2), tmin);
 	tmax = fminf(fmaxf(l1,l2), tmax);
 
-	return ((tmax >= tmin) && (tmax >= 0.0f));
+	return ((tmax >= tmin) && (tmax >= t0) && tmin < t1);
 }
 
-__device__ bool lightRayIntersectsBoundingBox( Ray r, const aabbtree::AABB& bb ) {
+__device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, const aabbtree::AABB& bb, float t0 = 0.0, float t1 = FLT_MAX ) {
 #if 1
-	float3 rdirinv = 1.0 / r.dir;
-	
-	/*
-	rdirinv.x = (r.dir.x==0)?FLT_MAX:rdirinv.x;
-	rdirinv.y = (r.dir.y==0)?FLT_MAX:rdirinv.y;
-	rdirinv.z = (r.dir.z==0)?FLT_MAX:rdirinv.z;
-	*/
-	
 	float tmin, tmax;
 
 	float l1   = (bb.minPt.x - r.origin.x) * rdirinv.x;
@@ -134,7 +120,7 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, const aabbtree::AABB& bb )
 	tmin = fmaxf(fminf(l1,l2), tmin);
 	tmax = fminf(fmaxf(l1,l2), tmax);
 
-	return ((tmax >= tmin) && (tmax >= 0.0f));
+	return ((tmax >= tmin) && (tmax >= t0) && tmin < t1);
 #else
 	float3 rdirinv = 1.0 / r.dir;
 	
@@ -430,7 +416,7 @@ __device__ float lightRayIntersectsCone(Ray r, d_Shape* shapes, int sid) {
 }
 
 __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int sid) {
-	if( !lightRayIntersectsBoundingBox(r, shapes[sid].bb ) ) return -1.0;
+	if( !lightRayIntersectsBoundingBox(r, 1.0/r.dir, shapes[sid].bb ) ) return -1.0;
 
 	float3 pq = shapes[sid].p - r.origin;
 	float a = dot(r.dir, mul(shapes[sid].m, r.dir));
@@ -573,8 +559,8 @@ __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, floa
 	return bcoord;
 }
 
-__device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Serial& node, aabbtree::Triangle& tri, float3& bcoords) {
-	float t = FLT_MAX;	
+__device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Serial& node, aabbtree::Triangle& tri, float3& bcoords, float tmax = FLT_MAX) {
+	float t = tmax;	
 	int hitIdx = -1;
 	// leaf node, test all primitives
 	for(int i=0;i<node.ntris;i++) {
@@ -601,9 +587,9 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 	float t = FLT_MAX;
 	bool hashit = false;
 
-	device::stack<int, 32> Q;
-	Q.clear();
+	float3 rdirinv = 1.0 / r.dir;
 
+	device::stack<int, 16> Q;
 	Q.push(0);
 
 	while( !Q.empty() ) {
@@ -613,7 +599,7 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 			float tmp;
 			aabbtree::Triangle tmptri;
 			float3 tmpbc;
-			tmp = lightRayIntersectsTriangles(r, node, tmptri, tmpbc);
+			tmp = lightRayIntersectsTriangles(r, node, tmptri, tmpbc, t);
 			if( tmp > 0 && tmp < t ) {
 				t = tmp;
 				tri = tmptri;
@@ -624,10 +610,22 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 		else if( node.type == aabbtree::AABBNode_Serial::INTERNAL_NODE ) {
 			// push children to the stack
 			int leftIdx = node.leftChild, rightIdx = node.rightChild;
-			if( lightRayIntersectsBoundingBox(r, tree[rightIdx].aabb) ) 
-				Q.push(rightIdx);
-			if( lightRayIntersectsBoundingBox(r, tree[leftIdx].aabb) ) 
-				Q.push(leftIdx);
+
+			float dl = dot(0.5 * (tree[leftIdx].aabb.minPt + tree[leftIdx].aabb.maxPt) - r.origin, r.dir);
+			float dr = dot(0.5 * (tree[rightIdx].aabb.minPt + tree[rightIdx].aabb.maxPt) - r.origin, r.dir);
+			
+			if( dl < dr ) {
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, 0.0, t) ) 
+					Q.push(rightIdx);
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, 0.0, t) ) 
+					Q.push(leftIdx);
+			}
+			else {
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, 0.0, t) ) 
+					Q.push(leftIdx);
+				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, 0.0, t) ) 
+					Q.push(rightIdx);
+			}
 		}
 	}
 
@@ -653,7 +651,7 @@ __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tr
 	if( node.type == aabbtree::AABBNode_Serial::EMPTY_NODE ) return -1.0;
 
 	float t = FLT_MAX;
-	if( !lightRayIntersectsBoundingBox(r, bb) ) return -1.0;
+	if( !lightRayIntersectsBoundingBox(r, 1.0/r.dir, bb) ) return -1.0;
 
 	if( node.type == aabbtree::AABBNode_Serial::INTERNAL_NODE )
 	{			
@@ -710,7 +708,7 @@ __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tr
 __device__ float lightRayIntersectsMesh(Ray r, d_Shape* shapes, int sid, int& fid, float3& bcoords) {
 	const d_Shape& sp = shapes[sid];
 
-	if( !lightRayIntersectsBoundingBox(r, sp.bb) ) return -1.0;
+	if( !lightRayIntersectsBoundingBox(r, 1.0/r.dir, sp.bb) ) return -1.0;
 	
 	bool hit = false;
 	float t = FLT_MAX;

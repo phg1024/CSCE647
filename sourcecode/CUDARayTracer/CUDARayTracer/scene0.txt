@@ -1,4 +1,6 @@
-camera 0 5 70 0 -2.5 -15 0 15 -2.5 0.75 1.0 0.75
+canvas 800 600
+maxiters 1024
+camera 0 0 70 0 0 -15 0 15 0 1.0 60.0
 # material	name type	emis	amb		diff	spec	Ks Kr Kf	shininess	ior	kcool			kwarm			alpha	beta	diffusetex		solidtexflag		normaltex
 material light0 emissive 0.25 0.25 0.25 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material light1 emissive 0.5 0.5 0.5 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
@@ -21,7 +23,7 @@ material whitejade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .96 .96 .96 1.0 1.0 
 material bluejade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .85 .9 .98 1.0 1.0 1.0 3.0 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material yellowjade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .98 .98 .1 1.0 1.0 1.0 2.0 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material redjade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .98 .7 .7 1.0 1.0 1.0 1.05 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
-material redglass refractive 0.5 0 0	0.1 0 0	.99 .75 .75	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material redglass refractive 0.1 0 0	0.1 0 0	.99 .75 .75	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material yellowglass0 refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.005 		50 			1.15 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material yellowglass1 refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.1 		50 			1.15 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material yellowglass2 refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.5 		50 			1.15 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
@@ -43,7 +45,8 @@ material glossygray glossy 0.0 0.0 0.0	0.075 0.185 0.25	0.5 0.5 0.5 1.0 1.0 1.0 
 #environment ./textures/room.jpg
 # shape Tx Ty Tz Sx Sy Sz Rx Ry Rz material
 sphere -40.0 80 40 50 50 50 0.753 0.753 0.0 light2
-#sphere 0 10 75 15 15 4.5 0 0 0 light2
+sphere 0 10 70 0.15 .15 .15 0 0 0 light1
+#sphere 0 10 85 15 15 4.5 0 0 0 light1
 #sphere -2.0 10 70 2 2 2 0.753 0.753 0.0 light2
 #sphere -40.0 40.75 40.0 5.5 5.5 5.5 0.753 0.753 0.0 light3
 #sphere 15.0 15.75 15.0 .5 .5 .5 0.753 0.753 0.0 light4
@@ -60,7 +63,7 @@ sphere 40.0 40.75 44.0 5.5 5.5 5.5 0.753 0.753 0.0 light1
 #plane 0.0 15.0 -10.0 20.0 15.0 20.0 1.57 0.0 0.0 julia2d
 #plane 0.0 39.5 0.0 10.0 10.0 10.0 0.0 0.0 0.0 light4		# top light
 #plane 0.0 40.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 lightgray		# top
-plane 0.0 -10.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray	# bottom
+plane 0.0 -5.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray	# bottom
 #plane -30.0 0.0 0.0 80.0 80.0 80.0 0.0 0.0 1.571 red			# left
 #plane 30.0 0.0 0.0 80.0 80.0 80.0 0.0 0.0 -1.571 green		# right
 #plane 0.0 0.0 -40.0 80.0 80.0 80.0 1.571.0 0.0 0.0 lightgray	# back
@@ -74,17 +77,18 @@ plane 0.0 -10.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray	# bottom
 #sphere 9.0 8.125 25.5 .625 .625 .625 0.0 0.0 0.0 redjade
 #sphere 9.0 9.0625 25.5 .3125 .3125 .3125 0.0 0.0 0.0 redjade
 # other stuff
-#mesh -7.5 -5.0 25.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj redglass
+#mesh -7.5 -5.0 25.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj bluejade
 #mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
 #mesh 10.0 -5.0 25.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj chessboard2d
 #mesh -12 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/teapot.obj yellowglass
-mesh -12 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellow marble3
-#mesh 0 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellowglass1
+#mesh -12 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj marble3
+#mesh 0 -10 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper_res3.obj yellowglass1
 #mesh 12 -10 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj wood
-mesh 0 -10 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj whitejade metal
-#mesh 0 -10 35 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/avent/Avent.obj jade
+#mesh 0 -10 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj whitejade metal
+#mesh 0 -5 20 5.0 5.0 5.0 0.0 0.753 0.0 ./meshes/avent/Avent.obj jade
 #mesh 0 0 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj whitejade
 #mesh 0 -2.5 35 2.5 2.5 2.5 0.0 1.51 0.0 ./meshes/dabrovic-sponza/sponza.obj whitejade
+mesh -742.5 22 260 1 1 1 1.68 3.14 0 ./meshes/T000/T000.obj whitejade
 #mesh 0 -2.5 35 .1 .1 .1 0.0 1.51 0.0 ./meshes/lost-empire/lost_empire.obj whitejade
 #mesh 0 -1 35 .8 .8 .8 0.0 0.0 0.0 ./meshes/bigguy2.obj lightgray
 #sphere 10.0 0.0 25.5 4.0 4.0 4.0 0.0 0.0 0.0 jade
