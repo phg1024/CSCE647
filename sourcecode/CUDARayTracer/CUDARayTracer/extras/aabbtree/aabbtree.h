@@ -18,34 +18,41 @@ public:
 	typedef float3 vert_t;
 	__host__ __device__ Triangle(){}
 	Triangle(
-		float3 v0, float3 v1, float3 v2, 
-		float3 n0 = zero3, float3 n1 = zero3, float3 n2 = zero3,
-		float2 t0 = zero2, float2 t1 = zero2, float2 t2 = zero2):
-	v0(v0), v1(v1), v2(v2),
-	n0(n0), n1(n1), n2(n2),
-	t0(t0), t1(t1), t2(t2)
+		unsigned int idx,
+		float3 v0, float3 v1, float3 v2//, 
+		//float3 n0 = zero3, float3 n1 = zero3, float3 n2 = zero3,
+		//float2 t0 = zero2, float2 t1 = zero2, float2 t2 = zero2
+		):
+	idx(idx),
+	v0(v0), v1(v1), v2(v2)//,
+	//n0(n0), n1(n1), n2(n2),
+	//t0(t0), t1(t1), t2(t2)
 	{}
 	__host__ __device__ Triangle(const Triangle& tri):
-		v0(tri.v0), v1(tri.v1), v2(tri.v2),
-		n0(tri.n0), n1(tri.n1), n2(tri.n2),
-		t0(tri.t0), t1(tri.t1), t2(tri.t2)
+		idx(tri.idx),
+		v0(tri.v0), v1(tri.v1), v2(tri.v2)//,
+		//n0(tri.n0), n1(tri.n1), n2(tri.n2),
+		//t0(tri.t0), t1(tri.t1), t2(tri.t2)
 	{}
 	__host__ __device__ Triangle(const Triangle&& tri):
-		v0(tri.v0), v1(tri.v1), v2(tri.v2),
-		n0(tri.n0), n1(tri.n1), n2(tri.n2),
-		t0(tri.t0), t1(tri.t1), t2(tri.t2)
+		idx(tri.idx),
+		v0(tri.v0), v1(tri.v1), v2(tri.v2)//,
+		//n0(tri.n0), n1(tri.n1), n2(tri.n2),
+		//t0(tri.t0), t1(tri.t1), t2(tri.t2)
 	{}
 	
 	__host__ __device__ Triangle& operator=(const Triangle& tri) {
+		idx = tri.idx;
 		v0 = tri.v0; v1 = tri.v1; v2 = tri.v2;
-		n0 = tri.n0; n1 = tri.n1; n2 = tri.n2;
-		t0 = tri.t0; t1 = tri.t1; t2 = tri.t2;
+		//n0 = tri.n0; n1 = tri.n1; n2 = tri.n2;
+		//t0 = tri.t0; t1 = tri.t1; t2 = tri.t2;
 		return (*this);
 	}
 	__host__ __device__ Triangle& operator=(Triangle&& tri) {
+		idx = tri.idx;
 		v0 = tri.v0; v1 = tri.v1; v2 = tri.v2;
-		n0 = tri.n0; n1 = tri.n1; n2 = tri.n2;
-		t0 = tri.t0; t1 = tri.t1; t2 = tri.t2;
+		//n0 = tri.n0; n1 = tri.n1; n2 = tri.n2;
+		//t0 = tri.t0; t1 = tri.t1; t2 = tri.t2;
 		return (*this);
 	}
 
@@ -63,9 +70,10 @@ public:
 		return 0.5 * length(cross(e1, e2));
 	}
 
+	unsigned int idx;
 	float3 v0, v1, v2;
-	float3 n0, n1, n2;
-	float2 t0, t1, t2;
+	//float3 n0, n1, n2;
+	//float2 t0, t1, t2;
 };
 
 struct AABB
@@ -81,7 +89,7 @@ public:
 	}
 
 	AABB(const Triangle& tri) {
-		const float3 bias = make_float3(1e-3);
+		const float3 bias = make_float3(1e-6);
 		minPt = fminf(fminf(tri.v0, tri.v1), tri.v2)-bias;
 		maxPt = fmaxf(fmaxf(tri.v0, tri.v1), tri.v2)+bias;
 	}
@@ -144,7 +152,7 @@ public:
 	float3 maxPt;
 };
 
-static const int MAX_TRIS_PER_NODE = 8;
+static const int MAX_TRIS_PER_NODE = 4;
 
 struct AABBNode_Serial {
 	enum NodeType {
@@ -176,7 +184,7 @@ struct AABBNode_Serial {
 
 	NodeType type;
 	unsigned char ntris;	
-	Triangle tri[MAX_TRIS_PER_NODE];	
+	unsigned int tri[MAX_TRIS_PER_NODE];	
 	int leftChild;
 	int rightChild;
 	AABB aabb;
@@ -199,7 +207,7 @@ struct AABBNode
 		AABBNode_Serial n;
 		n.type = type;
 		n.aabb = aabb;
-		memcpy(&(n.tri[0]), tri, sizeof(Triangle)*MAX_TRIS_PER_NODE);
+		memcpy(&(n.tri[0]), tri, sizeof(unsigned int)*MAX_TRIS_PER_NODE);
 		n.ntris = ntris;
 		n.leftChild = leftIdx;
 		n.rightChild = rightIdx;
@@ -208,7 +216,7 @@ struct AABBNode
 
 	NodeType type;
 	AABB aabb;
-	Triangle tri[MAX_TRIS_PER_NODE];
+	unsigned int tri[MAX_TRIS_PER_NODE];
 	int ntris;
 
 	AABBNode* leftChild;

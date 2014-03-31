@@ -243,176 +243,6 @@ __device__ float lightRayIntersectsPlane( Ray r, d_Shape* shapes, int sid ) {
     }
 }
 
-__device__ float lightRayIntersectsCylinder( Ray r, d_Shape* shapes, int sid ) {
-	float3 m = shapes[sid].p - r.origin;
-	float dDa = dot(r.dir, shapes[sid].axis[0]);
-	float mDa = dot(m, shapes[sid].axis[0]);
-	float a = dot(r.dir, r.dir) - dDa * dDa;
-	float b = mDa * dDa - dot(m, r.dir);
-	float c = dot(m, m) - mDa * mDa - shapes[sid].radius[0] * shapes[sid].radius[0];
-
-	// degenerate cases
-	if( abs(a) < 1e-6 ) {
-		if( abs(b) < 1e-6 ) {
-			return -1.0;
-		}
-		else {
-			float t = -c/b*0.5;
-			float3 p = t * r.dir + r.origin;
-			float3 pq = p - shapes[sid].p;
-			float hval = dot(pq, shapes[sid].axis[0]);
-
-			if( hval < 0 || hval > shapes[sid].radius[1] ) return t;
-			else return -1.0;
-		}
-	}
-
-    float delta = b*b - a*c;
-    if (delta < 0.0)
-    {
-		return -1.0;
-    }
-    else
-    {
-		delta = sqrt(delta);        
-		float inv = 1.0 / a;
-
-		float t0 = (-b-delta)*inv;
-		float t1 = (-b+delta)*inv;
-
-		float x0 = min(t0, t1);
-		float x1 = max(t0, t1);
-        
-		const float THRES = 1e-3;
-        {
-			// hit point
-			float3 p = x0 * r.dir + r.origin;
-			float3 pq = p - shapes[sid].p;
-			float hval = dot(pq, shapes[sid].axis[0]);
-
-			if( hval < 0 || hval > shapes[sid].radius[1] ) x0 = -1.0;
-			
-			p = x1 * r.dir + r.origin;
-			pq = p - shapes[sid].p;
-			float hval1 = dot(pq, shapes[sid].axis[0]);
-			if( hval1 < 0 || hval1 > shapes[sid].radius[1] ) x1 = -1.0;
-
-			// x0 and x1 are on cylinder surface
-			// find out the interscetion on caps
-
-			// top cap
-			// defined by p+radius[1]*axis[0] and axis[0]
-			float x2;
-			float3 top = shapes[sid].p + shapes[sid].radius[1] * shapes[sid].axis[0];
-		    pq = top - r.origin;
-			float ldotn = dot(shapes[sid].axis[0], r.dir);
-			if( abs(ldotn) < THRES ) x2 = -1.0;
-			else{
-				x2 = dot(shapes[sid].axis[0], pq) / ldotn;
-				p = x2 * r.dir + r.origin;
-				float hval = length(p - top);
-				if( hval > shapes[sid].radius[0] ) x2 = -1.0;
-			}
-
-			// bottom cap
-			// defined by p and -axis[0]
-			float x3;
-		    pq = shapes[sid].p - r.origin;
-			float ldotn2 = dot(-shapes[sid].axis[0], r.dir);
-			if( abs(ldotn2) < THRES ) x3 = -1.0;
-			else{
-				x3 = dot(-shapes[sid].axis[0], pq) / ldotn2;
-				p = x3 * r.dir + r.origin;
-				float hval = length(p - shapes[sid].p);
-				if( hval > shapes[sid].radius[0] ) x3 = -1.0;
-			}
-
-			float t = 1e10;
-			if( x0 > THRES ) t = x0;
-			if( x1 > THRES ) t = min(x1, t);
-			if( x2 > THRES ) t = min(x2, t);
-			if( x3 > THRES ) t = min(x3, t);
-			if( t >= 9e9 ) return -1.0;
-			else return t;
-		}
-    }
-}
-
-__device__ float lightRayIntersectsCone(Ray r, d_Shape* shapes, int sid) {
-	float3 m = shapes[sid].p - r.origin;
-	float cosTheta = cos(shapes[sid].radius[2]);
-	float dDa = dot(r.dir, shapes[sid].axis[0]);
-	float mDa = dot(m, shapes[sid].axis[0]);
-	float a = dot(r.dir, r.dir) * cosTheta * cosTheta - dDa*dDa;
-	float b = dDa * mDa - dot(m, r.dir) * cosTheta * cosTheta;
-	float c = dot(m, m) * cosTheta * cosTheta - mDa * mDa;
-
-	// degenerate case
-
-	if( abs(a) < 1e-6 ) {
-		if( abs(b) < 1e-6 ) {
-			// impossible
-			return -1.0;
-		}
-		else {
-			float t = -c/b*0.5;
-			float3 p = t * r.dir + r.origin;
-			float3 pq = p - shapes[sid].p;
-			float hval = dot(pq, shapes[sid].axis[0]);
-
-			if( hval < 0 || hval > shapes[sid].radius[1] ) return t;
-			else return -1.0;
-		}		
-	}
-
-    float delta = b*b - a*c;
-    if (delta < 0.0)
-    {
-		return -1.0;
-    }
-    else
-    {
-		delta = sqrt(delta);
-	        
-		float inv = 1.0 / a;
-
-		float x0 = (-b-delta)*inv;
-		float x1 = (-b+delta)*inv;
-
-		const float THRES = 1e-3;
-		// hit point
-		float3 p = x0 * r.dir + r.origin;
-		float3 pq = p - shapes[sid].p;
-		float hval = dot(pq, shapes[sid].axis[0]);
-		if( hval < 0 || hval > shapes[sid].radius[1] ) x0 = -1.0;
-
-		p = x1 * r.dir + r.origin;
-		pq = p - shapes[sid].p;
-		hval = dot(pq, shapes[sid].axis[0]);
-		if( hval < 0 || hval > shapes[sid].radius[1] ) x1 = -1.0;
-
-		// cap
-		float x2;
-		float3 top = shapes[sid].p + shapes[sid].radius[1] * shapes[sid].axis[0];
-		pq = top - r.origin;
-		float ldotn = dot(shapes[sid].axis[0], r.dir);
-		if( abs(ldotn) < 1e-6 ) x2 = -1.0;
-		else{
-			x2 = dot(shapes[sid].axis[0], pq) / ldotn;
-			p = x2 * r.dir + r.origin;
-			float hval = length(p - top);
-			if( hval > shapes[sid].radius[1] * tanf(shapes[sid].radius[2]) ) x2 = -1.0;
-		}
-
-		float t = 1e10;
-		if( x0 > THRES ) t = min(x0, t);
-		if( x1 > THRES ) t = min(x1, t);
-		if( x2 > THRES ) t = min(x2, t);
-		if( t > 9e9 ) t = -1.0;
-		return t;
-    }
-}
-
 __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int sid) {
 	if( !lightRayIntersectsBoundingBox(r, 1.0/r.dir, shapes[sid].bb ) ) return -1.0;
 
@@ -442,29 +272,6 @@ __device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int 
 		return t;
     }
 }
-
-__device__ void getTriangleVertices(int tid, int fid, float4 &v1, float4 &v2, float4 &v3) {
-	
-	int foffset = fid*3;
-	v1 = tex1D<float4>(tex[tid], foffset + 0.5);
-	v2 = tex1D<float4>(tex[tid], foffset + 1.5);
-	v3 = tex1D<float4>(tex[tid], foffset + 2.5);
-}
-
-__device__ void getTriangleNormals(int tid, int fid, float4 &n1, float4 &n2, float4 &n3) {
-	int foffset = fid*3;
-	n1 = tex1D<float4>(tex[tid], foffset + 0.5);
-	n2 = tex1D<float4>(tex[tid], foffset + 1.5);
-	n3 = tex1D<float4>(tex[tid], foffset + 2.5);
-}
-
-__device__ void getTriangleTextureCoords(int tid, int fid, float2 &t1, float2 &t2, float2 &t3) {
-	int foffset = fid*3;
-	t1 = tex1D<float2>(tex[tid], foffset);
-	t2 = tex1D<float2>(tex[tid], foffset+1);
-	t3 = tex1D<float2>(tex[tid], foffset+2);
-}
-
 
 __device__ float rayIntersectsTriangle(Ray r, float3 v0, float3 v1, float3 v2) {
 #if 0
@@ -537,8 +344,14 @@ __device__ float rayIntersectsTriangle(Ray r, float3 v0, float3 v1, float3 v2) {
 
 	bool hit = (u >= 0.0f && v >= 0.0f && (u + v) <= 1.0f);
 	const float EPS = 1e-3;
-	if( hit ) return t-EPS;
-	else return -1.0;
+	if( hit ){ 
+		//printf("hit\n"); 
+		return t-EPS; 
+	}
+	else{ 
+		//printf("no hit: u = %f, v = %f", u, v);
+		return -1.0; 
+	}
 #endif
 }
 
@@ -557,14 +370,18 @@ __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, floa
 	return bcoord;
 }
 
-__device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Serial& node, aabbtree::Triangle& tri, float3& bcoords, float tmin = 0.0, float tmax = FLT_MAX) {
+__device__ float lightRayIntersectsTriangles(Ray r, const TriangleMeshInfo& mesh, const aabbtree::AABBNode_Serial& node, int& tri, float tmin = 0.0, float tmax = FLT_MAX) {
 	float t = tmax;	
 	int hitIdx = -1;
 	// leaf node, test all primitives
 	for(int i=0;i<node.ntris;i++) {
-		const aabbtree::Triangle& trii = node.tri[i];
+		int trioffset = node.tri[i] * 3;
+		float4 v0, v1, v2;
+		v0 = mesh.faces[trioffset];
+		v1 = mesh.faces[trioffset+1];
+		v2 = mesh.faces[trioffset+2];
 
-		float tmp = rayIntersectsTriangle(r, trii.v0, trii.v1, trii.v2);
+		float tmp = rayIntersectsTriangle(r, tofloat3(v0), tofloat3(v1), tofloat3(v2));
 		if( tmp > tmin && tmp < t ) {
 			t = tmp;
 			hitIdx = i;
@@ -573,7 +390,6 @@ __device__ float lightRayIntersectsTriangles(Ray r, const aabbtree::AABBNode_Ser
 
 	if( hitIdx >= 0 ){
 		tri = node.tri[hitIdx];
-		bcoords = compute_barycentric_coordinates(r.origin + t * r.dir, tri.v0, tri.v1, tri.v2);				
 		return t;
 	}
 	else return -1.0;
@@ -586,15 +402,17 @@ struct TraverseInfo {
 	float tmin, tmax;
 };
 
-__device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_Serial* tree, int nidx, aabbtree::Triangle& tri, float3& bcoords) {
+__device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshInfo& mesh, int nidx, int& tri) {
 	typedef aabbtree::AABBNode_Serial& node_t;
+
+	aabbtree::AABBNode_Serial* tree = mesh.tree;
 
 	float t = FLT_MAX;
 	bool hashit = false;
 
 	float3 rdirinv = 1.0 / r.dir;
 
-	device::stack<TraverseInfo, 16> Q;
+	device::stack<TraverseInfo, 32> Q;
 	Q.push(TraverseInfo(0, 0, FLT_MAX));
 
 	float tmin, tmax;
@@ -605,13 +423,11 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 		if( node.type == aabbtree::AABBNode_Serial::LEAF_NODE ) {
 			// test intersection
 			float tmp;
-			aabbtree::Triangle tmptri;
-			float3 tmpbc;
-			tmp = lightRayIntersectsTriangles(r, node, tmptri, tmpbc, 0.0, t);
+			int tmptri;
+			tmp = lightRayIntersectsTriangles(r, mesh, node, tmptri, 0, t);
 			if( tmp > 0 && tmp < t ) {
 				t = tmp;
 				tri = tmptri;
-				bcoords = tmpbc;
 				hashit = true;
 			}
 		}
@@ -619,6 +435,7 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 			// push children to the stack
 			int leftIdx = node.leftChild, rightIdx = node.rightChild;
 
+#if 0
 			float dl = dot(0.5 * (tree[leftIdx].aabb.minPt + tree[leftIdx].aabb.maxPt) - r.origin, r.dir);
 			float dr = dot(0.5 * (tree[rightIdx].aabb.minPt + tree[rightIdx].aabb.maxPt) - r.origin, r.dir);
 			
@@ -634,6 +451,19 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 				if( lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tmin, tmax, 0, t) ) 
 					Q.push(TraverseInfo(rightIdx, tmin, tmax));
 			}
+#else
+			float tminL, tminR, tmaxL, tmaxR;
+			bool hitleft = lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tminL, tmaxL, 0, t);
+			bool hitright = lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tminR, tmaxR, 0, t);
+			if( hitleft && hitright ) {
+				if( tminL < tmaxL ) { Q.push(TraverseInfo(leftIdx, tminL, tmaxL)); Q.push(TraverseInfo(rightIdx, tminR, tmaxR)); }
+				else { Q.push(TraverseInfo(rightIdx, tminR, tmaxR)); Q.push(TraverseInfo(leftIdx, tminL, tmaxL)); }
+			}
+			else {
+				if( hitleft ) Q.push(TraverseInfo(leftIdx, tminL, tmaxL));
+				if( hitright ) Q.push(TraverseInfo(rightIdx, tminR, tmaxR));
+			}
+#endif
 		}
 	}
 
@@ -641,9 +471,10 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, aabbtree::AABBNode_
 	else return -1.0;
 }
 
-__device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tree, int nidx, aabbtree::Triangle& tri, float3& bcoords) {
+__device__ float lightRayIntersectsAABBTree(Ray r, const TriangleMeshInfo& mesh, int nidx, int& tri) {
 
 	// traverse the tree to look for a intersection
+	aabbtree::AABBNode_Serial* tree = mesh.tree;
 	aabbtree::AABBNode_Serial& node = tree[nidx];
 	BoundingBox bb;
 	bb.minPt = node.aabb.minPt;
@@ -665,18 +496,17 @@ __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tr
 	{			
 		bool hashit = false;
 		float tleft = -1.0, tright = -1.0;
-		aabbtree::Triangle trileft, triright;
-		float3 bcleft, bcright;
+		int trileft, triright;
 
 		if( node.leftChild != -1 )
 		{
 			//printf("try left @ %d\n", node.leftChild);
-			tleft = lightRayIntersectsAABBTree(r, tree, node.leftChild, trileft, bcleft);
+			tleft = lightRayIntersectsAABBTree(r, mesh, node.leftChild, trileft);
 		}
 		if( node.rightChild != -1 )
 		{
 			//printf("try right @ %d\n", node.rightChild);
-			tright = lightRayIntersectsAABBTree(r, tree, node.rightChild, triright, bcright);
+			tright = lightRayIntersectsAABBTree(r, mesh, node.rightChild, triright);
 		}
 
 		bool hitleft = tleft>0.0, hitright = tright>0.0;		
@@ -685,23 +515,19 @@ __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tr
 			if( hitleft && hitright ) {
 				if( tleft < tright ) {
 					tri = trileft;
-					bcoords = bcleft;
 					return tleft;
 				}
 				else {
 					tri = triright;
-					bcoords = bcright;
 					return tright;
 				}
 			}
 			else if( hitleft ) {
 				tri = trileft;
-				bcoords = bcleft;
 				return tleft;
 			}
 			else {
 				tri = triright;
-				bcoords = bcright;
 				return tright;
 			}
 		}
@@ -709,7 +535,7 @@ __device__ float lightRayIntersectsAABBTree(Ray r, aabbtree::AABBNode_Serial* tr
 	}
 	else
 	{
-		return lightRayIntersectsTriangles(r, node, tri, bcoords);
+		return lightRayIntersectsTriangles(r, mesh, node, tri);
 	}
 }
 
@@ -726,7 +552,10 @@ __device__ float lightRayIntersectsMesh(Ray r, d_Shape* shapes, int sid, int& fi
 
 	for(int i=0;i<sp.trimesh.nFaces;i++) {
 		float4 v1, v2, v3;
-		getTriangleVertices(sp.trimesh.faceTex, i, v1, v2, v3);
+		int offset = i*3;
+		v1 = sp.trimesh.faces[offset];
+		v2 = sp.trimesh.faces[offset+1];
+		v3 = sp.trimesh.faces[offset+2];
 
 		float tmp = rayIntersectsTriangle(r, tofloat3(v1), tofloat3(v2), tofloat3(v3));
 		if( tmp > 0.0 && tmp < t ) {
@@ -748,17 +577,12 @@ __device__  __forceinline__ float lightRayIntersectsShape(Ray r, d_Shape* shapes
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
 		return lightRayIntersectsPlane(r, shapes, sid);
-	case Shape::ELLIPSOID:
-	case Shape::HYPERBOLOID:
-	case Shape::HYPERBOLOID2:
-	case Shape::CYLINDER:
-	case Shape::CONE:
+	case Shape::QUADRATICS:
 		return lightRayIntersectsQuadraticSurface(r, shapes, sid);
 	case Shape::TRIANGLE_MESH:
-		aabbtree::Triangle tri;
-		float3 bcoords;
-		//return lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
-		return lightRayIntersectsAABBTree_Iterative(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+		int tri;
+		//return lightRayIntersectsAABBTree(r, shapes[sid].trimesh, 0, tri, bcoords);
+		return lightRayIntersectsAABBTree_Iterative(r, shapes[sid].trimesh, 0, tri);
 	default:
 		return -1.0;
 	}
@@ -1354,26 +1178,6 @@ __device__ __forceinline__ Ray generateRay(Camera* cam, float u, float v) {
 	return r;
 }
 
-// ray intersection test with shading computation
-__device__ Hit rayIntersectsSphere(Ray r, d_Shape* shapes, int nShapes, int sid) {
-	float ti = lightRayIntersectsSphere(r, shapes, sid);
-
-	if( ti > 0.0 ) {
-		Hit h;
-		h.t = ti;
-        // hit point
-        h.p = h.t * r.dir + r.origin;
-        // normal at hit point
-		h.n = normalize(h.p - shapes[sid].p);
-        // hack, move the point a little bit outer
-		h.p = shapes[sid].p + (shapes[sid].radius[0] + 1e-6) * h.n;
-        h.tex = spheremap(h.n);
-		h.objIdx = sid;
-        return h;
-    }
-	else return background();
-}
-
 __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, int sid) {
 	float ti = lightRayIntersectsPlane(r, shapes, sid);
 	if( ti > 0.0 ) {
@@ -1410,55 +1214,12 @@ __device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes
 		h.n = normalize(2.0 * mul(shapes[sid].m, (h.p - shapes[sid].p)) * shapes[sid].constant);
 
 		// apply normal map
-		
 		h.tex = spheremap(h.n);
 		
 		h.objIdx = sid;
         return h;
     }
 
-	else return background();
-}
-
-__device__ Hit rayIntersectsCone(Ray r, d_Shape* shapes, int nShapes, int sid) {
-	float ti = lightRayIntersectsCone(r, shapes, sid);
-	if( ti > 0.0 ) {
-		Hit h;
-		h.t = ti;
-		h.p = h.t * r.dir + r.origin;
-        float3 pq = h.p - shapes[sid].p;
-        float hval = dot(pq, shapes[sid].axis[0]);
-        // normal at hit point
-		if(fabsf(hval - shapes[sid].radius[1])<1e-4) 
-			h.n = shapes[sid].axis[0];
-		else 
-			h.n = normalize(cross(cross(shapes[sid].axis[0], pq), shapes[sid].axis[0]));
-
-        h.tex = make_float2(0, 0);
-		h.objIdx = sid;
-
-        return h;
-    }
-	else return background();
-}
-
-__device__ Hit rayIntersectsCylinder(Ray r, d_Shape* shapes, int nShapes, int sid) {
-	float ti = lightRayIntersectsCylinder(r, shapes, sid);
-	if( ti > 0.0 ) {
-		Hit h;
-		h.t = ti;
-        h.p = h.t * r.dir + r.origin;
-        float3 pq = h.p - shapes[sid].p;
-        float hval = dot(pq, shapes[sid].axis[0]);
-        // normal at hit point
-		h.n = normalize(pq - hval*shapes[sid].axis[0]);
-		if( fabsf(hval) < 1e-3 ) h.n = -shapes[sid].axis[0];
-		else if( fabsf(hval - shapes[sid].radius[1]) < 1e-3 ) h.n = shapes[sid].axis[0];
-        h.tex = make_float2(0, 0);
-		h.objIdx = sid;
-
-        return h;
-    }
 	else return background();
 }
 
@@ -1503,10 +1264,11 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 	}
 	else return background();
 #else
-	aabbtree::Triangle tri;
+	int tri;
 	float3 bcoords;
-	float ti = lightRayIntersectsAABBTree_Iterative(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
-	//float ti = lightRayIntersectsAABBTree(r, shapes[sid].trimesh.tree, 0, tri, bcoords);
+	const TriangleMeshInfo& mesh = shapes[sid].trimesh;
+	float ti = lightRayIntersectsAABBTree_Iterative(r, mesh, 0, tri);
+	//float ti = lightRayIntersectsAABBTree(r, shapes[sid].trimesh, 0, tri);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
@@ -1514,21 +1276,42 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 		// hit point
 		h.p = h.t * r.dir + r.origin;
 
+		float4 vm0, vm1, vm2;
+		int trioffset = tri * 3;
+		vm0 = mesh.faces[trioffset];
+		vm1 = mesh.faces[trioffset+1];
+		vm2 = mesh.faces[trioffset+2];
+
+		float3 v0 = tofloat3(vm0);
+		float3 v1 = tofloat3(vm1);
+		float3 v2 = tofloat3(vm2);
+		float3 bcoords = compute_barycentric_coordinates(h.p, v0, v1, v2);				
+
+
         // normal at hit point
-		if( shapes[sid].trimesh.normalTex == -1 ) {
-			h.n = normalize(cross(tri.v1-tri.v0, tri.v2-tri.v0));
+		if( mesh.normals == NULL ) {
+			h.n = normalize(cross(v1-v0, v2-v0));
 		}
 		else {			
-			h.n = bcoords.x * tri.n0 + bcoords.y * tri.n1 + bcoords.z * tri.n2;
+			float3 n0, n1, n2;
+			n0 = mesh.normals[trioffset];
+			n1 = mesh.normals[trioffset+1];
+			n2 = mesh.normals[trioffset+2];
+
+			h.n = bcoords.x * n0 + bcoords.y * n1 + bcoords.z * n2;
 			//printf("%f %f %f %f %f %f\n", bcoords.x, bcoords.y, bcoords.z, h.n.x, h.n.y, h.n.z);
 			// apply normal map
 		}
 		
-		if( shapes[sid].trimesh.texCoordTex == -1 ) {
+		if( mesh.texcoords == NULL ) {
 			h.tex = spheremap(normalize(h.p - shapes[sid].p));
 		}
 		else {
-			h.tex = bcoords.x * tri.t0 + bcoords.y * tri.t1 + bcoords.z * tri.t2;
+			float2 t0, t1, t2;
+			t0 = mesh.texcoords[trioffset];
+			t1 = mesh.texcoords[trioffset+1];
+			t2 = mesh.texcoords[trioffset+2];
+			h.tex = bcoords.x * t0 + bcoords.y * t1 + bcoords.z * t2;
 		}
 
 		h.objIdx = sid;
@@ -1542,11 +1325,7 @@ __device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nS
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
 		return rayIntersectsPlane(r, shapes, nShapes, sid);
-	case Shape::ELLIPSOID:
-	case Shape::HYPERBOLOID:
-	case Shape::HYPERBOLOID2:
-	case Shape::CYLINDER:
-	case Shape::CONE:
+	case Shape::QUADRATICS:
 		return rayIntersectsQuadraticSurface(r, shapes, nShapes, sid);
 	case Shape::TRIANGLE_MESH:
 		return rayIntersectsTriangleMesh(r, shapes, nShapes, sid);
@@ -1657,6 +1436,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 	const int maxBounces = 32;
 	float3 accumulatedColor = make_float3(0.0);
 	float3 colormask = make_float3(1.0);		// not absorbed color
+	const float Wcutoff = 1e-6;
 
 	int pixelIdx = y*res.x+x;
 
@@ -1665,6 +1445,12 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 	Ray ray = r;
 	int bounces = 0;
 	for(;bounces<maxBounces;bounces++) {
+		if( dot(colormask, colormask) < Wcutoff ) {
+			// terminate low weight ray
+			accumulatedColor += colormask;
+			break;
+		}
+
 		thrust::default_random_engine rng( myhash(time) * myhash(pixelIdx) * myhash(bounces) );
 		thrust::uniform_real_distribution<float> uniformDistribution(0,1);
 
@@ -1734,29 +1520,10 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				break;
 			}
 		case Material::Diffuse:
-			{
-				// direct lighting
-				//float3 shading = computeShading2(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
-				//accumulatedColor += shading * colormask;
+			{				
+				// merged glossy and diffuse
+				// change the coefficient Kr to adjust the glossy amount
 
-
-				accumulatedColor += mater.emission * colormask;
-
-				if( mater.diffuseTex != -1 ) {
-					color = texturefunc(mater.diffuseTex, h.tex, h.p);
-				}
-				else color = mater.diffuse;
-				
-				colormask *= color;
-
-				ray.origin = h.p;
-				float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
-				
-				ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
-				break;
-			}
-		case Material::Glossy:
-			{
 				// direct lighting
 				//float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx);
 				//accumulatedColor += shading * colormask;
@@ -1779,36 +1546,28 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				ray.dir = normalize(ray.dir);
 				break;
 			}
-		case Material::DiffuseScatter:
-			{
-				// direct lighting
-				float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
-				accumulatedColor += shading * colormask * (1.0 - mater.Kr);
-
-				// get a random number
-				float Xi = generateRandomNumberFromThread1(res, time, x, y);
-
-				if( Xi > mater.Kr ) { 
-					// emission is zero, no need to add it
-					//accumulatedColor += shapes[h.objIdx].material.emission * colormask;
-					colormask *= mater.diffuse;
-
-					ray.origin = h.p + 1e-3 * h.n;
-					float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
-				
-					ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
-				}
-				else {
-					colormask *= mater.diffuse;
-
-					// get the reflected ray
-					ray.origin = h.p + 1e-3 * h.n;
-					ray.dir = reflect(ray.dir, h.n);
-				}
-				break;
-			}
 		case Material::Specular:
 			{
+				if( mater.normalTex != -1 ) {
+					// modify normal direction
+					float3 n_normalmap = texturefunc(mater.normalTex, h.tex, h.p, 1)*2.0-1.0;
+										
+					float3 tangent;
+					if( shapes[h.objIdx].t == Shape::PLANE )
+						tangent = shapes[h.objIdx].axis[1];
+					else
+						tangent = normalize(sphere_tangent(h.n));
+					float3 bitangent = cross(h.n, tangent);
+
+					// find the mapping from tangent space to camera space
+					mat3 m_t = mat3(tangent, bitangent, h.n);
+
+					mat3 m_t_inv = m_t.inv();
+
+					// change it
+					h.n = (m_t_inv*n_normalmap);
+				}
+
 				// get the reflected ray
 				Ray rf;
 				rf.origin = h.p; rf.dir = normalize(reflect(ray.dir, h.n));
@@ -1945,6 +1704,7 @@ __global__ void copy2pbo(float3 *color, float3 *pos, int iters, int w, int h, fl
 	int idx = y*w+x;
 
 	float3 inC = clamp(color[idx]/iters, 0.0, 1.0);
+
 	inC = pow(inC, 1.0/gamma);
 
 	Color c;
@@ -1972,7 +1732,7 @@ __global__ void raytrace(float time, float3 *color, Camera* cam,
 	__shared__ int inLightsCount;
 	__shared__ int inShapesCount;
 	__shared__ int inMaterialCount;
-	__shared__ d_Shape inShapes[64];
+	__shared__ d_Shape inShapes[16];
 	__shared__ int inLights[4];
 	__shared__ d_Material inMaterial[64];
 	
@@ -1997,31 +1757,20 @@ __global__ void raytrace(float time, float3 *color, Camera* cam,
 	if( x > width - 1 || y > height - 1 ) return;
 	
 	float3 c = make_float3(0.0);
-	int edgeSamples = sqrtf(AASamples);
-	float step = 1.0 / edgeSamples;
 
-	for(int i=0;i<AASamples;i++) {
-		float px = floor(i*step);
-		float py = i % edgeSamples;
+	float2 offset = generateRandomNumberFromThread2(resolution, time, x, y);
 
-		float2 offset = make_float2(0, 0);
-		if( jittered )
-			offset = generateRandomOffsetFromThread2(resolution, time, x, y);
+	float u = x + offset.x;
+	float v = y + offset.y;
+	u = u / (float) width - 0.5;
+	v = v / (float) height - 0.5;
 
-		float u = x + (px + offset.x) * step;
-		float v = y + (py + offset.y) * step;
-		u = u / (float) width - 0.5;
-		v = v / (float) height - 0.5;
+	Ray r = generateRay(cam, u, v);
 
-		Ray r = generateRay(cam, u, v);
-
-		if( isRayTracing ) {
-			c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
-		}
-		else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
+	if( isRayTracing ) {
+		c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 	}
-
-	c /= (float)AASamples;
+	else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 
 	// write output vertex
 	color[y*width+x] += c;
@@ -2046,7 +1795,7 @@ __global__ void raytrace2(float time, float3 *color, Camera* cam,
 	__shared__ int inLightsCount;
 	__shared__ int inShapesCount;
 	__shared__ int inMaterialCount;
-	__shared__ d_Shape inShapes[64];
+	__shared__ d_Shape inShapes[16];
 	__shared__ int inLights[4];
 	__shared__ d_Material inMaterial[64];
 
@@ -2074,30 +1823,21 @@ __global__ void raytrace2(float time, float3 *color, Camera* cam,
 			if( x > width - 1 || y > height - 1 ) return;
 
 			float3 c = make_float3(0, 0, 0);
-			int edgeSamples = sqrtf(AASamples);
-			float step = 1.0 / edgeSamples;
 
-			for(int i=0;i<AASamples;i++) {
-				float px = floor(i*step);
-				float py = i % edgeSamples;
+			float2 offset = generateRandomNumberFromThread2(resolution, time, x, y);
 
-				float2 offset = generateRandomOffsetFromThread2(resolution, time, x, y);
+			float u = x + offset.x;
+			float v = y + offset.y;
 
-				float u = x + (px + offset.x) * step;
-				float v = y + (py + offset.y) * step;
+			u = u / (float) width - 0.5;
+			v = v / (float) height - 0.5;
 
-				u = u / (float) width - 0.5;
-				v = v / (float) height - 0.5;
+			Ray r = generateRay(cam, u, v);
 
-				Ray r = generateRay(cam, u, v);
-
-				if( isRayTracing ) {
-					c += traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
-				}
-				else c += traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
+			if( isRayTracing ) {
+				c = traceRay_simple(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 			}
-
-			c /= (float)AASamples;
+			else c = traceRay_general(time, resolution, x, y, r, inShapesCount, inShapes, inLightsCount, inLights, inMaterialCount, inMaterial);
 
 #define SHOW_AFFINITY 0
 #if SHOW_AFFINITY
@@ -2183,7 +1923,7 @@ __global__ void raytrace3(float time, float3 *color, Camera* cam,
 		if( x > width - 1 || y > height - 1 ) return;
 
 		float3 c;
-		float2 offset = generateRandomOffsetFromThread2(resolution, time, x, y);
+		float2 offset = generateRandomNumberFromThread2(resolution, time, x, y);
 
 		float u = x + offset.x;
 		float v = y + offset.y;

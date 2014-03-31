@@ -121,6 +121,8 @@ static void mouse(GLFWwindow*, int, int, int);
 static void cursor_pos(GLFWwindow*, double, double);
 static void resize(GLFWwindow*, int, int);
 
+void screenshot();
+
 // Cuda functionality
 extern __global__ void setParams(int, int, int);
 extern __global__ void bindTexture2(const cudaTextureObject_t* texs, int texCount);
@@ -325,7 +327,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		// execute the kernel
 		dim3 block(32, 32, 1);
 		dim3 grid(ceil(window_width / (float)block.x), ceil(window_width / (float)block.y), 1);
-		raytrace<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
+		raytrace<<< grid, block >>>((iterations+rand()), cumulatedColor, d_cam,
 			lights.size(), d_lights,
 			shapes.size(), d_shapes,
 			materials.size(), d_materials,
@@ -338,7 +340,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		dim3 grid(group.x, group.y, 1);
 		dim3 groupCount(ceil(window_width/(float)(block.x * group.x)), ceil(window_height/(float)(block.y * group.y)), 1);
 
-		raytrace2<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
+		raytrace2<<< grid, block >>>((iterations+rand()), cumulatedColor, d_cam,
 			lights.size(), d_lights,
 			shapes.size(), d_shapes,
 			materials.size(), d_materials,
@@ -357,7 +359,7 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 		srand(clock());
 
 		initCurrentBlock<<<1, 1>>>(0);
-		raytrace3<<< grid, block >>>((iterations+rand()%1024), cumulatedColor, d_cam,
+		raytrace3<<< grid, block >>>((iterations+rand()), cumulatedColor, d_cam,
 			lights.size(), d_lights,
 			shapes.size(), d_shapes,
 			materials.size(), d_materials,
@@ -376,6 +378,8 @@ void launch_kernel(float3 *pos, unsigned int mesh_width,
 	dim3 grid(ceil(window_width / (float)block.x), ceil(window_width / (float)block.y), 1);
 	copy2pbo<<<grid,block>>>(cumulatedColor, pos, iterations, window_width, window_height, gamma);
 	cudaThreadSynchronize();
+
+	if( iterations == 1024 ) screenshot();
 }
 
 bool checkHW(char *name, const char *gpuType, int dev)
@@ -589,6 +593,8 @@ void refresh() {
 ////////////////////////////////////////////////////////////////////////////////
 bool runTest(int argc, char **argv, char *ref_file)
 {
+	cudaDeviceReset();
+
 	// Create the CUTIL timer
 	sdkCreateTimer(&timer);
 
@@ -609,6 +615,7 @@ bool runTest(int argc, char **argv, char *ref_file)
 	}
 	else
 	{
+		cout << "using GPU " << gpuGetMaxGflopsDeviceId() << endl;
 		cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
 	}
 

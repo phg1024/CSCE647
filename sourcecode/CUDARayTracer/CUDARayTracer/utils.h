@@ -14,6 +14,13 @@
 #include "FreeImagePlus.h"
 #include "mathutils.h"
 
+inline double bits2MB(double bits) {
+	return bits / 8.0 / 1024.0 / 1024.0;
+}
+inline double bytes2MB(double bytes) {
+	return bytes / 1024.0 / 1024.0;
+}
+
 inline void showCUDAMemoryUsage() {
 	size_t free_byte ;
 	size_t total_byte ;
@@ -26,7 +33,7 @@ inline void showCUDAMemoryUsage() {
 	double free_db = (double)free_byte ;
 	double total_db = (double)total_byte ;
 	double used_db = total_db - free_db ;
-	printf("GPU memory usage: used = %f, free = %f MB, total = %f MB\n", used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
+	printf("GPU memory usage: used = %f, free = %f MB, total = %f MB\n", bytes2MB(used_db), bytes2MB(free_db), bytes2MB(total_db));
 }
 
 static int loadTexture(const char* filename, float** texAddr, int2* texSize, int& textureCount) {
@@ -58,10 +65,13 @@ static int loadMeshTexture(const vector<float4>& tris, vector<TextureObject>& te
 
 	TextureObject texObj;
 	texObj.t = TextureObject::Mesh;
-	texObj.size = make_int2(tris.size(), 1);
-	const size_t sz_tex = tris.size() * sizeof(float4);
+
+	const int MaxWidth = 65536;
+	texObj.size = make_int2(MaxWidth, ceil(tris.size() / (float)65536));
+
+	const size_t sz_tex = texObj.size.x * texObj.size.y * sizeof(float4);
 	cudaMalloc((void**)&(texObj.addr), sz_tex);
-	cudaMemcpy(texObj.addr, &tris[0], sz_tex, cudaMemcpyHostToDevice);
+	cudaMemcpy(texObj.addr, &tris[0], sizeof(float4)*tris.size(), cudaMemcpyHostToDevice);
 	showCUDAMemoryUsage();
 
 	texObjs.push_back(texObj);
@@ -73,10 +83,14 @@ static int loadTexcoordTexture(const vector<float2>& tris, vector<TextureObject>
 
 	TextureObject texObj;
 	texObj.t = TextureObject::Mesh;
-	texObj.size = make_int2(tris.size(), 1);
-	const size_t sz_tex = tris.size() * sizeof(float2);
+
+	const int MaxWidth = 65536;
+	texObj.size = make_int2(MaxWidth, ceil(tris.size() / (float)65536));
+
+	const size_t sz_tex = texObj.size.x * texObj.size.y * sizeof(float2);
+
 	cudaMalloc((void**)&(texObj.addr), sz_tex);
-	cudaMemcpy(texObj.addr, &tris[0], sz_tex, cudaMemcpyHostToDevice);
+	cudaMemcpy(texObj.addr, &tris[0], sizeof(float2)*tris.size(), cudaMemcpyHostToDevice);
 	showCUDAMemoryUsage();
 
 	texObjs.push_back(texObj);

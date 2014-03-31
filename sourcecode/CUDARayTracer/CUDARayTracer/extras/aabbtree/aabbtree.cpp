@@ -153,7 +153,7 @@ void AABBTree::printNodeStats()
 
 vector<AABBNode_Serial> AABBTree::toArray() const {
 	cout << "Serializing the AABB tree ..." << endl;
-	cout << "reserving " << sizeof(AABBNode_Serial)*(nodeCount[2]*2+1) << " bytes ..." << endl;
+	cout << "reserving " << sizeof(AABBNode_Serial)*(nodeCount[2]*2+1) / 1024.0 / 1024.0 << " MB ..." << endl;
 	vector<AABBNode_Serial> A;
 	A.reserve(nodeCount[2]*2+1);
 	cout << "done." << endl;
@@ -196,7 +196,7 @@ vector<AABBNode_Serial> AABBTree::toArray() const {
 		}
 	}
 
-#define WRITE_TREE 0
+#define WRITE_TREE 1
 #if WRITE_TREE
 
 	ofstream fout("tree.txt");
@@ -233,7 +233,7 @@ AABBNode* AABBTree::buildAABBTree(const vector<Triangle>& inTris, int level)
 		node->type = AABBNode_Serial::LEAF_NODE;
 		
 		for(int i=0;i<tris.size();i++) {
-			node->tri[i] = tris[i];
+			node->tri[i] = tris[i].idx;
 		}
 		node->ntris = tris.size();
 		node->aabb = AABB(&(tris[0]), tris.size());
@@ -336,7 +336,7 @@ AABBNode* AABBTree::buildAABBTree_SAH(const vector<Triangle>& inTris, const Spli
 			node->type = AABBNode_Serial::LEAF_NODE;
 
 			for(int i=0;i<tris.size();i++) {
-				node->tri[i] = tris[i];
+				node->tri[i] = tris[i].idx;
 			}
 			node->ntris = tris.size();
 			node->aabb = AABB(&(tris[0]), tris.size());

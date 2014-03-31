@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <iostream>
 #include <fstream>
 #include <sstream>
 
@@ -468,11 +469,19 @@ LoadObj(
 
   std::stringstream err;
 
-  std::ifstream ifs(filename);
-  if (!ifs) {
+  std::ifstream fin(filename);
+  if (!fin) {
     err << "Cannot open file [" << filename << "]" << std::endl;
     return err.str();
   }
+
+  // hack, load everything into memory
+  std::cout << "reading obj file " << filename << " ..." << std::endl;
+  std::string instr((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
+  std::cout << "done." << std::endl;
+  std::stringstream ifs;
+  ifs.str(instr);
+  std::cout << "parsing obj file ..." << std::endl;
 
   std::vector<float> v;
   std::vector<float> vn;

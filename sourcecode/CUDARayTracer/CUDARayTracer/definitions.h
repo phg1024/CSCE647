@@ -24,26 +24,10 @@ class Material {
 public:
 	enum MaterialType {
 		Emissive,
-		Diffuse,
+		Diffuse,		// glossy is merged into diffuse
 		Specular,
-		Refractive,
-		DiffuseScatter,
-		Glossy
+		Refractive
 	};
-	static Material makeDiffuseScatter(vec3 diffuse, float r) {
-		Material m;
-		m.diffuse = diffuse;
-		m.t = DiffuseScatter;
-		m.Kr = r;
-		return m;
-	}
-	static Material makeGlossy(vec3 v, float r) {
-		Material m;
-		m.diffuse = v;
-		m.t = Glossy;
-		m.Kr = r;
-		return m;
-	}
 	static Material makeDiffuse(vec3 v) {
 		Material m;
 		m.diffuse = v;
@@ -112,12 +96,6 @@ public:
 		}
 		else if( tag == "refractive" ) {
 			return Refractive;
-		}
-		else if( tag == "diffusescatter" ) {
-			return DiffuseScatter;
-		}
-		else if( tag == "glossy" ) {
-			return Glossy;
 		}
 		else return Diffuse;
 	}
@@ -201,21 +179,21 @@ struct d_Material {
 };
 
 struct TriangleMeshInfo {
-	
 	__device__ TriangleMeshInfo& operator=(const TriangleMeshInfo& info) {
 		nFaces = info.nFaces;
-		faceTex = info.faceTex;
-		normalTex = info.normalTex;
-		texCoordTex = info.texCoordTex;
+		faces = info.faces;
+		normals = info.normals;
+		texcoords = info.texcoords;
+		materials = info.materials;
 		tree = info.tree;
 		return (*this);
 	}
 	
-
 	int nFaces;
-	int faceTex;		// float4 texture of a list of faces, together with material indices
-	int normalTex;		// float3 texture of a list of normal vectors
-	int texCoordTex;	// float2 texture of texture coordinates, if exists
+	float4* faces;			// float4 texture of a list of faces, together with material indices
+	float3* normals;		// float3 texture of a list of normal vectors
+	float2* texcoords;		// float2 texture of texture coordinates, if exists
+	Material* materials;	// material for the triangle mesh
 	aabbtree::AABBNode_Serial* tree;
 };
 
@@ -232,6 +210,7 @@ public:
 		CONE,
 		HYPERBOLOID,
 		HYPERBOLOID2,
+		QUADRATICS,
 		TRIANGLE_MESH
 	};
     __device__ __host__ Shape(){}
@@ -329,7 +308,7 @@ struct d_Shape {
 	Shape::ShapeType t;
 
 	__device__ void init(const Shape& s) {
-		t = s.t;
+		t = (s.t == Shape::PLANE || s.t == Shape::TRIANGLE_MESH)?s.t:Shape::QUADRATICS;
 		p = s.p.data;
 		axis[0] = s.axis[0].data;
 		axis[1] = s.axis[1].data;
@@ -348,8 +327,8 @@ struct d_Shape {
 
 		bb = s.bb;
 
-		constant = (t==Shape::HYPERBOLOID2)?-1.0:1.0;
-		constant2 = (t==Shape::CONE)?0.0:1.0;
+		constant = (s.t==Shape::HYPERBOLOID2)?-1.0:1.0;
+		constant2 = (s.t==Shape::CONE)?0.0:1.0;
 	}
 
 	__device__ float3 randomPointOnSurface(int2 res, float time, int x, int y) const {
