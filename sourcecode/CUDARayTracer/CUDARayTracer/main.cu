@@ -44,9 +44,11 @@ using namespace std;
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 
+/*
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+*/
 
 #include "element.h"
 #include "definitions.h"
@@ -808,17 +810,28 @@ void cleanup()
 }
 
 void screenshot() {
-	// Make the BYTE array, factor of 3 because it's RBG.
 	int width = window_width;
 	int height = window_height;
 	BYTE* pixels = new BYTE[ 3 * width * height];
-	glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+	glReadPixels(0, 0, width, height, GL_BGR, GL_UNSIGNED_BYTE, pixels);
 
-	cv::Mat m( height, width, CV_8UC3, pixels );
-	cv::cvtColor(m, m, CV_RGB2BGR);
-	cv::flip(m, m, 0);
-	cv::imwrite("screenshot.png", m);
-	delete[] pixels;
+	FIBITMAP* bitmap = FreeImage_Allocate (width, height, 24);
+	RGBQUAD color ;
+	if (! bitmap ) {
+		cerr << "Failed to save screenshot.png." << endl;
+	}
+
+	for ( int i=0, idx=0; i<height; i++) { 
+		for ( int j=0; j<width; j++) {
+			color.rgbBlue = pixels[idx++];
+			color.rgbGreen = pixels[idx++];
+			color.rgbRed = pixels[idx++];
+			FreeImage_SetPixelColor ( bitmap, j, i, &color );
+		}
+	}
+		
+	if ( FreeImage_Save (FIF_PNG, bitmap , " screenshot.png" , 0) )
+		cout << "screenshot.png saved!" << endl;
 
 	vector<float3> buffer(width*height);
 	vector<float3> flipped(width*height);

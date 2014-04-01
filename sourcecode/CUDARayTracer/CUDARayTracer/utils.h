@@ -7,12 +7,11 @@
 #include "props.h"
 #include <thrust/random.h>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
 #include "FreeImagePlus.h"
 #include "mathutils.h"
+
+#include <vector>
+using std::vector;
 
 inline double bits2MB(double bits) {
 	return bits / 8.0 / 1024.0 / 1024.0;
@@ -36,29 +35,6 @@ inline void showCUDAMemoryUsage() {
 	printf("GPU memory usage: used = %f, free = %f MB, total = %f MB\n", bytes2MB(used_db), bytes2MB(free_db), bytes2MB(total_db));
 }
 
-static int loadTexture(const char* filename, float** texAddr, int2* texSize, int& textureCount) {
-	cv::Mat image = cv::imread(filename); 
-
-	//cv::imshow("texture", image);
-
-	cout << image.cols << "x" << image.rows << endl;
-	int width = image.cols, height = image.rows;
-	vector<uchar4> buffer(width*height*3);
-	for(int i=0;i<height;i++) {
-		for(int j=0;j<width;j++) {
-			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
-			int idx = (i*width+j);
-			buffer[idx] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
-		}
-	}
-
-	texSize[textureCount] = make_int2(width, height);
-	const size_t sz_tex = width * height * sizeof(uchar4);
-	cudaMalloc((void**)&(texAddr[textureCount]), sz_tex);
-	cudaMemcpy(texAddr[textureCount], &buffer[0], sz_tex, cudaMemcpyHostToDevice);
-
-	return textureCount++;
-}
 
 static int loadMeshTexture(const vector<float4>& tris, vector<TextureObject>& texObjs) {
 	if( tris.empty() ) return -1;
@@ -99,17 +75,22 @@ static int loadTexcoordTexture(const vector<float2>& tris, vector<TextureObject>
 
 static int loadTexture(const char* filename, vector<TextureObject>& texObjs) {
 	cout << "loading texture " << filename << endl;
-	cv::Mat image = cv::imread(filename); 
-	//cv::imshow("texture", image);
 
-	cout << image.cols << "x" << image.rows << endl;
-	int width = image.cols, height = image.rows;
-	vector<uchar4> buffer(width*height*3);
+	fipImage image(FIT_BITMAP);
+	image.load(filename);
+
+	cout << image.getWidth() << "x" << image.getHeight() << endl;
+	cout << image.getBitsPerPixel() << endl;
+	int width = image.getWidth(), height = image.getHeight();
+	int stride = image.getBitsPerPixel() / 8;
+	vector<uchar4> buffer(width*height);
 	for(int i=0;i<height;i++) {
+		unsigned char* scanline = reinterpret_cast<unsigned char*>(image.getScanLine(height-1-i));
 		for(int j=0;j<width;j++) {
-			cv::Vec3b bgrPixel = image.at<cv::Vec3b>(i, j);
 			int idx = (i*width+j);
-			buffer[idx] = make_uchar4(bgrPixel.val[2], bgrPixel.val[1], bgrPixel.val[0], 255);
+			// B, G, R order
+			buffer[idx] = make_uchar4(scanline[2], scanline[1], scanline[0], 255);
+			scanline+=stride;
 		}
 	}
 

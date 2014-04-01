@@ -7,6 +7,7 @@
 #include <string>
 #include <algorithm>
 #include <vector>
+#include <map>
 using namespace std;
 
 class Scene
