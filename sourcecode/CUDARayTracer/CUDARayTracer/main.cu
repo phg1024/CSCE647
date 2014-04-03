@@ -584,11 +584,6 @@ bool initGL(int *argc, char **argv) {
 	return true;
 }
 
-void refresh() {
-	//system("pause");
-	glutPostRedisplay();
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Run a simple test for CUDA

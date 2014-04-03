@@ -5,7 +5,6 @@
 
 #include "definitions.h"
 #include "utils.h"
-#include "randvec.h"
 #include "proceduralTexture.cuh"
 #include "extras/containers/cudaContainers.h"
 
@@ -186,36 +185,6 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, const aabb
 #endif
 }
 
-// light ray intersection tests
-__device__ float lightRayIntersectsSphere( Ray r, d_Shape* shapes, int sid ) {
-    float3 pq = r.origin - shapes[sid].p;
-    float a = 1.0;
-    float b = dot(pq, r.dir);
-    float c = dot(pq, pq) - shapes[sid].radius[0] * shapes[sid].radius[0];
-
-    // solve the quadratic equation
-    float delta = b*b - a*c;
-    if( delta < 0.0 )
-    {
-        return -1.0;
-    }
-    else
-    {
-        delta = sqrt(delta);
-        float x0 = -b+delta; // a = 1, no need to do the division
-        float x1 = -b-delta;
-        float THRES = 1e-3;
-
-        if( x0 < THRES ) {
-            return -1.0;
-        }
-        else
-        {
-            if( x1 < THRES ) return x0;
-            else return x1;
-        }
-    }
-}
 
 __device__ float lightRayIntersectsPlane( Ray r, d_Shape* shapes, int sid ) {
 	//if( !lightRayIntersectsBoundingBox(r, shapes[sid].bb ) ) return -1.0;
@@ -676,37 +645,6 @@ __device__ float travelPathLength(Ray r, d_Shape* shapes, int shapeCount, int si
 	return L;
 }
 
-/*
-__device__ bool checkLightVisibility(float3 p, float3 N, d_Shape* shapes, int nShapes, d_Light* lights) {
-	switch( lights->t ) {
-	case Light::POINT:
-	case Light::SPHERE: {
-		float dist = length(p - lights->pos);
-		Ray r;
-		r.origin = p;
-		r.dir = normalize(lights->pos - p);
-		float t = lightRayIntersectsShapes(r, shapes, nShapes);
-
-		float THRES = 1e-3;
-		return t < THRES || t > dist;
-	}
-	case Light::SPOT: {
-	}
-	case Light::DIRECTIONAL: {
-		Ray r;
-		r.origin = p;
-		r.dir = -lights->dir;
-		float t = lightRayIntersectsShapes(r, shapes, nShapes);
-
-		float THRES = 1e-3;
-		return (t < THRES && (dot(N, lights->dir)<0));
-	}
-	default:
-		return false;
-	}
-}
-*/
-
 __device__ bool checkLightVisibility2(float3 l, float3 p, float3 N, d_Shape* shapes, int nShapes, int sid) {
 	float dist = length(p - l);
 
@@ -1147,7 +1085,7 @@ __device__ __forceinline__ Hit background() {
 	return h;
 }
 
-__device__ float3 computeShading2(int2 res, float time, int x, int y, 
+__device__ float3 computeShading(int2 res, float time, int x, int y, 
 								  float3 p, float3 n, float2 t, Ray r, 
 								  d_Shape* shapes, int nShapes, 
 								  int* lights, int nLights, 
@@ -1368,7 +1306,7 @@ __device__ float3 traceRay_simple(float time, int2 res, int x, int y, Ray r, int
 			return mater.emission;
 		}
 		else {
-			return computeShading2(res, time, x, y, h.p, h.n, h.tex, r, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
+			return computeShading(res, time, x, y, h.p, h.n, h.tex, r, shapes, nShapes, lights, nLights, mats, nMats, h.objIdx);
 		}
 	}
 }

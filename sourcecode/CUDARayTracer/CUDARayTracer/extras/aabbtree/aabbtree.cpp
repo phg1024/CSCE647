@@ -39,12 +39,12 @@ bool AABB::intersectTest(const float3 &origin, const float3 &dir, const float3 &
 }
 
 AABBTree::AABBTree(): Tree<AABBNode>() {
-nodeCount[0] = 0; nodeCount[1] = 0; nodeCount[2] = 0;
+	nodeCount[0] = 0; nodeCount[1] = 0; nodeCount[2] = 0;
 }
 
 bool AABBTree::intersectTest(const float3 &origin,
-                                    const float3 &destination,
-                                    float &t, Triangle& tri)
+                             const float3 &destination,
+                             float &t, Triangle& tri)
 {
     float3 dir = destination - origin;
     float3 invDir = 1.0 / dir;

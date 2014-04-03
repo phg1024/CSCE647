@@ -30,22 +30,4 @@ private:
 	T data[MaxSize];
 };
 
-template <typename T, int MaxSize=128>
-class queue {
-public:
-	__device__ queue():head(0),tail(-1){}
-	__device__ void push(T val) {
-		tail++;
-		data[tail] = val;
-		if( tail >= MaxSize ) tail = 0;
-	}
-	__device__ T pop() {
-		T val = data[head++];
-		if( head >= MaxSize ) head = 0;
-		return val;
-	}
-private:
-	int head, tail;
-	T data[MaxSize];
-};
 }
