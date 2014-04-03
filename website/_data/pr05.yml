@@ -1,0 +1,23 @@
+- name: overview.png
+  des: Spheres with different effects. The central one has perfect reflection defined by normal map. The yellow one is simple pure reflection. The green on is glossy, and the red one has Fresnel reflection.
+  id: "1"
+  
+- name: fresnel.png
+  des: Spheres with Fresnel reflection.
+  id: "2"
+  
+- name: teapot.png
+  des: Teapot, sphere and cube.
+  id: "3"
+  
+- name: buddha.png
+  des: Golden buddha, about 1M triangles.
+  id: "4"
+
+- name: dragon.png
+  des: Golden dragon, more than 7M triangles.
+  id: "5"
+
+- name: statue.png
+  des: Statue, 10M triangles.
+  id: "6"
