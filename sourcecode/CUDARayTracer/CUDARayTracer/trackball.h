@@ -74,7 +74,7 @@ private:
 	float m_sceneScale;
 };
 
-void TrackBall::init()
+inline void TrackBall::init()
 {
 	R = quaternion(1.0f, 0.0f, 0.0f, 0.0f); 	// no rotation
 	T = vec3(0.0, 0.0, 0.0);           // no translation
@@ -88,34 +88,34 @@ void TrackBall::init()
 	m_Quaternion2Matrix();
 }
 
-void TrackBall::reset()
+inline void TrackBall::reset()
 {
 	R = quaternion(1.0, 0.0, 0.0, 0.0);
 	m_scale = 1.0;
 	m_Quaternion2Matrix();
 }
 
-vec3 TrackBall::getNormDir()
+inline vec3 TrackBall::getNormDir()
 {
 	return R.v;
 }
 
-quaternion TrackBall::getRotation() const
+inline quaternion TrackBall::getRotation() const
 {
 	return R;
 }
 
-quaternion TrackBall::getIncRotation() const
+inline quaternion TrackBall::getIncRotation() const
 {
 	return incR;
 }
 
-vec3 TrackBall::getTranslation() const
+inline vec3 TrackBall::getTranslation() const
 {
 	return T;
 }
 
-void TrackBall::reshape(int w, int h)
+inline void TrackBall::reshape(int w, int h)
 {
 	m_width = w;
 	m_height = h;
@@ -123,7 +123,7 @@ void TrackBall::reshape(int w, int h)
 	m_r = min(m_width, m_height) / 2.f;
 }
 
-void TrackBall::mouse_rotate(int u, int v)
+inline void TrackBall::mouse_rotate(int u, int v)
 {
 	v = m_height - v;
 
@@ -131,7 +131,7 @@ void TrackBall::mouse_rotate(int u, int v)
 	m_y = v;
 }
 
-void TrackBall::mouse_translate(int u, int v)
+inline void TrackBall::mouse_translate(int u, int v)
 {
 	v = m_height - v;
 
@@ -139,7 +139,7 @@ void TrackBall::mouse_translate(int u, int v)
 	m_y = v;
 }
 
-void TrackBall::motion_rotate(int u, int v)
+inline void TrackBall::motion_rotate(int u, int v)
 {
 	vec3 N;
 	vec3 v0(0, 0, 0), v1(0, 0, 0);
@@ -196,7 +196,7 @@ void TrackBall::motion_rotate(int u, int v)
 	m_x = u, m_y = v;
 }
 
-void TrackBall::motion_translate(int u, int v)
+inline void TrackBall::motion_translate(int u, int v)
 {
 	v = m_height - v;
 
@@ -214,21 +214,21 @@ void TrackBall::motion_translate(int u, int v)
 	m_x = u, m_y = v;
 }
 
-void TrackBall::rotate(const quaternion &Q)
+inline void TrackBall::rotate(const quaternion &Q)
 {
 	R = Q*R;
 
 	m_Quaternion2Matrix();
 }
 
-void TrackBall::setRotation(const quaternion &Q)
+inline void TrackBall::setRotation(const quaternion &Q)
 {
 	R = Q;
 
 	m_Quaternion2Matrix();
 }
 
-void TrackBall::wheel(int delta)
+inline void TrackBall::wheel(int delta)
 {
 	if (delta > 0)
 		m_scale *= 1.025;
@@ -275,13 +275,13 @@ void TrackBall::applyInverseTransform()
 }
 */
 
-float* TrackBall::getMatrix()
+inline float* TrackBall::getMatrix()
 {
 	m_Quaternion2Matrix();
 	return M;
 }
 
-float* TrackBall::getInverseMatrix()
+inline float* TrackBall::getInverseMatrix()
 {
 	quaternion S = R;
 	R.s = -R.s;
@@ -306,7 +306,7 @@ void TrackBall::applyInverseRotation()
 }
 */
 
-void TrackBall::m_Quaternion2Matrix()
+inline void TrackBall::m_Quaternion2Matrix()
 {
 	float q0 = R.s,	q1 = R.v.x,	q2 = R.v.y,	q3 = R.v.z;
 
@@ -331,7 +331,7 @@ void TrackBall::m_Quaternion2Matrix()
 	M[15]= 1;
 }
 
-void TrackBall::loadStatus(const char *filename)
+inline void TrackBall::loadStatus(const char *filename)
 {
 	ifstream ifs;
 	float x, y, z, w, s;
@@ -353,7 +353,7 @@ void TrackBall::loadStatus(const char *filename)
 	m_Quaternion2Matrix();
 }
 
-void TrackBall::saveStatus(const char *filename)
+inline void TrackBall::saveStatus(const char *filename)
 {
 	ofstream ofs;
 

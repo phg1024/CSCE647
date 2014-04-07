@@ -17,10 +17,10 @@ material lightblue diffuse	0 0 0	0 0 0	0.75 0.75 0.995	1 1 1	1 0.0 0		50			1.0 0
 material yellow diffuse	0 0 0	0 0 0	0.87 0.87 0.15	1 1 1	1 0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material lightgray diffuse	0 0 0	0 0 0	.85 .85 .85	1 1 1	1 0.75 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material gray diffuse	0 0 0	0 0 0	.5 .5 .5	1 1 1	1 0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material mirror diffuse 0.0 0.0 0.0 0.25 0.125 0.105 .95 .95 .95 1.0 1.0 1.0 1.0 0.0 0.0 50.0 3.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
+material mirror specular 0.0 0.0 0.0 0.25 0.125 0.105 .95 .95 .95 1.0 1.0 1.0 1.0 0.0 0.0 50.0 13.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material redmirror specular 0.0 0.0 0.0 0.0 0.0 0.0 .87 .15 .15 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.75 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material greenmirror specular	0 0 0	0 0 0	0.15 0.87 0.15	1 1 1	1 0.25 0		50			2.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material yellowmirror specular	0 0 0	0 0 0	0.95 0.95 0.45	1 1 1	1 0.05 0		50			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material yellowmirror specular	0 0 0	0 0 0	0.95 0.95 0.45	1 1 1	1 0.05 0		50			3.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material bluemirror specular	0 0 0	0 0 0	0.15 0.15 0.87	1 1 1	1 0.0 0		50			2.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material jade refractive 0.0 0.0 0.0 0.125 0.25 0.105 .65 .96 .65 1.0 1.0 1.0 1.5 0.0 0.0 50.0 1.625 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material yellowmarble refractive 0.0 0.0 0.0 0.125 0.25 0.105 .87 .87 .15 1.0 1.0 1.0 8.0 0.0 0.0 50.0 1.625 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
@@ -86,19 +86,20 @@ plane 0.0 -5.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 checker	# bottom
 #sphere 9.0 8.125 25.5 .625 .625 .625 0.0 0.0 0.0 redjade
 #sphere 9.0 9.0625 25.5 .3125 .3125 .3125 0.0 0.0 0.0 redjade
 # other stuff
-#mesh -2.5 5.0 25.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj mirror bluejade
+#mesh -14.5 5.0 35.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj mirror bluejade
 #mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
 #mesh 15.0 -8.0 45.5 2.0 2.0 2.0 0.0 0.0 0.0 ./meshes/cube.obj lightblue chessboard2d
 #mesh -20 -10 35 1.0 1.0 1.0 0.0 0.753 0.0 ./meshes/teapot.obj yellow yellowglass
 #sphere 4 -10 5 10.0 10.0 10.0 0.0 0.753 0.0 mirror yellowglass
 #mesh -12 -5 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper_res2.obj marble3
-#mesh 0 -6.0 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellowglass1
+#mesh 0 -6.0 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj mirror yellowglass1
 #mesh 12 -5 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj greenglass
 #mesh -8 -6.5 35 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip_res2.obj redglass metal
 #mesh 0 -7.5 40 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip_res2.obj greenglass metal
 #mesh 8 -8.5 45 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip_res2.obj blueglass metal
+#mesh 12 -6.5 45 60.0 60.0 60.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj mirror
 #mesh 0 -5 20 6.0 6.0 6.0 0.0 -0.753 0.0 ./meshes/avent/Avent.obj mirror
-#mesh 0 2 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj yellow
+#mesh 0 2 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj yellowmirror yellow
 #mesh 0 2 35 0.075 0.075 0.075 0.0 3.14 0.0 ./meshes/xyzrgb_dragon.obj yellow
 #mesh 0 4 35 0.05 0.05 0.05 0.0 3.14 0.0 ./meshes/xyzrgb_statuette.obj lightgreen
 #mesh 0 -2.5 35 2.5 2.5 2.5 0.0 1.51 0.0 ./meshes/dabrovic-sponza/sponza.obj whitejade

@@ -21,3 +21,15 @@
 - name: statue.png
   des: Statue, 10M triangles.
   id: "6"
+
+- name: iridescence.png
+  des: Spheres with iridescence.
+  id: "7"
+
+- name: ibunny.png
+  des: Bunny, dragon and 120-faces polyhedral with iridescence.
+  id: "8"
+
+- name: ibuddha.png
+  des: Buddha with iridescence.
+  id: "9"

@@ -1535,7 +1535,25 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 					if( Xi < Re ) {
 						ray = rf;
-						colormask *= mater.specular;
+
+						float3 rcolor = mater.specular;
+
+						bool hasIridescence = true;
+						if ( hasIridescence ) {
+							float thickness = 1e-5;
+							float wavelength = 1e-5;
+
+							float cosTheta = fabs(dot(ray.dir, h.n));
+							// compute light distance					
+							float distdiff = 2.0 * thickness / cosTheta;
+							float phasediff = distdiff / wavelength;
+
+							float3 icolor = hsv2rgb( make_float3( fracf(phasediff) * 360.0, 1.0, 1.0) );
+
+							rcolor = icolor;
+						}
+
+						colormask *= rcolor;
 					}
 					else {
 						float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
