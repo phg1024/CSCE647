@@ -224,12 +224,15 @@ void RayTracerWindow::display() {
 
 	renderer->computeFPS();
 
-	if( renderer->iterations == 32 ){ 
+	if( renderer->iterations == renderer->scene.maxIters() ){ 
 		screenshot("");
 	}
 }
 
 void RayTracerWindow::resize(int w, int h) {
+	// make sure the context is correct
+	makeCurrent();
+
 	cout << "resizing canvas to " << w << "x" << h << endl;
 	glfwSetWindowSize(window, w, h);
 	GLFWWindow::resize(w, h);
