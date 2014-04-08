@@ -102,7 +102,7 @@ struct CUDARayTracer {
 		AASamples = 1;
 		sMode = 1;
 		specType = 0;
-		tracingType = 1;
+		tracingType = 2;
 		iterations = 0;
 		gamma = 1.0;
 
@@ -114,7 +114,7 @@ struct CUDARayTracer {
 		frameCount = 0;
 	}
 
-	void init(int w, int h) {
+	void init() {
 		// initialize CUDA GPU
 		cudaDeviceReset();
 
@@ -126,19 +126,29 @@ struct CUDARayTracer {
 		GLFWWindowManager::instance()->registerWindow(window);
 		SDK_CHECK_ERROR_GL();
 
-		cout << "using GPU " << gpuGetMaxGflopsDeviceId() << endl;
-		cudaSetDevice(gpuGetMaxGflopsDeviceId());
+		int gpuIdx = gpuGetMaxGflopsDeviceId();
+		cout << "using GPU " << gpuIdx << endl;
+		cudaGLSetGLDevice(gpuIdx);
+
+		cudaDeviceProp devProp;
+        cudaGetDeviceProperties(&devProp, gpuIdx);
+        printDevProp(devProp);
+
+		//cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
+
+		// load the scene first
+		loadScene("scene0.txt");
+
+		window->resize(scene.width(), scene.height());
 
 		cout << "initializing renderer ..." << endl;
-		imagesize.x = w;
-		imagesize.y = h;
+		imagesize.x = scene.width();
+		imagesize.y = scene.height();
 		createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
 		
 		int sz = npixels() * sizeof(float3);
 		cudaMalloc((void**)&cumulatedColor, sz);
 		cudaMemset(cumulatedColor, 0, sz);
-
-		loadScene("scene0.txt");
 
 		clear();
 	}
@@ -192,10 +202,11 @@ struct CUDARayTracer {
 		caminfo.pos = camPos;
 		caminfo.right = caminfo.dir.cross(caminfo.up);
 
-		cudaMemcpyAsync(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
+		cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 
 		bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
 		setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
+		//checkCudaErrors(cudaThreadSynchronize());
 
 		switch( kernelIdx ) {
 		case 0:{
@@ -243,7 +254,12 @@ struct CUDARayTracer {
 			break;
 			   }
 		}
-		cudaThreadSynchronize();
+		/*
+		std::string errorstr = cudaGetErrorString(cudaPeekAtLastError());
+		cout << errorstr << endl;;
+		*/
+
+		//checkCudaErrors(cudaThreadSynchronize());
 
 		iterations++;
 
@@ -251,7 +267,7 @@ struct CUDARayTracer {
 		dim3 block(32, 32, 1);
 		dim3 grid(ceil(imagesize.x / (float)block.x), ceil(imagesize.y / (float)block.y), 1);
 		copy2pbo<<<grid,block>>>(cumulatedColor, pos, iterations, imagesize.x, imagesize.y, gamma);
-		cudaThreadSynchronize();
+		checkCudaErrors(cudaThreadSynchronize());
 	}
 
 	void render() {

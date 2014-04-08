@@ -56,6 +56,7 @@ bool GLFWWindow::init() {
 	int iOpenGLMinor = glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MINOR);
 	int iOpenGLRevision = glfwGetWindowAttrib(window, GLFW_CONTEXT_REVISION);
 	printf("Status: Using GLFW Version %s\n", glfwGetVersionString());
+	printf("Status: Using OpenGL Renderer: %s\n", glGetString(GL_RENDERER));
 	printf("Status: Using OpenGL Version: %i.%i, Revision: %i\n", iOpenGLMajor, iOpenGLMinor, iOpenGLRevision);
 	printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 
@@ -93,6 +94,7 @@ void GLFWWindow::cursor_pos(double x, double y) {
 }
 
 void GLFWWindow::screenshot(const string& filename) {
+	makeCurrent();
 	int width = w;
 	int height = h;
 	cout << "canvas size = " << w << "x" << h << endl;
@@ -114,7 +116,7 @@ void GLFWWindow::screenshot(const string& filename) {
 		}
 	}
 		
-	if ( FreeImage_Save (FIF_PNG, bitmap , "screenshot.png" , 0) )
+	if ( FreeImage_Save (FIF_PNG, bitmap , filename.c_str(), 0) )
 		cout << "screenshot.png saved!" << endl;
 }
 

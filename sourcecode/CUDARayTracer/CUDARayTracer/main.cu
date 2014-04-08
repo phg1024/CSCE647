@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 	srand(clock());
 	
 	CUDARayTracer raytracer;
-	raytracer.init(640, 480);
+	raytracer.init();
 	raytracer.run();
 	
 	FreeImage_DeInitialise();

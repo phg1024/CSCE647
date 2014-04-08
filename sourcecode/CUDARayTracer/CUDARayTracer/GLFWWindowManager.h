@@ -32,6 +32,9 @@ public:
 		Down
 	};
 
+	MouseState() { 
+		state[0] = state[1] = state[2] = Up;
+	}
 	void setPosition(double x, double y) { xpos = x; ypos = y; }
 	void setState(Button btn, State sta) { state[btn] = sta; }
 	State getState(Button btn) { return state[btn]; }

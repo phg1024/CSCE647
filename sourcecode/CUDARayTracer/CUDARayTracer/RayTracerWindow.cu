@@ -58,9 +58,8 @@ void CUDARayTracer::loadScene(const string& filename) {
 			 << endl;
 	}
 
-	cam = scene.camera();
-
-	window->resize(scene.width(), scene.height());
+	gamma = scene.gammaValue();
+	cam = scene.camera();	
 
 	cudaMalloc((void**)&d_cam, sizeof(Camera));
 	cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice);
@@ -225,7 +224,10 @@ void RayTracerWindow::display() {
 	renderer->computeFPS();
 
 	if( renderer->iterations == renderer->scene.maxIters() ){ 
-		screenshot("");
+		screenshot(renderer->scene.sceneName());
+
+		// hard coded
+		exit(0);
 	}
 }
 
@@ -234,6 +236,8 @@ void RayTracerWindow::resize(int w, int h) {
 	makeCurrent();
 
 	cout << "resizing canvas to " << w << "x" << h << endl;
+
+	// @fixme need to clean up this mess
 	glfwSetWindowSize(window, w, h);
 	GLFWWindow::resize(w, h);
 	tball.reshape(w, h);
@@ -278,7 +282,7 @@ void RayTracerWindow::keyboard(int key, int scancode, int action, int mods) {
 		renderer->specType = (renderer->specType + 1) % 5;
 		break;
 	case GLFW_KEY_C:
-		screenshot("");
+		screenshot(renderer->scene.sceneName());
 		break;
 	case GLFW_KEY_ESCAPE:
 		glfwTerminate();
@@ -332,7 +336,7 @@ void RayTracerWindow::cursor_pos(double x, double y) {
 }
 
 void RayTracerWindow::screenshot(const string& filename) {
-	GLFWWindow::screenshot(filename);
+	GLFWWindow::screenshot(filename + ".png");
 
 	// save HDR image
 	vector<float3> buffer(w*h);
@@ -344,7 +348,9 @@ void RayTracerWindow::screenshot(const string& filename) {
 			flipped[offset] = buffer[idx];
 		}
 	}
-	FILE* f = fopen("screenshot.hdr","wb");
+
+	string hdrfilename = filename + ".hdr";
+	FILE* f = fopen(hdrfilename.c_str(),"wb");
 	RGBE_WriteHeader(f,w,h,NULL);
 	RGBE_WritePixels(f,&(flipped[0].x),w*h);
 	fclose(f);

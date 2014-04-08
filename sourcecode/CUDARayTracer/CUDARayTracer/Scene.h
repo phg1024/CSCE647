@@ -38,12 +38,15 @@ public:
 	int width() const { return w; }
 	int height() const { return h; }
 	int maxIters() const { return maxiters; }
+	const string& sceneName() const { return name; }
+	float gammaValue() const { return gamma; }
 
 protected:
 	void parse(const string& line);
 
 private:
 	int maxiters;
+	float gamma;
 	int w, h;
 
 	Camera cam;
@@ -54,4 +57,5 @@ private:
 	map<string, int> materialMap;
 
 	int envmap;
+	string name;
 };

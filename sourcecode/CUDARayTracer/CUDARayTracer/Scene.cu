@@ -5,7 +5,9 @@
 
 Scene::Scene(void)
 {
-	envmap = -1;
+	envmap = -1;	// by default, no environment mapping
+	name = "scene"; // default name
+	gamma = 1.0;	// default gamma
 }
 
 
@@ -45,6 +47,9 @@ void Scene::parse(const string& line)
 
 	std::for_each(tag.begin(), tag.end(), ::tolower);
 	
+	if( tag == "name" ) {
+		ss >> name;
+	}
 	if( tag == "environment" ) {
 		string texFile;
 		ss >> texFile;
@@ -59,6 +64,9 @@ void Scene::parse(const string& line)
 	}
 	else if( tag == "maxiters" ) {
 		ss >> maxiters;
+	}
+	else if( tag == "gamma" ) {
+		ss >> gamma;
 	}
 	else if( tag == "canvas" ) {
 		ss >> w >> h;
