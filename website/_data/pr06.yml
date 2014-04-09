@@ -1,7 +1,23 @@
+- name: spheres.png
+  des: Transparent spheres.
+  id: "1"
+
+- name: all.png
+  des: Spheres, cube and triangle mesh.
+  id: "2"
+
+- name: normalNior.png
+  des: Normal direction defined by a bump map and index of refraction defined by a texture map. As a comparison, the two green spheres are rendered using the same texture, with the left one for normal vector and the right one for index of refraction (ior = length of normal vector before normalization).
+  id: "3"
+
 - name: glassbunny.png
-  des: Cool effects - Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds.
-  id: "7"
+  des: Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds.
+  id: "4"
 
 - name: translucency.png
-  des: Cool effects - Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right.
-  id: "8"
+  des: Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right.
+  id: "5"
+
+- name: bunnyNdragon2.png
+  des: Translucent bunny and transparent dragons.
+  id: "6"
