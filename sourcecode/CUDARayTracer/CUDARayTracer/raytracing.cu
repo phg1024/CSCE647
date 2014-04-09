@@ -1371,7 +1371,7 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 }
 
 __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
-	const int maxBounces = 32;
+	const int maxBounces = 8;
 	float3 accumulatedColor = make_float3(0.0);
 	float3 colormask = make_float3(1.0);		// not absorbed color
 	const float Wcutoff = 1e-6;

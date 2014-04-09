@@ -102,7 +102,7 @@ struct CUDARayTracer {
 		AASamples = 1;
 		sMode = 1;
 		specType = 0;
-		tracingType = 2;
+		tracingType = 1;
 		iterations = 0;
 		gamma = 1.0;
 
@@ -116,7 +116,7 @@ struct CUDARayTracer {
 
 	void init() {
 		// initialize CUDA GPU
-		cudaDeviceReset();
+		//cudaDeviceReset();
 
 		sdkCreateTimer(&timer);
 

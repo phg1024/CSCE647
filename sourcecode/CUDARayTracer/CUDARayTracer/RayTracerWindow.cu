@@ -59,6 +59,8 @@ void CUDARayTracer::loadScene(const string& filename) {
 	}
 
 	gamma = scene.gammaValue();
+	tracingType = scene.tracingType();
+
 	cam = scene.camera();	
 
 	cudaMalloc((void**)&d_cam, sizeof(Camera));

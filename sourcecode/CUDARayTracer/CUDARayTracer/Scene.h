@@ -40,13 +40,14 @@ public:
 	int maxIters() const { return maxiters; }
 	const string& sceneName() const { return name; }
 	float gammaValue() const { return gamma; }
-
+	int tracingType() const { return ttype; }
 protected:
 	void parse(const string& line);
 
 private:
 	int maxiters;
 	float gamma;
+	int ttype;
 	int w, h;
 
 	Camera cam;
