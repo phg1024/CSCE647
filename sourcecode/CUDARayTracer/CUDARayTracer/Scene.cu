@@ -8,6 +8,7 @@ Scene::Scene(void)
 	envmap = -1;	// by default, no environment mapping
 	name = "scene"; // default name
 	gamma = 1.0;	// default gamma
+	ttype = 1;
 }
 
 
@@ -49,6 +50,9 @@ void Scene::parse(const string& line)
 	
 	if( tag == "name" ) {
 		ss >> name;
+	}
+	if( tag == "tracingtype" ) {
+		ss >> ttype;
 	}
 	if( tag == "environment" ) {
 		string texFile;
