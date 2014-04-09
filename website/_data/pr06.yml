@@ -1,0 +1,7 @@
+- name: glassbunny.png
+  des: Cool effects - Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds.
+  id: "7"
+
+- name: translucency.png
+  des: Cool effects - Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right.
+  id: "8"

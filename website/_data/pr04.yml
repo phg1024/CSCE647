@@ -2,7 +2,7 @@
   des: Polygon mesh, 120 triangles, rendered in 22 seconds.
   id: "1"
 
-- name: bunnydragon.png
+- name: bunnydragon2.png
   des: Bunny (69451 triangles) and dragon (871414 triangles), took about 9 minutes to render.
   id: "2"
 
@@ -34,5 +34,5 @@
   des: Cool effects - Jade dragon, 871414 triangles, rendered in about an hour.
   id: "9"
 
-- name: msw.png
+- name: msw_10k.png
   des: Cool effects - Marble bunny, silver dragon and wood teapot, rendered in about an hour.
