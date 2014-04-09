@@ -5,6 +5,7 @@
 
 #include "definitions.h"
 #include "utils.h"
+#include "pixel.h"
 #include "proceduralTexture.cuh"
 #include "extras/containers/cudaContainers.h"
 
@@ -1371,7 +1372,7 @@ __device__ float3 computeShadow(int2 res, float time, int x, int y, float3 v, fl
 }
 
 __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
-	const int maxBounces = 8;
+	const int maxBounces = 64;
 	float3 accumulatedColor = make_float3(0.0);
 	float3 colormask = make_float3(1.0);		// not absorbed color
 	const float Wcutoff = 1e-6;
@@ -1573,6 +1574,34 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 			}
 		case Material::Refractive:
 			{
+				
+				if( mater.normalTex != -1 ) {
+					// modify normal direction
+					float3 n_normalmap = texturefunc(mater.normalTex, h.tex, h.p, 1)*2.0-1.0;
+										
+					float3 tangent;
+					if( shapes[h.objIdx].t == Shape::PLANE )
+						tangent = shapes[h.objIdx].axis[1];
+					else
+						tangent = normalize(sphere_tangent(h.n));
+					float3 bitangent = cross(h.n, tangent);
+
+					// find the mapping from tangent space to camera space
+					mat3 m_t = mat3(tangent, bitangent, h.n);
+
+					mat3 m_t_inv = m_t.inv();
+
+					// change it
+					h.n = (m_t_inv*n_normalmap);
+				}
+
+				float ior;
+				if( mater.diffuseTex != -1 ) {
+					float3 texval = texturefunc(mater.diffuseTex, h.tex, h.p);
+					ior = fmaxf(length(texval), 1.0);
+				}
+				else ior = mater.eta;
+
 				// get the reflected ray
 				Ray rf;
 				rf.origin = h.p; rf.dir = normalize(reflect(ray.dir, h.n));
@@ -1580,7 +1609,7 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 				double dDn = dot(h.n, ray.dir);
 				float3 n1 = dDn<0?h.n:-h.n;
 				bool into = dDn<0;
-				double nc=1.0, nt=mater.eta;
+				double nc=1.0, nt=ior;
 				double nnt=into?nc/nt:nt/nc, ddn = dot(ray.dir, n1);
 				double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
 
@@ -1616,11 +1645,14 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 						if(into) {
 							//printf("in\n");
 
-							float3 Idiff;
+							float3 Idiff = mater.diffuse;
+
+							/*
 							if( mater.diffuseTex != -1 ) {
 								Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
 							}
 							else Idiff = mater.diffuse;
+							*/
 
 							asprop.absortionCoeffs = 1.0 - Idiff;
 							asprop.reducedScatteringCoeffs = mater.Ks;
@@ -1638,6 +1670,374 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 	}
 
 	return accumulatedColor;
+}
+
+__device__ void traceRay_general_singlepass(float time, PixelState& pix, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
+	const float Wcutoff = 1e-6;
+
+	if( dot(pix.colormask, pix.colormask) < Wcutoff ) {
+		// terminate low weight ray
+		pix.accumulatedColor += pix.colormask;
+		pix.isActive = false;
+		return;
+	}
+
+	thrust::default_random_engine rng( myhash(time) * myhash(pix.idx) );
+	thrust::uniform_real_distribution<float> uniformDistribution(0,1);
+
+	Hit h = rayIntersectsShapes(pix.ray, nShapes, shapes);		
+
+	if( h.objIdx == -1 ) {	
+		// no hit, sample environment map
+		if( envMapIdx >= 0 ) {
+			float2 t = spheremap(pix.ray.dir);
+			pix.colormask *= tofloat3(tex2D<float4>(tex[envMapIdx], -t.x, t.y));
+		}
+		else {
+			const float3 bgcolor = make_float3(.90, .95, .975);
+			pix.colormask *= bgcolor;
+		}
+
+		pix.accumulatedColor += pix.colormask;
+		pix.isActive = false;
+		return;
+	}
+
+	const d_Material& mater = mats[shapes[h.objIdx].materialId];
+
+	// process scattering and absorption
+	const float ZERO_ABSOPTION_THRESHOLD = 0.00001;
+	if ( pix.asprop.reducedScatteringCoeffs > 0 || dot(pix.asprop.absortionCoeffs, pix.asprop.absortionCoeffs) >= ZERO_ABSOPTION_THRESHOLD ) {
+		float randomFloatForScatteringDistance = uniformDistribution(rng);
+		float scatteringDistance = -log(randomFloatForScatteringDistance) / pix.asprop.reducedScatteringCoeffs;
+		if (scatteringDistance < h.t) {
+			// printf("SS: %f %f %f %f\n", asprop.reducedScatteringCoeffs, asprop.absortionCoeffs.x, asprop.absortionCoeffs.y, asprop.absortionCoeffs.z);
+			// Both absorption and scattering - subsurface scattering
+			// Scatter the ray:
+			Ray nextRay;
+			nextRay.origin = hitpoint(pix.ray, scatteringDistance);
+			float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+			nextRay.dir = calculateRandomDirectionInSphere(uv.x, uv.y); // Isoptropic scattering!
+
+			pix.ray = nextRay;
+
+			// Compute how much light was absorbed along the ray before it was scattered:
+			pix.colormask *= transmission(pix.asprop.absortionCoeffs, scatteringDistance);
+
+			// That's it for this iteration!
+			return;
+		} else {
+			// Just absorption.
+			float3 trans = transmission(pix.asprop.absortionCoeffs, h.t);
+			pix.colormask *= trans;
+		}
+	}
+
+	switch( mater.t ) {
+	case Material::Emissive:
+		{				
+			//float maxf = fmaxf(shapes[h.objIdx].material.emission.x, shapes[h.objIdx].material.emission.y);
+			//maxf = fmaxf(shapes[h.objIdx].material.emission.z, maxf);				
+
+			// hit a light
+			pix.accumulatedColor += mater.emission * pix.colormask;
+			pix.colormask *= mater.emission;
+
+			// send it out again
+			pix.ray.origin = h.p + 1e-3 * h.n;
+			float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+
+			pix.ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
+			return;
+		}
+	case Material::Diffuse:
+		{				
+			// merged glossy and diffuse
+			// change the coefficient Kr to adjust the glossy amount
+
+			// direct lighting
+			//float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx);
+			//accumulatedColor += shading * colormask;
+
+			float3 color;
+			if( mater.diffuseTex != -1 ) {
+				color = texturefunc(mater.diffuseTex, h.tex, h.p);
+			}
+			else color = mater.diffuse;
+
+			pix.colormask *= color;
+
+			pix.ray.origin = h.p + 1e-3 * h.n;
+			pix.ray.dir = reflect(pix.ray.dir, h.n);
+
+			float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+
+			pix.ray.dir = mix(pix.ray.dir, calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), mater.Kr);
+
+			pix.ray.dir = normalize(pix.ray.dir);
+			break;
+		}
+	case Material::Specular:
+		{
+			if( mater.normalTex != -1 ) {
+				// modify normal direction
+				float3 n_normalmap = texturefunc(mater.normalTex, h.tex, h.p, 1)*2.0-1.0;
+
+				float3 tangent;
+				if( shapes[h.objIdx].t == Shape::PLANE )
+					tangent = shapes[h.objIdx].axis[1];
+				else
+					tangent = normalize(sphere_tangent(h.n));
+				float3 bitangent = cross(h.n, tangent);
+
+				// find the mapping from tangent space to camera space
+				mat3 m_t = mat3(tangent, bitangent, h.n);
+
+				mat3 m_t_inv = m_t.inv();
+
+				// change it
+				h.n = (m_t_inv*n_normalmap);
+			}
+
+			// get the reflected ray
+			Ray rf;
+			rf.origin = h.p; rf.dir = normalize(reflect(pix.ray.dir, h.n));
+
+			double dDn = dot(h.n, pix.ray.dir);
+			float3 n1 = dDn<0?h.n:-h.n;
+			bool into = dDn<0;
+			double nc=1.0, nt=mater.eta;
+			double nnt=into?nc/nt:nt/nc, ddn = dot(pix.ray.dir, n1);
+			double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
+
+			if( cos2t<0.0 ) {
+				// total internal reflection
+				rf.origin -= 1e-3 * h.n;
+				pix.ray = rf;
+			}
+			else {
+				// choose either reflection or refraction
+				Ray rr;
+				rr.origin = h.p - 1e-3 * n1; 
+				rr.dir = normalize(nnt*pix.ray.dir-(into?1.0:-1.0)*(ddn*nnt+sqrtf(cos2t))*h.n);
+
+				float a = nt-nc, b = nt+nc, R0 = a*a/(b*b), c = 1.0 - (into?-ddn:dot(rr.dir, h.n));
+				float Re = R0 + (1-R0)*powf(c, 5.0), Tr =1.0 - Re, P=0.25+0.5*Re, RP = Re/P, TP = Tr/(1.0-P);
+
+				float Xi = uniformDistribution(rng);
+
+				if( Xi < Re ) {
+					pix.ray = rf;
+
+					float3 rcolor = mater.specular;
+
+					bool hasIridescence = true;
+					if ( hasIridescence ) {
+						float thickness = 1e-5;
+						float wavelength = 1e-5;
+
+						float cosTheta = fabs(dot(pix.ray.dir, h.n));
+						// compute light distance					
+						float distdiff = 2.0 * thickness / cosTheta;
+						float phasediff = distdiff / wavelength;
+
+						float3 icolor = hsv2rgb( make_float3( fracf(phasediff) * 360.0, 1.0, 1.0) );
+
+						rcolor = icolor;
+					}
+
+					pix.colormask *= rcolor;
+				}
+				else {
+					float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+					pix.ray = rr;
+					pix.ray.dir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
+
+					float3 Idiff;
+					if( mater.diffuseTex != -1 ) {
+						Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
+					}
+					else Idiff = mater.diffuse;
+
+					pix.colormask *= Idiff;
+				}
+			}
+			break;
+		}
+	case Material::Refractive:
+		{
+
+			if( mater.normalTex != -1 ) {
+				// modify normal direction
+				float3 n_normalmap = texturefunc(mater.normalTex, h.tex, h.p, 1)*2.0-1.0;
+
+				float3 tangent;
+				if( shapes[h.objIdx].t == Shape::PLANE )
+					tangent = shapes[h.objIdx].axis[1];
+				else
+					tangent = normalize(sphere_tangent(h.n));
+				float3 bitangent = cross(h.n, tangent);
+
+				// find the mapping from tangent space to camera space
+				mat3 m_t = mat3(tangent, bitangent, h.n);
+
+				mat3 m_t_inv = m_t.inv();
+
+				// change it
+				h.n = (m_t_inv*n_normalmap);
+			}
+
+			float ior;
+			if( mater.diffuseTex != -1 ) {
+				float3 texval = texturefunc(mater.diffuseTex, h.tex, h.p);
+				ior = fmaxf(length(texval), 1.0);
+			}
+			else ior = mater.eta;
+
+			// get the reflected ray
+			Ray rf;
+			rf.origin = h.p; rf.dir = normalize(reflect(pix.ray.dir, h.n));
+
+			double dDn = dot(h.n, pix.ray.dir);
+			float3 n1 = dDn<0?h.n:-h.n;
+			bool into = dDn<0;
+			double nc=1.0, nt=ior;
+			double nnt=into?nc/nt:nt/nc, ddn = dot(pix.ray.dir, n1);
+			double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
+
+			if( cos2t<0.0 ) {
+				// total internal reflection
+				rf.origin -= 1e-3 * h.n;
+				pix.ray = rf;
+			}
+			else {
+				// choose either reflection or refraction
+				Ray rr;
+				rr.origin = h.p - 1e-3 * n1; 
+				rr.dir = normalize(nnt*pix.ray.dir-(into?1.0:-1.0)*(ddn*nnt+sqrtf(cos2t))*h.n);
+
+				float a = nt-nc, b = nt+nc, R0 = a*a/(b*b), c = 1.0 - (into?-ddn:dot(rr.dir, h.n));
+				float Re = R0 + (1-R0)*powf(c, 5.0), Tr =1.0 - Re, P=0.25+0.5*Re, RP = Re/P, TP = Tr/(1.0-P);
+
+				float Xi = uniformDistribution(rng);
+
+				if( Xi < Re ) {
+					pix.ray = rf;
+					pix.colormask *= mater.specular;
+				}
+				else {
+					pix.ray = rr;
+
+					// purturb the refraction direction a little bit
+					float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
+					float3 pdir = calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y);
+
+					pix.ray.dir = normalize(mix(pix.ray.dir, pdir, mater.Kf));
+
+					if(into) {
+						//printf("in\n");
+
+						float3 Idiff = mater.diffuse;
+
+						/*
+						if( mater.diffuseTex != -1 ) {
+						Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
+						}
+						else Idiff = mater.diffuse;
+						*/
+
+						pix.asprop.absortionCoeffs = 1.0 - Idiff;
+						pix.asprop.reducedScatteringCoeffs = mater.Ks;
+					}
+					else {
+						//printf("out\n");
+						pix.asprop.absortionCoeffs = make_float3(0.0);
+						pix.asprop.reducedScatteringCoeffs = 0.0;
+					}
+				}
+			}
+			break;
+		}
+	}
+}
+
+
+__device__ int dLightsCount;
+__device__ int dShapesCount;
+__device__ int dMaterialCount;
+__device__ d_Shape dShapes[16];
+__device__ int dLights[4];
+__device__ d_Material dMaterial[64];
+
+__global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes, int nMaterials, Material* materials) {
+	int tidx = threadIdx.x;
+	int tidy = threadIdx.y;
+
+	dLightsCount = nLights;
+	dShapesCount = nShapes;
+	dMaterialCount = nMaterials;
+	int tid = tidy * blockDim.x + tidx;
+	if( tid < nLights )	dLights[tid] = lights[tid];	
+	if( tid < nMaterials )	dMaterial[tid].init(materials[tid]);
+	if( tid < nShapes ){
+		dShapes[tid].init(shapes[tid]);
+		//inShapes[tid].material = inMaterial[inShapes[tid].materialId];
+	}
+}
+
+__global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height) {
+	int tidx = threadIdx.x;
+	int tidy = threadIdx.y;
+
+	int2 resolution = make_int2(width, height);
+
+	// pixel position
+	unsigned int x = blockIdx.x*blockDim.x + tidx;
+	unsigned int y = blockIdx.y*blockDim.y + tidy;
+
+	if( x > width - 1 || y > height - 1 ) return;
+	int pidx = y * width + x;
+
+	// set all pixel to be active
+	activeIdx[pidx] = pidx;
+
+	PixelState& p = pixels[pidx];
+	p.isActive = true;
+	p.idx = pidx;
+	
+	p.accumulatedColor = make_float3(0.0);
+	p.colormask = make_float3(1.0);
+	p.asprop.reset();
+
+	// generate a ray with jittering
+	float2 offset = generateRandomNumberFromThread2(resolution, time, x, y);
+	float u = x + offset.x;
+	float v = y + offset.y;
+	u = u / (float) width - 0.5;
+	v = v / (float) height - 0.5;
+
+	p.ray = generateRay(cam, u, v);	
+}
+
+__global__ void raytrace_singlepass(float time, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height) 
+{
+	unsigned int tid = blockIdx.x*blockDim.x + threadIdx.x;
+	if( tid >= activeCount ) return;
+	int pidx = activeIdx[tid];
+	PixelState& p = pixels[pidx];
+	if( p.isActive ) {
+		// only trace active ray
+		traceRay_general_singlepass(time, p, dShapesCount, dShapes, dLightsCount, dLights, dMaterialCount, dMaterial);		
+	}
+}
+
+__global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, int height) {
+	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if( x > width - 1 || y > height - 1 ) return;
+	int pidx = y*width+x;
+	color[pidx] += pixels[pidx].accumulatedColor;
 }
 
 __global__ void clearCumulatedColor(float3* color, int w, int h) {

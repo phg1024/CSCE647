@@ -287,7 +287,7 @@ void RayTracerWindow::keyboard(int key, int scancode, int action, int mods) {
 		screenshot(renderer->scene.sceneName());
 		break;
 	case GLFW_KEY_ESCAPE:
-		glfwTerminate();
+		exit(0);
 		break;
 	}
 }

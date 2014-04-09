@@ -19,11 +19,14 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
-
+#include <thrust/count.h>
+#include <thrust/functional.h>
+#include <thrust/remove.h>
 
 #include "element.h"
 #include "definitions.h"
 #include "Scene.h"
+#include "pixel.h"
 #include "trackball.h"
 
 #include "extras/aabbtree/aabbtree.h"
@@ -37,6 +40,11 @@ extern __global__ void bindTexture2(const cudaTextureObject_t* texs, int texCoun
 
 extern __global__ void copy2pbo(float3*, float3*, int, int, int, float);
 extern __global__ void clearCumulatedColor(float3*, int, int);
+
+extern __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height);
+extern __global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes, int nMaterials, Material* materials);
+extern __global__ void raytrace_singlepass(float time, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height);
+extern __global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, int height);
 
 extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
 						 int nLights, int* lights, 
@@ -150,7 +158,32 @@ struct CUDARayTracer {
 		cudaMalloc((void**)&cumulatedColor, sz);
 		cudaMemset(cumulatedColor, 0, sz);
 
+		pixels.resize(npixels());
+		activePixels0.resize(npixels());
+		activePixels1.resize(npixels());
+
 		clear();
+	}
+
+	void resize(int w, int h) {
+		// no need to resize
+		if( w == imagesize.x && h == imagesize.y ) return;
+		imagesize.x = w;
+		imagesize.y = h;
+		
+		createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
+		
+		if( cumulatedColor ) cudaFree(cumulatedColor);
+		int sz = npixels() * sizeof(float3);
+		cudaMalloc((void**)&cumulatedColor, sz);
+		cudaMemset(cumulatedColor, 0, sz);
+
+		pixels.resize(npixels());
+		activePixels0.resize(npixels());
+		activePixels1.resize(npixels());
+
+		cam.h = atan(0.5 * cam.fov / 180.0 * MathUtils::PI) * cam.f;
+		cam.w = w / (float)h * cam.h;
 	}
 
 	void computeFPS() {
@@ -270,8 +303,68 @@ struct CUDARayTracer {
 		checkCudaErrors(cudaThreadSynchronize());
 	}
 
+	void launch_rendering_kernel_singlepass_mode(float3 *pos) {
+		TrackBall& tball = window->trackball();
+		mat4 mat(tball.getInverseMatrix());
+		mat = mat.trans();
+
+		vec3 camPos = cam.pos;
+		vec3 camDir = cam.dir;
+		vec3 camUp = cam.up;
+
+		camPos = (mat * (camPos / tball.getScale()));
+		camDir = (mat * camDir);
+		camUp = (mat * camUp);
+
+		Camera caminfo = cam;
+		caminfo.dir = camDir;
+		caminfo.up = camUp;
+		caminfo.pos = camPos;
+		caminfo.right = caminfo.dir.cross(caminfo.up);
+
+		cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
+
+		bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
+		setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
+		initScene<<<1,64>>>(lights.size(), d_lights, shapes.size(), d_shapes, materials.size(), d_materials);
+
+		dim3 block(32, 32, 1);
+		dim3 grid(ceil(imagesize.x / (float)block.x), ceil(imagesize.y / (float)block.y), 1);
+
+		int seed = iterations+rand();
+		initPixel<<<grid, block>>>(
+			thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]),
+			d_cam, seed, imagesize.x, imagesize.y);
+		//checkCudaErrors(cudaThreadSynchronize());
+
+		PixelActivivtyTester tester(thrust::raw_pointer_cast(&pixels[0]));
+
+		int count = activePixels0.size();
+		const int maxBounces = 64;
+		for(int i=0;i<maxBounces;i++) {
+			raytrace_singlepass<<<ceil(count/1024.0), 1024>>>( seed+i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), count, imagesize.x, imagesize.y );
+			checkCudaErrors(cudaThreadSynchronize());
+
+			thrust::device_vector<int>::iterator activeEnd = thrust::remove_if( activePixels0.begin(), activePixels0.begin()+count,  tester );
+			count = activeEnd - activePixels0.begin();
+			cout << "bounce #" << i << " active count = " << count << endl;
+			if( !count ) break;	// break if no more active pixels
+		}
+
+		collectPixelValue<<<grid, block>>>( cumulatedColor, thrust::raw_pointer_cast(&pixels[0]), imagesize.x, imagesize.y );
+
+		//checkCudaErrors(cudaThreadSynchronize());
+
+		iterations++;
+
+		// copy to pbo
+		copy2pbo<<<grid,block>>>(cumulatedColor, pos, iterations, imagesize.x, imagesize.y, gamma);
+		checkCudaErrors(cudaThreadSynchronize());
+	}
+
 	void render() {
 		sdkStartTimer(&timer);
+
 		// map OpenGL buffer object for writing from CUDA
 		float3 *dptr;
 		checkCudaErrors(cudaGraphicsMapResources(1, &cuda_vbo_resource, 0));
@@ -280,7 +373,8 @@ struct CUDARayTracer {
 			cuda_vbo_resource));
 		//printf("CUDA mapped VBO: May access %ld bytes\n", num_bytes);
 
-		launch_rendering_kernel(dptr, sMode);
+		//launch_rendering_kernel(dptr, sMode);
+		launch_rendering_kernel_singlepass_mode(dptr);
 
 		// unmap buffer object
 		checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_vbo_resource, 0));
@@ -290,23 +384,6 @@ struct CUDARayTracer {
 
 	void run() {
 		GLFWWindowManager::instance()->run();		
-	}
-
-	void resize(int w, int h) {
-		// no need to resize
-		if( w == imagesize.x && h == imagesize.y ) return;
-		imagesize.x = w;
-		imagesize.y = h;
-		
-		createVBO(&vbo, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard);
-		
-		if( cumulatedColor ) cudaFree(cumulatedColor);
-		int sz = npixels() * sizeof(float3);
-		cudaMalloc((void**)&cumulatedColor, sz);
-		cudaMemset(cumulatedColor, 0, sz);
-		
-		cam.h = atan(0.5 * cam.fov / 180.0 * MathUtils::PI) * cam.f;
-		cam.w = w / (float)h * cam.h;
 	}
 
 	void createVBO(GLuint *vbo, struct cudaGraphicsResource **vbo_res, unsigned int vbo_res_flags);
@@ -351,6 +428,9 @@ struct CUDARayTracer {
 	// rendered image
 	int2 imagesize;
 	float3* cumulatedColor;
+	thrust::device_vector<PixelState> pixels;
+	thrust::device_vector<int> activePixels0, activePixels1;
+
 
 	// rendering related resources
 	GLuint vbo;
