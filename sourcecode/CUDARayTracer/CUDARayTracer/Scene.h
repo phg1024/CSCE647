@@ -38,16 +38,21 @@ public:
 	int width() const { return w; }
 	int height() const { return h; }
 	int maxIters() const { return maxiters; }
+	int maxBounces() const { return maxbounces; }
 	const string& sceneName() const { return name; }
 	float gammaValue() const { return gamma; }
 	int tracingType() const { return ttype; }
+	int saveInterval() const { return interval;	}
+
 protected:
 	void parse(const string& line);
 
 private:
 	int maxiters;
+	int interval;
 	float gamma;
 	int ttype;
+	int maxbounces;
 	int w, h;
 
 	Camera cam;

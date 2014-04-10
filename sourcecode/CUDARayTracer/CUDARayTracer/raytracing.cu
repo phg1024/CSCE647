@@ -1672,17 +1672,18 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 	return accumulatedColor;
 }
 
-__device__ void traceRay_general_singlepass(float time, PixelState& pix, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
-	const float Wcutoff = 1e-6;
+__device__ float3 computeBackgroundColor(const float3 & direction) {
+	float position = (dot(direction, normalize(make_float3(-0.5, 0.5, -1.0))) + 1) / 2;
+	float3 firstColor = make_float3(0.15, 0.3, 0.5); // Bluish.
+	float3 secondColor = make_float3(1.0, 1.0, 1.0); // White.
+	float3 interpolatedColor = (1 - position) * firstColor + position * secondColor;
+	float radianceMultiplier = 1.0;
+	return interpolatedColor * radianceMultiplier;
+}
 
-	if( dot(pix.colormask, pix.colormask) < Wcutoff ) {
-		// terminate low weight ray
-		pix.accumulatedColor += pix.colormask;
-		pix.isActive = false;
-		return;
-	}
+__device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
 
-	thrust::default_random_engine rng( myhash(time) * myhash(pix.idx) );
+	thrust::default_random_engine rng( myhash(seed) * myhash(pix.idx) * myhash(pass) );
 	thrust::uniform_real_distribution<float> uniformDistribution(0,1);
 
 	Hit h = rayIntersectsShapes(pix.ray, nShapes, shapes);		
@@ -1694,7 +1695,7 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 			pix.colormask *= tofloat3(tex2D<float4>(tex[envMapIdx], -t.x, t.y));
 		}
 		else {
-			const float3 bgcolor = make_float3(.90, .95, .975);
+			const float3 bgcolor = computeBackgroundColor(pix.ray.dir);
 			pix.colormask *= bgcolor;
 		}
 
@@ -1741,7 +1742,7 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 
 			// hit a light
 			pix.accumulatedColor += mater.emission * pix.colormask;
-			pix.colormask *= mater.emission;
+			pix.colormask *= mater.diffuse;
 
 			// send it out again
 			pix.ray.origin = h.p + 1e-3 * h.n;
@@ -1765,6 +1766,7 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 			}
 			else color = mater.diffuse;
 
+			//pix.accumulatedColor += pix.colormask * mater.emission;
 			pix.colormask *= color;
 
 			pix.ray.origin = h.p + 1e-3 * h.n;
@@ -1799,54 +1801,49 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 				h.n = (m_t_inv*n_normalmap);
 			}
 
-			// get the reflected ray
 			Ray rf;
 			rf.origin = h.p; rf.dir = normalize(reflect(pix.ray.dir, h.n));
 
 			double dDn = dot(h.n, pix.ray.dir);
-			float3 n1 = dDn<0?h.n:-h.n;
-			bool into = dDn<0;
+			float3 n1 = -h.n;
+
 			double nc=1.0, nt=mater.eta;
-			double nnt=into?nc/nt:nt/nc, ddn = dot(pix.ray.dir, n1);
+			double nnt=nc/nt, ddn = dot(pix.ray.dir, n1);
 			double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
 
-			if( cos2t<0.0 ) {
+			if( cos2t < 0.0 ) {
 				// total internal reflection
 				rf.origin -= 1e-3 * h.n;
 				pix.ray = rf;
 			}
 			else {
-				// choose either reflection or refraction
 				Ray rr;
 				rr.origin = h.p - 1e-3 * n1; 
-				rr.dir = normalize(nnt*pix.ray.dir-(into?1.0:-1.0)*(ddn*nnt+sqrtf(cos2t))*h.n);
+				rr.dir = normalize(nnt*pix.ray.dir-(ddn*nnt+sqrtf(cos2t))*h.n);
 
-				float a = nt-nc, b = nt+nc, R0 = a*a/(b*b), c = 1.0 - (into?-ddn:dot(rr.dir, h.n));
-				float Re = R0 + (1-R0)*powf(c, 5.0), Tr =1.0 - Re, P=0.25+0.5*Re, RP = Re/P, TP = Tr/(1.0-P);
+				Fresnel fsl = fresnel(h.n, pix.ray.dir, 1.0, mater.eta, rf.dir, rr.dir);
 
 				float Xi = uniformDistribution(rng);
 
-				if( Xi < Re ) {
+				if( Xi < fsl.reflectionCoeffs ) {
+					rf.origin += 1e-3 * h.n;
 					pix.ray = rf;
 
-					float3 rcolor = mater.specular;
+#ifdef INCLUDE_IRIDESCENCE
+					float thickness = 1e-5;
+					float wavelength = 1e-5;
 
-					bool hasIridescence = true;
-					if ( hasIridescence ) {
-						float thickness = 1e-5;
-						float wavelength = 1e-5;
+					float cosTheta = fabs(dot(pix.ray.dir, h.n));
+					// compute light distance					
+					float distdiff = 2.0 * thickness / cosTheta;
+					float phasediff = distdiff / wavelength;
 
-						float cosTheta = fabs(dot(pix.ray.dir, h.n));
-						// compute light distance					
-						float distdiff = 2.0 * thickness / cosTheta;
-						float phasediff = distdiff / wavelength;
+					float3 icolor = hsv2rgb( make_float3( fracf(phasediff) * 360.0, 1.0, 1.0) );
 
-						float3 icolor = hsv2rgb( make_float3( fracf(phasediff) * 360.0, 1.0, 1.0) );
-
-						rcolor = icolor;
-					}
-
-					pix.colormask *= rcolor;
+					pix.colormask *= icolor;
+#else
+					pix.colormask *= mater.specular;
+#endif
 				}
 				else {
 					float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
@@ -1859,7 +1856,8 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 					}
 					else Idiff = mater.diffuse;
 
-					pix.colormask *= Idiff;
+					pix.accumulatedColor += pix.colormask * mater.emission;
+					pix.colormask *= Idiff;			
 				}
 			}
 			break;
@@ -1899,10 +1897,12 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 			rf.origin = h.p; rf.dir = normalize(reflect(pix.ray.dir, h.n));
 
 			double dDn = dot(h.n, pix.ray.dir);
-			float3 n1 = dDn<0?h.n:-h.n;
 			bool into = dDn<0;
-			double nc=1.0, nt=ior;
-			double nnt=into?nc/nt:nt/nc, ddn = dot(pix.ray.dir, n1);
+
+			float3 n1;
+			double nc, nt;
+			if( into ) { n1 = h.n; nc = 1.0; nt = ior; } else { n1 = -h.n; nc = ior; nt = 1.0; }
+			double nnt=nc/nt, ddn = dot(pix.ray.dir, n1);
 			double cos2t=1.0-nnt*nnt*(1-ddn*ddn);
 
 			if( cos2t<0.0 ) {
@@ -1911,17 +1911,16 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 				pix.ray = rf;
 			}
 			else {
-				// choose either reflection or refraction
 				Ray rr;
 				rr.origin = h.p - 1e-3 * n1; 
-				rr.dir = normalize(nnt*pix.ray.dir-(into?1.0:-1.0)*(ddn*nnt+sqrtf(cos2t))*h.n);
+				rr.dir = normalize(nnt*pix.ray.dir-(ddn*nnt+sqrtf(cos2t))*h.n);
 
-				float a = nt-nc, b = nt+nc, R0 = a*a/(b*b), c = 1.0 - (into?-ddn:dot(rr.dir, h.n));
-				float Re = R0 + (1-R0)*powf(c, 5.0), Tr =1.0 - Re, P=0.25+0.5*Re, RP = Re/P, TP = Tr/(1.0-P);
-
+				// choose either reflection or refraction
+				Fresnel fsl = fresnel(n1, pix.ray.dir, nc, nt, rf.dir, rr.dir);
+				
 				float Xi = uniformDistribution(rng);
 
-				if( Xi < Re ) {
+				if( Xi < fsl.reflectionCoeffs ) {
 					pix.ray = rf;
 					pix.colormask *= mater.specular;
 				}
@@ -1958,6 +1957,15 @@ __device__ void traceRay_general_singlepass(float time, PixelState& pix, int nSh
 			}
 			break;
 		}
+	}
+
+	const float Wcutoff = 1e-6;
+
+	if( dot(pix.colormask, pix.colormask) < Wcutoff ) {
+		// terminate low weight ray
+		const float3 bgcolor = make_float3(.955, .975, .995);
+		pix.accumulatedColor += pix.colormask * bgcolor;
+		pix.isActive = false;
 	}
 }
 
@@ -2008,6 +2016,7 @@ __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int t
 	p.accumulatedColor = make_float3(0.0);
 	p.colormask = make_float3(1.0);
 	p.asprop.reset();
+	p.weight = 1.0;
 
 	// generate a ray with jittering
 	float2 offset = generateRandomNumberFromThread2(resolution, time, x, y);
@@ -2019,7 +2028,7 @@ __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int t
 	p.ray = generateRay(cam, u, v);	
 }
 
-__global__ void raytrace_singlepass(float time, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height) 
+__global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height) 
 {
 	unsigned int tid = blockIdx.x*blockDim.x + threadIdx.x;
 	if( tid >= activeCount ) return;
@@ -2027,7 +2036,7 @@ __global__ void raytrace_singlepass(float time, PixelState *pixels, int *activeI
 	PixelState& p = pixels[pidx];
 	if( p.isActive ) {
 		// only trace active ray
-		traceRay_general_singlepass(time, p, dShapesCount, dShapes, dLightsCount, dLights, dMaterialCount, dMaterial);		
+		traceRay_general_singlepass(seed, pass, p, dShapesCount, dShapes, dLightsCount, dLights, dMaterialCount, dMaterial);		
 	}
 }
 
@@ -2037,7 +2046,7 @@ __global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, 
 
 	if( x > width - 1 || y > height - 1 ) return;
 	int pidx = y*width+x;
-	color[pidx] += pixels[pidx].accumulatedColor;
+	color[pidx] += pixels[pidx].accumulatedColor / pixels[pidx].weight;
 }
 
 __global__ void clearCumulatedColor(float3* color, int w, int h) {

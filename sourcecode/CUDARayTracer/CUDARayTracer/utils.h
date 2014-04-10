@@ -11,6 +11,8 @@
 #include "mathutils.h"
 
 #include <vector>
+#include <sstream>
+#include <string>
 using std::vector;
 
 inline double bits2MB(double bits) {
@@ -232,7 +234,7 @@ __host__ __device__ __forceinline__ float2 generateRandomNumberFromThread2(int2 
 	int index = x + (y * resolution.x);
 	int seed = time;
 
-	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed));
+	thrust::default_random_engine rng(myhash(seed)*myhash(index)*myhash(seed%64));
 	thrust::uniform_real_distribution<float> u01(0,1);
 
 	return make_float2((float) u01(rng), (float) u01(rng));
@@ -347,27 +349,22 @@ __device__ __forceinline__ float3 refract(float3 i, float3 n, float eta) {
 		return normalize(eta * i - (eta * nDi + sqrtf(k)) * n);
 }
 
-__device__ __forceinline__ Fresnel fresnel(const float3 & normal, const float3 & incident, float refractiveIndexIncident, float refractiveIndexTransmitted, const float3 & reflectionDirection, const float3 & transmissionDirection) {
+__device__ __forceinline__ Fresnel fresnel(float3 normal, float3 incident, 
+										   float n1, float n2, 
+										   float3 rf, const float3 & rt) 
+{
 	Fresnel f;
 
-	// First, check for total internal reflection:
-	if ( length(transmissionDirection) <= 0.12345 || dot(normal, transmissionDirection) > 0 ) { // The length == 0 thing is how we're handling TIR right now.
-		// Total internal reflection!
-		f.reflectionCoeffs = 1;
-		f.tranmissionCoeffs = 0;
-		return f;
-	}
+	float cosi = dot(normal, rf);
+	float cost = dot(-normal, rt);
+	float Rs = (n1 * cosi - n2 * cost)   /   (n1 * cosi + n2 * cost);
+	Rs *= Rs;
+	float Rp = (n1 * cost - n2 * cosi)   /   (n1 * cost + n2 * cosi);
+	Rp *= Rp;
+	float R = 0.5 * (Rs + Rp);
 
-	// Real Fresnel equations:
-	// Copied from Photorealizer.
-	float cosThetaIncident = dot(normal, incident);
-	float cosThetaTransmitted = dot(-1 * normal, transmissionDirection);
-	float reflectionCoefficientSPolarized = pow(   (refractiveIndexIncident * cosThetaIncident - refractiveIndexTransmitted * cosThetaTransmitted)   /   (refractiveIndexIncident * cosThetaIncident + refractiveIndexTransmitted * cosThetaTransmitted)   , 2);
-	float reflectionCoefficientPPolarized = pow(   (refractiveIndexIncident * cosThetaTransmitted - refractiveIndexTransmitted * cosThetaIncident)   /   (refractiveIndexIncident * cosThetaTransmitted + refractiveIndexTransmitted * cosThetaIncident)   , 2);
-	float reflectionCoefficientUnpolarized = (reflectionCoefficientSPolarized + reflectionCoefficientPPolarized) / 2.0; // Equal mix.
-	//
-	f.reflectionCoeffs = reflectionCoefficientUnpolarized;
-	f.tranmissionCoeffs = 1 - f.reflectionCoeffs;
+	f.reflectionCoeffs = R;
+	f.tranmissionCoeffs = 1 - R;
 	return f;
 }
 
@@ -521,4 +518,11 @@ __host__ __forceinline__ ostream& operator<<(ostream& os, const float3& v) {
 __host__ __forceinline__ ostream& operator<<(ostream& os, const float4& v) {
 	os << "(" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << ")\t";
 	return os;
+}
+
+template <typename T>
+__host__ std::string tostring(T val) {
+	std::stringstream ss;
+	ss << val;
+	return ss.str();
 }

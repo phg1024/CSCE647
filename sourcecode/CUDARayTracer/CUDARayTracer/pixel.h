@@ -12,6 +12,7 @@ struct PixelState {
 	float3 accumulatedColor;
 	float3 colormask;
 	AbsorptionAndScatteringProp asprop;
+	float weight;
 	bool isActive;		// is the ray terminated
 };
 

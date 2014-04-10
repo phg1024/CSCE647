@@ -9,6 +9,8 @@ Scene::Scene(void)
 	name = "scene"; // default name
 	gamma = 1.0;	// default gamma
 	ttype = 1;
+	maxbounces = 64;
+	interval = 1;
 }
 
 
@@ -51,10 +53,13 @@ void Scene::parse(const string& line)
 	if( tag == "name" ) {
 		ss >> name;
 	}
-	if( tag == "tracingtype" ) {
+	else if( tag == "save_interval" ) {
+		ss >> interval;
+	}
+	else if( tag == "tracingtype" ) {
 		ss >> ttype;
 	}
-	if( tag == "environment" ) {
+	else if( tag == "environment" ) {
 		string texFile;
 		ss >> texFile;
 
@@ -68,6 +73,9 @@ void Scene::parse(const string& line)
 	}
 	else if( tag == "maxiters" ) {
 		ss >> maxiters;
+	}
+	else if( tag == "maxbounces" ) {
+		ss >> maxbounces;
 	}
 	else if( tag == "gamma" ) {
 		ss >> gamma;

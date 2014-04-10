@@ -225,6 +225,10 @@ void RayTracerWindow::display() {
 
 	renderer->computeFPS();
 
+	if( renderer->iterations % renderer->scene.saveInterval() == 0 ) {
+		screenshot(renderer->scene.sceneName()+tostring(renderer->iterations));
+	}
+
 	if( renderer->iterations == renderer->scene.maxIters() ){ 
 		screenshot(renderer->scene.sceneName());
 

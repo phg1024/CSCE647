@@ -43,7 +43,7 @@ extern __global__ void clearCumulatedColor(float3*, int, int);
 
 extern __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height);
 extern __global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes, int nMaterials, Material* materials);
-extern __global__ void raytrace_singlepass(float time, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height);
+extern __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height);
 extern __global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, int height);
 
 extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
@@ -340,15 +340,21 @@ struct CUDARayTracer {
 		PixelActivivtyTester tester(thrust::raw_pointer_cast(&pixels[0]));
 
 		int count = activePixels0.size();
-		const int maxBounces = 64;
+		const int maxBounces = scene.maxBounces();
+		const int nthreads = 1024;
 		for(int i=0;i<maxBounces;i++) {
-			raytrace_singlepass<<<ceil(count/1024.0), 1024>>>( seed+i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), count, imagesize.x, imagesize.y );
+			raytrace_singlepass<<<ceil(count/(float)nthreads), nthreads>>>( seed, i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), count, imagesize.x, imagesize.y );
 			checkCudaErrors(cudaThreadSynchronize());
 
 			thrust::device_vector<int>::iterator activeEnd = thrust::remove_if( activePixels0.begin(), activePixels0.begin()+count,  tester );
 			count = activeEnd - activePixels0.begin();
-			cout << "bounce #" << i << " active count = " << count << endl;
-			if( !count ) break;	// break if no more active pixels
+			//cout << "bounce #" << i << " active count = " << count << endl;
+#if 0
+			const float PIXNUM_THRES = 0.01;
+			if( count / (float)npixels() < PIXNUM_THRES ) break;	// break if only a few more active pixels
+#else
+			if( !count ) break;
+#endif
 		}
 
 		collectPixelValue<<<grid, block>>>( cumulatedColor, thrust::raw_pointer_cast(&pixels[0]), imagesize.x, imagesize.y );
