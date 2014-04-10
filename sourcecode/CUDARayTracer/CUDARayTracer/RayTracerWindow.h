@@ -184,6 +184,8 @@ struct CUDARayTracer {
 
 		cam.h = atan(0.5 * cam.fov / 180.0 * MathUtils::PI) * cam.f;
 		cam.w = w / (float)h * cam.h;
+
+		cout << "film size = " << cam.w << "x" << cam.h << endl;
 	}
 
 	void computeFPS() {
@@ -317,10 +319,10 @@ struct CUDARayTracer {
 		camUp = (mat * camUp);
 
 		Camera caminfo = cam;
-		caminfo.dir = camDir;
-		caminfo.up = camUp;
+		caminfo.dir = camDir.normalized();
+		caminfo.up = camUp.normalized();
 		caminfo.pos = camPos;
-		caminfo.right = caminfo.dir.cross(caminfo.up);
+		caminfo.right = caminfo.dir.cross(caminfo.up).normalized();
 
 		cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
 

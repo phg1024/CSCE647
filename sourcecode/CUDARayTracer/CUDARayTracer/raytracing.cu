@@ -1104,15 +1104,22 @@ __device__ float3 computeShading(int2 res, float time, int x, int y,
 	}
 }
 
-__device__ __forceinline__ Ray generateRay(Camera* cam, float u, float v) {
+__device__ __forceinline__ Ray generateRay(Camera* cam, float u, float v, float2 eyeoffset = make_float2(0.0)) {
 	Ray r;
 	r.origin = cam->pos.data;
 
-    // find the intersection point on the canvas
+	const float PI_2 = 6.2831853071795864769252867665590057683943;
+	// purturb eye position for DOF effect
+	float theta = eyeoffset.x * PI_2;
+	float er = eyeoffset.y * cam->apertureRadius;
+	float2 eoffset = make_float2(er*cosf(theta), er*sinf(theta));
+	r.origin += (eoffset.x * cam->right.data + eoffset.y * cam->up.data);
+
+    // find the intersection point on the canvas	
     float3 canvasCenter = cam->f * cam->dir.data + cam->pos.data;
     float3 pcanvas = canvasCenter + u * cam->w * cam->right.data + v * cam->h * cam->up.data;
 
-    r.dir = normalize(pcanvas - cam->pos.data);
+    r.dir = normalize(pcanvas - r.origin);
 
 	return r;
 }
@@ -1674,8 +1681,8 @@ __device__ float3 traceRay_general(float time, int2 res, int x, int y, Ray r, in
 
 __device__ float3 computeBackgroundColor(const float3 & direction) {
 	float position = (dot(direction, normalize(make_float3(-0.5, 0.5, -1.0))) + 1) / 2;
-	float3 firstColor = make_float3(0.15, 0.3, 0.5); // Bluish.
-	float3 secondColor = make_float3(1.0, 1.0, 1.0); // White.
+	const float3 firstColor = make_float3(0.15, 0.3, 0.5); // Bluish.
+	const float3 secondColor = make_float3(1.0, 1.0, 1.0); // White.
 	float3 interpolatedColor = (1 - position) * firstColor + position * secondColor;
 	float radianceMultiplier = 1.0;
 	return interpolatedColor * radianceMultiplier;
@@ -1993,15 +2000,49 @@ __global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes,
 	}
 }
 
-__global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height) {
-	int tidx = threadIdx.x;
-	int tidy = threadIdx.y;
+// generate ray with DOF lens
+// implemented following this: http://courses.cs.washington.edu/courses/csep557/99au/projects/trace/depthoffield.doc
+__device__ __forceinline__ Ray generateRay(Camera* cam, int seed, int pidx, int x, int y, int width, int height) {
+	Ray r;
+	r.origin = cam->pos.data;
 
-	int2 resolution = make_int2(width, height);
+	thrust::default_random_engine rng( myhash(seed) * myhash(pidx) * myhash(seed) );
+	thrust::uniform_real_distribution<float> uniformDistribution(0,1);
+
+	// generate a ray with jittering
+	float randval1 = uniformDistribution(rng);
+	float randval2 = uniformDistribution(rng);
+
+	// jitter the image plane pixel position
+	float u = (x + randval1) / (float) width - 0.5;
+	float v = (y + randval2) / (float) height - 0.5;
+
+    // pixel on image plane	    
+    float3 pcanvas = cam->pos.data + cam->f * cam->dir.data + u * cam->w * cam->right.data + v * cam->h * cam->up.data;
+
+	// convergence point
+	float3 cpoint = cam->pos.data + normalize(pcanvas - cam->pos.data) * cam->f * cam->magRatio;
+
+	float3 eyepos = cam->pos.data;
+	// purturb eye position for DOF effect
+	const float PI_2 = 6.2831853071795864769252867665590057683943;	
+	randval1 = uniformDistribution(rng);
+	randval2 = uniformDistribution(rng);
+
+	float theta = randval1 * PI_2;
+	float er = sqrtf(randval2) * cam->apertureRadius;
+	r.origin = eyepos + (er*cosf(theta) * cam->right.data + er*sinf(theta) * cam->up.data);
+
+    r.dir = normalize(cpoint - r.origin);
+
+	return r;
+}
+
+__global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height) {
 
 	// pixel position
-	unsigned int x = blockIdx.x*blockDim.x + tidx;
-	unsigned int y = blockIdx.y*blockDim.y + tidy;
+	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
 
 	if( x > width - 1 || y > height - 1 ) return;
 	int pidx = y * width + x;
@@ -2018,6 +2059,7 @@ __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int t
 	p.asprop.reset();
 	p.weight = 1.0;
 
+#if 0
 	// generate a ray with jittering
 	float2 offset = generateRandomNumberFromThread2(resolution, time, x, y);
 	float u = x + offset.x;
@@ -2025,7 +2067,11 @@ __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int t
 	u = u / (float) width - 0.5;
 	v = v / (float) height - 0.5;
 
-	p.ray = generateRay(cam, u, v);	
+	float2 eyePosOffset = generateRandomNumberFromThread2(resolution, time+1, x, y);
+	p.ray = generateRay(cam, u, v, eyePosOffset);
+#else
+	p.ray = generateRay(cam, time, pidx, x, y, width, height);
+#endif
 }
 
 __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height) 

@@ -104,7 +104,7 @@ void GLFWWindow::screenshot(const string& filename) {
 	FIBITMAP* bitmap = FreeImage_Allocate (width, height, 24);
 	RGBQUAD color ;
 	if (! bitmap ) {
-		cerr << "Failed to save screenshot.png." << endl;
+		cerr << "Failed to save " << filename << "." << endl;
 	}
 
 	for ( int i=0, idx=0; i<height; i++) { 
@@ -117,7 +117,7 @@ void GLFWWindow::screenshot(const string& filename) {
 	}
 		
 	if ( FreeImage_Save (FIF_PNG, bitmap , filename.c_str(), 0) )
-		cout << "screenshot.png saved!" << endl;
+		cout << filename << " saved!" << endl;
 }
 
 

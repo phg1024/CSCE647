@@ -17,7 +17,7 @@ public:
 
     float w, h;		// canvas size
 
-	float apertureRadius;
+	float apertureRadius, magRatio;
 };
 
 class Material {

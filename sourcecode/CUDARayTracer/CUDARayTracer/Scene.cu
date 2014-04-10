@@ -84,7 +84,9 @@ void Scene::parse(const string& line)
 		ss >> w >> h;
 	}
 	else if( tag == "camera" ) {
-		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov;
+		float fnumber, magratio;
+		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov >> fnumber >> cam.magRatio;
+		cam.apertureRadius = cam.f / (2.0 * fnumber);
 		cam.dir = cam.dir.normalized();
 		cam.up = cam.up.normalized();
 	}
