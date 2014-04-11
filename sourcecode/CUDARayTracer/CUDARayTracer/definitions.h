@@ -244,7 +244,7 @@ public:
 		}
 	}
 
-	__device__ __host__ Shape(const Shape& s):t(s.t), p(s.p), m(s.m), 
+	__device__ __host__ Shape(const Shape& s):t(s.t), p(s.p), v(s.v), m(s.m), 
 		materialId(s.materialId), trimesh(s.trimesh), bb(s.bb){
 		for(int i=0;i<3;i++) {
 			axis[i] = s.axis[i];
@@ -289,7 +289,8 @@ public:
 	ShapeType t;
 
 	// geometry
-	vec3 p;
+	vec3 p;				// position
+	vec3 v;				// velocity
 	vec3 axis[3];
 	float radius[3];
 	mat3 m;
@@ -310,6 +311,7 @@ struct d_Shape {
 	__device__ void init(const Shape& s) {
 		t = (s.t == Shape::PLANE || s.t == Shape::TRIANGLE_MESH)?s.t:Shape::QUADRATICS;
 		p = s.p.data;
+		v = s.v.data;
 		axis[0] = s.axis[0].data;
 		axis[1] = s.axis[1].data;
 		axis[2] = s.axis[2].data;
@@ -351,6 +353,7 @@ struct d_Shape {
 
 	// geometry
 	float3 p;
+	float3 v;
 	float3 axis[3];
 	float radius[3];
 	float m[9];

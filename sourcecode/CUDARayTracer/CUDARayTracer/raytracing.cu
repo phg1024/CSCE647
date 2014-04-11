@@ -101,8 +101,12 @@ __device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, BoundingBo
 	return ((tmax >= tmin) && (tmax >= t0) && tmin < t1);
 }
 
-__device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, const aabbtree::AABB& bb, float& tmin, float& tmax, float t0 = 0.0, float t1 = FLT_MAX ) {
+__device__ bool lightRayIntersectsBoundingBox( Ray r, float3 rdirinv, const aabbtree::AABB& ibb, float& tmin, float& tmax, float t0 = 0.0, float t1 = FLT_MAX, float3 disp = make_float3(0.0) ) {
 #if 1
+	aabbtree::AABB bb = ibb;
+	bb.minPt += disp;
+	bb.maxPt += disp;
+
 	float l1   = (bb.minPt.x - r.origin.x) * rdirinv.x;
 	float l2   = (bb.maxPt.x - r.origin.x) * rdirinv.x;
 	tmin = fminf(l1,l2);
@@ -213,13 +217,21 @@ __device__ float lightRayIntersectsPlane( Ray r, d_Shape* shapes, int sid ) {
     }
 }
 
-__device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int sid) {
-	if( !lightRayIntersectsBoundingBox(r, 1.0/r.dir, shapes[sid].bb ) ) return -1.0;
+__device__ float lightRayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int sid, float camtime = 0.0) {
+	d_Shape& sp = shapes[sid];
+	float3 disp = camtime * sp.v;
+	BoundingBox bb = sp.bb;
+	bb.minPt += disp;
+	bb.maxPt += disp;
 
-	float3 pq = shapes[sid].p - r.origin;
-	float a = dot(r.dir, mul(shapes[sid].m, r.dir));
-	float b = -dot(pq, mul(shapes[sid].m, r.dir));
-	float c = dot(pq, mul(shapes[sid].m, pq)) - shapes[sid].constant2;
+	if( !lightRayIntersectsBoundingBox(r, 1.0/r.dir, bb ) ) return -1.0;
+
+	float3 cpos = sp.p + disp;
+
+	float3 pq = cpos - r.origin;
+	float a = dot(r.dir, mul(sp.m, r.dir));
+	float b = -dot(pq, mul(sp.m, r.dir));
+	float c = dot(pq, mul(sp.m, pq)) - sp.constant2;
 
     float delta = b*b - a*c;
     if (delta < 0.0)
@@ -340,7 +352,7 @@ __device__ __forceinline__ float3 compute_barycentric_coordinates(float3 p, floa
 	return bcoord;
 }
 
-__device__ float lightRayIntersectsTriangles(Ray r, const TriangleMeshInfo& mesh, const aabbtree::AABBNode_Serial& node, int& tri, float tmin = 0.0, float tmax = FLT_MAX) {
+__device__ float lightRayIntersectsTriangles(Ray r, const TriangleMeshInfo& mesh, const aabbtree::AABBNode_Serial& node, int& tri, float tmin = 0.0, float tmax = FLT_MAX, float3 disp = make_float3(0.0)) {
 	float t = tmax;	
 	int hitIdx = -1;
 	// leaf node, test all primitives
@@ -351,7 +363,7 @@ __device__ float lightRayIntersectsTriangles(Ray r, const TriangleMeshInfo& mesh
 		v1 = mesh.faces[trioffset+1];
 		v2 = mesh.faces[trioffset+2];
 
-		float tmp = rayIntersectsTriangle(r, tofloat3(v0), tofloat3(v1), tofloat3(v2));
+		float tmp = rayIntersectsTriangle(r, tofloat3(v0) + disp, tofloat3(v1) + disp, tofloat3(v2) + disp);
 		if( tmp > tmin && tmp < t ) {
 			t = tmp;
 			hitIdx = i;
@@ -372,7 +384,7 @@ struct TraverseInfo {
 	float tmin, tmax;
 };
 
-__device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshInfo& mesh, int nidx, int& tri) {
+__device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshInfo& mesh, int nidx, int& tri, float3 disp = make_float3(0.0)) {
 	typedef aabbtree::AABBNode_Serial& node_t;
 
 	aabbtree::AABBNode_Serial* tree = mesh.tree;
@@ -394,7 +406,7 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshI
 			// test intersection
 			float tmp;
 			int tmptri;
-			tmp = lightRayIntersectsTriangles(r, mesh, node, tmptri, 0, t);
+			tmp = lightRayIntersectsTriangles(r, mesh, node, tmptri, 0, t, disp);
 			if( tmp > 0 && tmp < t ) {
 				t = tmp;
 				tri = tmptri;
@@ -423,8 +435,8 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshI
 			}
 #else
 			float tminL, tminR, tmaxL, tmaxR;
-			bool hitleft = lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tminL, tmaxL, 0, t);
-			bool hitright = lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tminR, tmaxR, 0, t);
+			bool hitleft = lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tminL, tmaxL, 0, t, disp);
+			bool hitright = lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tminR, tmaxR, 0, t, disp);
 			if( hitleft && hitright ) {
 				if( tminL < tmaxL ) { Q.push(TraverseInfo(leftIdx, tminL, tmaxL)); Q.push(TraverseInfo(rightIdx, tminR, tmaxR)); }
 				else { Q.push(TraverseInfo(rightIdx, tminR, tmaxR)); Q.push(TraverseInfo(leftIdx, tminL, tmaxL)); }
@@ -1148,16 +1160,18 @@ __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, int sid) 
 	else return background();
 }
 
-__device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes, int sid) {
-	float ti = lightRayIntersectsQuadraticSurface(r, shapes, sid);
+__device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes, int sid, float camtime = 0.0) {
+	float ti = lightRayIntersectsQuadraticSurface(r, shapes, sid, camtime);
 	if( ti > 0.0 ) {
 		Hit h;
 		h.t = ti;
 		// hit point
 		h.p = h.t * r.dir + r.origin;
 
+		float3 disp = shapes[sid].v * camtime;
+
         // normal at hit point
-		h.n = normalize(2.0 * mul(shapes[sid].m, (h.p - shapes[sid].p)) * shapes[sid].constant);
+		h.n = normalize(2.0 * mul(shapes[sid].m, (h.p - shapes[sid].p - disp)) * shapes[sid].constant);
 
 		// apply normal map
 		h.tex = spheremap(h.n);
@@ -1169,7 +1183,7 @@ __device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes
 	else return background();
 }
 
-__device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, int sid) {
+__device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, int sid, float camtime = 0.0) {
 #if 0
 	int faceIdx = -1;
 	float3 bcoords;
@@ -1213,7 +1227,8 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 	int tri;
 	float3 bcoords;
 	const TriangleMeshInfo& mesh = shapes[sid].trimesh;
-	float ti = lightRayIntersectsAABBTree_Iterative(r, mesh, 0, tri);
+	float3 disp = camtime * shapes[sid].v;
+	float ti = lightRayIntersectsAABBTree_Iterative(r, mesh, 0, tri, disp);
 	//float ti = lightRayIntersectsAABBTree(r, shapes[sid].trimesh, 0, tri);
 	if( ti > 0.0 ) {
 		Hit h;
@@ -1231,7 +1246,7 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 		float3 v0 = tofloat3(vm0);
 		float3 v1 = tofloat3(vm1);
 		float3 v2 = tofloat3(vm2);
-		float3 bcoords = compute_barycentric_coordinates(h.p, v0, v1, v2);				
+		float3 bcoords = compute_barycentric_coordinates(h.p - disp, v0, v1, v2);
 
 
         // normal at hit point
@@ -1267,26 +1282,26 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 #endif
 }
 
-__device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, int sid) {
+__device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nShapes, int sid, float camtime = 0.0) {
 	switch( shapes[sid].t ) {
 	case Shape::PLANE:
 		return rayIntersectsPlane(r, shapes, nShapes, sid);
 	case Shape::QUADRATICS:
-		return rayIntersectsQuadraticSurface(r, shapes, nShapes, sid);
+		return rayIntersectsQuadraticSurface(r, shapes, nShapes, sid, camtime);
 	case Shape::TRIANGLE_MESH:
-		return rayIntersectsTriangleMesh(r, shapes, nShapes, sid);
+		return rayIntersectsTriangleMesh(r, shapes, nShapes, sid, camtime);
 	default:
 		return background();
 	}
 }
 
-__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes) {
+__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, float camtime = 0.0) {
 	Hit h;
 	h.t = 1e10;
 	h.objIdx = -1;
 
     for(int i=0;i<nShapes;i++) {
-        Hit hit = rayIntersectsShape(r, shapes, nShapes, i);
+        Hit hit = rayIntersectsShape(r, shapes, nShapes, i, camtime);
         if( (hit.t > 0.0) && (hit.t < h.t) ) {
             h = hit;
         }
@@ -1693,7 +1708,11 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 	thrust::default_random_engine rng( myhash(seed) * myhash(pix.idx) * myhash(pass) );
 	thrust::uniform_real_distribution<float> uniformDistribution(0,1);
 
-	Hit h = rayIntersectsShapes(pix.ray, nShapes, shapes);		
+	// only related to seed and pass, for motion blur
+	thrust::default_random_engine rng2( myhash(seed) * myhash(seed) * myhash(seed) );
+	float camtime = uniformDistribution(rng2);
+
+	Hit h = rayIntersectsShapes(pix.ray, nShapes, shapes, camtime);
 
 	if( h.objIdx == -1 ) {	
 		// no hit, sample environment map

@@ -117,8 +117,8 @@ void Scene::parse(const string& line)
 		materialMap[mater.name] = materials.size()-1;
 	}
 	else if( tag == "plane" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string matName;
 		ss >> matName;
 		
@@ -134,47 +134,15 @@ void Scene::parse(const string& line)
 
 		sp.bb.minPt = mrot * make_float3(-S.x, -1e-1, -S.z);
 		sp.bb.maxPt = mrot * make_float3(S.x, 1e-1, S.z);
+		sp.v = V;
 
 		shapes.push_back(sp);
 	}
-	else if( tag == "box" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
-		string matName;
-		ss >> matName;
-
-		// construct transformation matrix
-		mat3 mscl = mat3::scaling(S.x, S.y, S.z);
-		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
-		mat3 M = mrot * mscl;
-
-		vec3 dim = mscl * vec3(1, 1, 1);
-		vec3 p, n, u, v;
-
-		// top
-		p = vec3(0, 1.0, 0), n = vec3(0, 1, 0), u = vec3(1, 0, 0), v = vec3(0, 0, 1);		
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, materialMap[matName]));
-		// bottom
-		p = vec3(0, -1.0, 0), n = vec3(0, -1, 0), u = vec3(-1, 0, 0), v = vec3(0, 0, -1);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, materialMap[matName]));
-		// left
-		p = vec3(-1.0, 0, 0), n = vec3(-1, 0, 0), u = vec3(0, 1, 0), v = vec3(0, 0, 1);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, materialMap[matName]));
-		// right
-		p = vec3(1.0, 0, 0), n = vec3(1, 0, 0), u = vec3(0, -1, 0), v = vec3(0, 0, -1);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, materialMap[matName]));
-		// front
-		p = vec3(0, 0, 1.0), n = vec3(0, 0, 1), u = vec3(0, 1, 0), v = vec3(1, 0, 0);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, materialMap[matName]));
-		// back
-		p = vec3(0, 0, -1.0), n = vec3(0, 0, -1), u = vec3(0, -1, 0), v = vec3(-1, 0, 0);
-		shapes.push_back(Shape::createPlane(M*p + T, dim.x, dim.y, 1.0, mrot*n, mrot*u, mrot*v, materialMap[matName]));
-	}
 	else if( tag == "sphere" ) {
 
-		vec3 T, S, R;
+		vec3 V, T, S, R;
 		string matName;
-		ss >> T >> S >> R >> matName;
+		ss >> V >> T >> S >> R >> matName;
 		cout << matName << endl;
 
 		mat3 mscl = mat3::scaling(S.x, S.y, S.z);
@@ -185,15 +153,17 @@ void Scene::parse(const string& line)
 
 		Shape sp = Shape::createSphere(T, dim.x, materialMap[matName]);
 
-		S = S * 1.5;
+		S = S * 1.05;
 		sp.bb.maxPt = make_float3(T.x + S.x, T.y + S.y, T.z + S.z);
 		sp.bb.minPt = make_float3(T.x - S.x, T.y - S.y, T.z - S.z);
+
+		sp.v = V;
 
 		shapes.push_back(sp);
 	}
 	else if( tag == "ellipsoid") {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string matName;
 		ss >> matName;
 
@@ -202,51 +172,60 @@ void Scene::parse(const string& line)
 
 		Shape sp = Shape::createEllipsoid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]);
 
+		sp.v = V;
+
 		shapes.push_back(sp);
 	}
 	else if( tag == "cylinder" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string matName;
 		ss >> matName;
 
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
 
-		shapes.push_back(Shape::createCylinder(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]));
+		Shape sp = Shape::createCylinder(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]);
+		sp.v = V;
+		shapes.push_back(sp);
 	}
 	else if( tag == "cone" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string matName;
 		ss >> matName;
 
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
-
-		shapes.push_back(Shape::createCone(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]));
+		Shape sp = Shape::createCone(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]);
+		sp.v = V;
+		shapes.push_back(sp);
 	}
 	else if( tag == "hyperboloid" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string matName;
 		ss >> matName;
 
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
 
-		shapes.push_back(Shape::createHyperboloid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]));
+		Shape sp = Shape::createHyperboloid(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]);
+		sp.v = V;
+		shapes.push_back(sp);
 	}
 	else if( tag == "hyperboloid2" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string matName;
 		ss >> matName;
 
 		mat3 mrot = mat3::rotation(R.x, R.y, R.z);
 
-		shapes.push_back(Shape::createHyperboloid2(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]));
+		Shape sp = Shape::createHyperboloid2(T, S, mrot*vec3(1, 0, 0), mrot*vec3(0, 1, 0), mrot*vec3(0, 0, 1), materialMap[matName]);
+		sp.v = V;
+		shapes.push_back(sp);
 	}
 	else if( tag == "mesh" ) {
-		vec3 T, S, R;
-		ss >> T >> S >> R;
+		vec3 V, T, S, R;
+		ss >> V >> T >> S >> R;
 		string meshFile, matName;
 		ss >> meshFile >> matName;
 
@@ -257,6 +236,7 @@ void Scene::parse(const string& line)
 		vec3 dim = mscl * vec3(1, 1, 1);
 
 		Shape sp = Shape::createMesh(T, S, mrot, materialMap[matName]);
+		sp.v = V;
 		
 		// load the mesh and convert it to a texture
 		vector<tinyobj::shape_t> objs;
