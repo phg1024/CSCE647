@@ -1,0 +1,27 @@
+- name: motionblur4096.png
+  des: Motion blur and DOF.
+  id: "1"
+
+- name: motionblur2_2048.png
+  des: Motion blur with triangle meshes.
+  id: "2"
+
+- name: dof4096.png
+  des: Depth of field.
+  id: "3"
+
+- name: 9spheres4096.png
+  des: Depth of field with various materials.
+  id: "4"
+
+- name: 3dragons1792.png
+  des: Depth of field with dragons.
+  id: "5"
+
+- name: translucency.png
+  des: Bunny with 0.005, 0.1, and 0.5 translucency from left to right.
+  id: "6"
+
+- name: 7teapots2048.png
+  des: Teapots - red specular, green glossy, blue glass, mirror, gold, green diffuse and red diffuse.
+  id: "7"
