@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Project 02 - Shadow Casting</title>
+        <meta name="viewport" content="width=device-width">
+
+        <!-- syntax highlighting CSS -->
+        <link rel="stylesheet" href="../css/syntax.css">
+
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="../css/main.css">
+
+        <script type="text/javascript" src="../scripts/jquery-1.10.2.min.js"></script>
+        <script type="text/javascript" src="../scripts/d3.v3.min.js"></script>
+
+        <!-- Add mousewheel plugin (this is optional) -->
+        <script type="text/javascript" src="../fancybox/lib/jquery.mousewheel-3.0.6.pack.js"></script>
+
+        <!-- Add fancyBox -->
+        <link rel="stylesheet" href="../fancybox/source/jquery.fancybox.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/jquery.fancybox.pack.js"></script>
+
+        <!-- Optionally add helpers - button, thumbnail and/or media -->
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-buttons.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-buttons.js"></script>
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-media.js"></script>
+
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-thumbs.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-thumbs.js"></script>
+
+        <!-- Script -->
+        <script type="text/javascript" src="../scripts/phgscript.js"></script>
+
+    </head>
+    <body>
+
+	    <header>
+          <div class="banner">
+              <h1><a class="mylink" href="../index.html">Peihong's CSCE 647 Projects</a></h1>
+          </div>
+	    </header>
+
+        <article>
+    <div class="maincontent">
+        <h2>Project 02 - Shadow Casting</h2>
+        <div class="projectbrief">
+            <p>
+                In this project, I have done all the required tasks. Below are the renders I generated.
+             </p>
+            <p>
+                With GPU acceleration, regular lighting images (point light, spot light and fake shadow with "transparent" object)
+                are rendered in real time.</p>
+            <p>
+                For the area lights,
+                over 1024 (32x32) samples are used in generating soft shadows. The images are rendered in a progressive way and
+                the typical running time for an image with 1200 shadow samples is 30 seconds.
+            </p>
+        </div>
+        <div class="results">
+            <h2>Images</h2>
+            <p class="note">Click on the images to view full size version.</p>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/point_light.png" title="Point Light (the white dot)"><img class="resultimage"  src="./images/point_light.png"></a>
+                <p class="resultdes">Image 1: Point Light (the white dot)</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/point_light_gooch.png" title="Point Light Gooch Shading"><img class="resultimage"  src="./images/point_light_gooch.png"></a>
+                <p class="resultdes">Image 2: Point Light Gooch Shading</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/dir_light.png" title="Directional Light"><img class="resultimage"  src="./images/dir_light.png"></a>
+                <p class="resultdes">Image 3: Directional Light</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/spotlight.png" title="Spot Light"><img class="resultimage"  src="./images/spotlight.png"></a>
+                <p class="resultdes">Image 4: Spot Light</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/spotlight_soft.png" title="Soft Spot Light"><img class="resultimage"  src="./images/spotlight_soft.png"></a>
+                <p class="resultdes">Image 5: Soft Spot Light</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/two_lights.png" title="Two Lights"><img class="resultimage"  src="./images/two_lights.png"></a>
+                <p class="resultdes">Image 6: Two Lights</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/three_lights.png" title="Three Lights"><img class="resultimage"  src="./images/three_lights.png"></a>
+                <p class="resultdes">Image 7: Three Lights</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/fakeshadow.png" title="Soft Shadow with Transparent Objects"><img class="resultimage"  src="./images/fakeshadow.png"></a>
+                <p class="resultdes">Image 8: Soft Shadow with Transparent Objects</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/fakeshadow_gooch.png" title="Soft Shadow with Transparent Objects, Gooch Shading"><img class="resultimage"  src="./images/fakeshadow_gooch.png"></a>
+                <p class="resultdes">Image 10: Soft Shadow with Transparent Objects, Gooch Shading</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/arealight.png" title="Soft Shadow with Area Light (the white quad)"><img class="resultimage"  src="./images/arealight.png"></a>
+                <p class="resultdes">Image 11: Soft Shadow with Area Light (the white quad)</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/arealight_sphere.png" title="Soft Shadow with Spherical Area Light (the white sphere)"><img class="resultimage"  src="./images/arealight_sphere.png"></a>
+                <p class="resultdes">Image 11: Soft Shadow with Spherical Area Light (the white sphere)</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/arealight_gooch.png" title="Soft Shadow with Area Light, Gooch Shading"><img class="resultimage"  src="./images/arealight_gooch.png"></a>
+                <p class="resultdes">Image 12: Soft Shadow with Area Light, Gooch Shading</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/arealight_sphere_gooch.png" title="Soft Shadow with Spherical Area Light, Gooch Shading"><img class="resultimage"  src="./images/arealight_sphere_gooch.png"></a>
+                <p class="resultdes">Image 12: Soft Shadow with Spherical Area Light, Gooch Shading</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/final.png" title="Multiple Spot Lights with Ray-traced Soft Shadow"><img class="resultimage"  src="./images/final.png"></a>
+                <p class="resultdes">Image 13: Multiple Spot Lights with Ray-traced Soft Shadow</p>
+            </div>
+            
+            <div class="resultentry">
+                <a class="fbox" href="./images/rainbow.png" title="Special Lighting Effect using Red-Green-Blue Interpolation for Light Color, Soft Shadow"><img class="resultimage"  src="./images/rainbow.png"></a>
+                <p class="resultdes">Image 14: Special Lighting Effect using Red-Green-Blue Interpolation for Light Color, Soft Shadow</p>
+            </div>
+            
+        </div>
+    </div>
+</article>
+
+
+        <footer>
+          <div class="banner">
+          &copy; 2009-2014 &nbsp; <a class="mylink" href="http://www.github.com/phg1024">Peihong Guo</a> &nbsp; <script type="text/javascript"> writeEmailAddress(); </script>
+          </div>
+        </footer>
+
+    </body>
+</html>

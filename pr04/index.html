@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Project 04 - Ray Casting Triangles</title>
+        <meta name="viewport" content="width=device-width">
+
+        <!-- syntax highlighting CSS -->
+        <link rel="stylesheet" href="../css/syntax.css">
+
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="../css/main.css">
+
+        <script type="text/javascript" src="../scripts/jquery-1.10.2.min.js"></script>
+        <script type="text/javascript" src="../scripts/d3.v3.min.js"></script>
+
+        <!-- Add mousewheel plugin (this is optional) -->
+        <script type="text/javascript" src="../fancybox/lib/jquery.mousewheel-3.0.6.pack.js"></script>
+
+        <!-- Add fancyBox -->
+        <link rel="stylesheet" href="../fancybox/source/jquery.fancybox.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/jquery.fancybox.pack.js"></script>
+
+        <!-- Optionally add helpers - button, thumbnail and/or media -->
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-buttons.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-buttons.js"></script>
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-media.js"></script>
+
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-thumbs.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-thumbs.js"></script>
+
+        <!-- Script -->
+        <script type="text/javascript" src="../scripts/phgscript.js"></script>
+
+    </head>
+    <body>
+
+	    <header>
+          <div class="banner">
+              <h1><a class="mylink" href="../index.html">Peihong's CSCE 647 Projects</a></h1>
+          </div>
+	    </header>
+
+        <article>
+<div class="maincontent">
+    <h2>Project 04 - Ray Casting Triangles</h2>
+    <div class="projectbrief">
+        <p>
+            Rendering polygon meshes are far more fun than planes and quadratics, but also more challenging. I need to include
+            K-D tree to achieve reasonable performance, even with GPU implementation.
+        </p>
+        <p>
+            All images below are rendered with <b>1024 shadow rays per pixel</b> to generate soft shadow, since I simply could not bear to look at
+            hard shadow images anymore :/. The rendering a while, but the images are definitely worth the waiting.
+            In fact, most of the images below can be generated in <b>real time</b> if rendered with fewer shadow rays (special thanks
+            to my Nvidia GTX-750 GPU).
+        </p>
+        <p>
+            The K-D tree I implemented now is probably a low quality one, since I used the primitive median separation method.
+        Adding surface area heuristic for the construction of K-D tree should produce much better trees and further boost
+        the rendering performance.
+        </p>
+
+        <p>
+            The source code of this project is available <a href="https://github.com/phg1024/CSCE647/tree/master/sourcecode/CUDARayTracer/CUDARayTracer">here</a>.
+            It is a bit messy currently, but I will try to clean it up later.
+        </p>
+    </div>
+    <div class="results">
+        <h2>Images</h2>
+        <p class="note">Click on the images to view full size version.</p>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/120faces_5k.png" title="Polygon mesh, 120 triangles, rendered in 22 seconds."><img class="resultimage"  src="./images/120faces_5k.png"></a>
+            <p class="resultdes">Image 1: Polygon mesh, 120 triangles, rendered in 22 seconds.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/bunnydragon2.png" title="Bunny (69451 triangles) and dragon (871414 triangles), took about 9 minutes to render."><img class="resultimage"  src="./images/bunnydragon2.png"></a>
+            <p class="resultdes">Image 2: Bunny (69451 triangles) and dragon (871414 triangles), took about 9 minutes to render.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/bunny.png" title="Cube, tetrahedron and bunny, with textures."><img class="resultimage"  src="./images/bunny.png"></a>
+            <p class="resultdes">Image 3: Cube, tetrahedron and bunny, with textures.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/lamb1857.png" title="Lamborghini aventador, 183309 triangles, rendered in 17 minutes."><img class="resultimage"  src="./images/lamb1857.png"></a>
+            <p class="resultdes">Image 4: Lamborghini aventador, 183309 triangles, rendered in 17 minutes.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/buddha.png" title="Buddha, 1087474 triangles, rendered in 5 minutes 41 seconds."><img class="resultimage"  src="./images/buddha.png"></a>
+            <p class="resultdes">Image 5: Buddha, 1087474 triangles, rendered in 5 minutes 41 seconds.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/error.png" title="Interesting error of KD tree. Turned out the conversion from pointer based tree to array based tree caused this problem. Some non-existing nodes are added to the tree during the conversion, resulting in the visible holes in the rendered mesh."><img class="resultimage"  src="./images/error.png"></a>
+            <p class="resultdes">Image 6: Interesting error of KD tree. Turned out the conversion from pointer based tree to array based tree caused this problem. Some non-existing nodes are added to the tree during the conversion, resulting in the visible holes in the rendered mesh.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/glassbunny.png" title="Cool effects - Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds."><img class="resultimage"  src="./images/glassbunny.png"></a>
+            <p class="resultdes">Image 7: Cool effects - Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/translucency.png" title="Cool effects - Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right."><img class="resultimage"  src="./images/translucency.png"></a>
+            <p class="resultdes">Image 8: Cool effects - Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/jadedragon_1k.png" title="Cool effects - Jade dragon, 871414 triangles, rendered in about an hour."><img class="resultimage"  src="./images/jadedragon_1k.png"></a>
+            <p class="resultdes">Image 9: Cool effects - Jade dragon, 871414 triangles, rendered in about an hour.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/msw_10k.png" title="Cool effects - Marble bunny, silver dragon and wood teapot, rendered in about an hour."><img class="resultimage"  src="./images/msw_10k.png"></a>
+            <p class="resultdes">Image : Cool effects - Marble bunny, silver dragon and wood teapot, rendered in about an hour.</p>
+        </div>
+        
+    </div>
+</div>
+</article>
+
+
+        <footer>
+          <div class="banner">
+          &copy; 2009-2014 &nbsp; <a class="mylink" href="http://www.github.com/phg1024">Peihong Guo</a> &nbsp; <script type="text/javascript"> writeEmailAddress(); </script>
+          </div>
+        </footer>
+
+    </body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Project 06 - Refraction</title>
+        <meta name="viewport" content="width=device-width">
+
+        <!-- syntax highlighting CSS -->
+        <link rel="stylesheet" href="../css/syntax.css">
+
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="../css/main.css">
+
+        <script type="text/javascript" src="../scripts/jquery-1.10.2.min.js"></script>
+        <script type="text/javascript" src="../scripts/d3.v3.min.js"></script>
+
+        <!-- Add mousewheel plugin (this is optional) -->
+        <script type="text/javascript" src="../fancybox/lib/jquery.mousewheel-3.0.6.pack.js"></script>
+
+        <!-- Add fancyBox -->
+        <link rel="stylesheet" href="../fancybox/source/jquery.fancybox.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/jquery.fancybox.pack.js"></script>
+
+        <!-- Optionally add helpers - button, thumbnail and/or media -->
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-buttons.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-buttons.js"></script>
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-media.js"></script>
+
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-thumbs.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-thumbs.js"></script>
+
+        <!-- Script -->
+        <script type="text/javascript" src="../scripts/phgscript.js"></script>
+
+    </head>
+    <body>
+
+	    <header>
+          <div class="banner">
+              <h1><a class="mylink" href="../index.html">Peihong's CSCE 647 Projects</a></h1>
+          </div>
+	    </header>
+
+        <article>
+<div class="maincontent">
+    <h2>Project 06 - Refraction</h2>
+    <div class="projectbrief">
+        <p>Refraction implemented with <a href="http://en.wikipedia.org/wiki/Fresnel_equations">Fresnel equation</a>.
+            Caustics is enabled by distributed ray tracing.
+            Translucency effect is also added to make things more interesting.
+        </p>
+
+        <p>
+            The source code of this project is available <a href="https://github.com/phg1024/CSCE647/tree/master/sourcecode/CUDARayTracer/CUDARayTracer">here</a>.
+            It is a bit messy currently, but I will try to clean it up later.
+        </p>
+    </div>
+    <div class="results">
+        <h2>Videos</h2>
+        <div class="resultentry">
+            <iframe src="//player.vimeo.com/video/91419449?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+            <p class="resultdes">
+                <a href="https://vimeo.com/91419449">Video 1</a>:
+                Varying index of refraction. Note the conversion from refraction to perfect reflection as IOR increases,
+                as predicted by the <a href="http://en.wikipedia.org/wiki/Fresnel_equations">Fresnel equation</a>.
+            </p>
+        </div>
+        <div class="resultentry">
+            <iframe src="//player.vimeo.com/video/91577579?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+            <p class="resultdes">
+                <a href="https://vimeo.com/91577579">Video 2</a>:
+                Varying translucency.
+            </p>
+        </div>
+        <h2>Images</h2>
+        <p class="note">Click on the images to view full size version.</p>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/spheres.png" title="Transparent spheres."><img class="resultimage"  src="./images/spheres.png"></a>
+            <p class="resultdes">Image 1: Transparent spheres.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/all.png" title="Spheres, cube and triangle mesh."><img class="resultimage"  src="./images/all.png"></a>
+            <p class="resultdes">Image 2: Spheres, cube and triangle mesh.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/normalNior.png" title="Normal direction defined by a bump map and index of refraction defined by a texture map. As a comparison, the two green spheres are rendered using the same texture, with the left one for normal vector and the right one for index of refraction (ior = length of normal vector before normalization)."><img class="resultimage"  src="./images/normalNior.png"></a>
+            <p class="resultdes">Image 3: Normal direction defined by a bump map and index of refraction defined by a texture map. As a comparison, the two green spheres are rendered using the same texture, with the left one for normal vector and the right one for index of refraction (ior = length of normal vector before normalization).</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/glassbunny.png" title="Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds."><img class="resultimage"  src="./images/glassbunny.png"></a>
+            <p class="resultdes">Image 4: Glass bunny, 69451 triangles, rendered in 8 minutes and 7 seconds.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/threedragons.png" title="Three dragons with different color."><img class="resultimage"  src="./images/threedragons.png"></a>
+            <p class="resultdes">Image 5: Three dragons with different color.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/lamb1024.png" title="Transparent Lamborghini aventador."><img class="resultimage"  src="./images/lamb1024.png"></a>
+            <p class="resultdes">Image 6: Transparent Lamborghini aventador.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/translucency.png" title="Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right."><img class="resultimage"  src="./images/translucency.png"></a>
+            <p class="resultdes">Image 7: Translucent bunny, 69451 triangles, rendered in about 17 minutes. Translucency values are 0.005, 0.1, and 0.5 from left to right.</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/bunnyNdragon2.png" title="Translucent bunny and transparent dragons."><img class="resultimage"  src="./images/bunnyNdragon2.png"></a>
+            <p class="resultdes">Image 8: Translucent bunny and transparent dragons.</p>
+        </div>
+        
+    </div>
+</div>
+</article>
+
+
+        <footer>
+          <div class="banner">
+          &copy; 2009-2014 &nbsp; <a class="mylink" href="http://www.github.com/phg1024">Peihong Guo</a> &nbsp; <script type="text/javascript"> writeEmailAddress(); </script>
+          </div>
+        </footer>
+
+    </body>
+</html>

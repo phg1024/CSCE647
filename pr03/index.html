@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Project 03 - Texturing</title>
+        <meta name="viewport" content="width=device-width">
+
+        <!-- syntax highlighting CSS -->
+        <link rel="stylesheet" href="../css/syntax.css">
+
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="../css/main.css">
+
+        <script type="text/javascript" src="../scripts/jquery-1.10.2.min.js"></script>
+        <script type="text/javascript" src="../scripts/d3.v3.min.js"></script>
+
+        <!-- Add mousewheel plugin (this is optional) -->
+        <script type="text/javascript" src="../fancybox/lib/jquery.mousewheel-3.0.6.pack.js"></script>
+
+        <!-- Add fancyBox -->
+        <link rel="stylesheet" href="../fancybox/source/jquery.fancybox.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/jquery.fancybox.pack.js"></script>
+
+        <!-- Optionally add helpers - button, thumbnail and/or media -->
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-buttons.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-buttons.js"></script>
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-media.js"></script>
+
+        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-thumbs.css" type="text/css" media="screen" />
+        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-thumbs.js"></script>
+
+        <!-- Script -->
+        <script type="text/javascript" src="../scripts/phgscript.js"></script>
+
+    </head>
+    <body>
+
+	    <header>
+          <div class="banner">
+              <h1><a class="mylink" href="../index.html">Peihong's CSCE 647 Projects</a></h1>
+          </div>
+	    </header>
+
+        <article>
+<div class="maincontent">
+    <h2>Project 03 - Texturing</h2>
+    <div class="projectbrief">
+        <p>
+            In this project, I have done all the required tasks, plus 2 bonus tasks. Below are the renders I generated.
+        </p>
+    </div>
+    <div class="results">
+        <h2>Images</h2>
+        <p class="note">Click on the images to view full size version.</p>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/basic.png" title="Basic texture mapping for sphere and plane"><img class="resultimage"  src="./images/basic.png"></a>
+            <p class="resultdes">Image 1: Basic texture mapping for sphere and plane</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/normalmap.png" title="Texture mapping and normal mapping"><img class="resultimage"  src="./images/normalmap.png"></a>
+            <p class="resultdes">Image 2: Texture mapping and normal mapping</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/project.png" title="Projective mapping"><img class="resultimage"  src="./images/project.png"></a>
+            <p class="resultdes">Image 3: Projective mapping</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/image_2d.png" title="Texture mapping with image"><img class="resultimage"  src="./images/image_2d.png"></a>
+            <p class="resultdes">Image 4: Texture mapping with image</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/image_solid.png" title="Image converted solid texture mapping"><img class="resultimage"  src="./images/image_solid.png"></a>
+            <p class="resultdes">Image 5: Image converted solid texture mapping</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/image_2d2.png" title="Texture mapping with image II"><img class="resultimage"  src="./images/image_2d2.png"></a>
+            <p class="resultdes">Image 6: Texture mapping with image II</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/image_solid2.png" title="Image converted solid texture mapping II"><img class="resultimage"  src="./images/image_solid2.png"></a>
+            <p class="resultdes">Image 7: Image converted solid texture mapping II</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/image_2d3.png" title="Texture mapping with image III"><img class="resultimage"  src="./images/image_2d3.png"></a>
+            <p class="resultdes">Image 8: Texture mapping with image III</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/image_solid3.png" title="Image converted solid texture mapping III"><img class="resultimage"  src="./images/image_solid3.png"></a>
+            <p class="resultdes">Image 9: Image converted solid texture mapping III</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/julia.png" title="Procedure texture mapping - Julia set"><img class="resultimage"  src="./images/julia.png"></a>
+            <p class="resultdes">Image 10: Procedure texture mapping - Julia set</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/perlin.png" title="Procedure texture mapping - Perlin noise"><img class="resultimage"  src="./images/perlin.png"></a>
+            <p class="resultdes">Image 11: Procedure texture mapping - Perlin noise</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/marble.png" title="Procedure texture mapping - Marble pattern generated with 3D Perlin noise"><img class="resultimage"  src="./images/marble.png"></a>
+            <p class="resultdes">Image 12: Procedure texture mapping - Marble pattern generated with 3D Perlin noise</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/procedure.png" title="Procedure texture mapping - Texture generated with 2D and 3D functions"><img class="resultimage"  src="./images/procedure.png"></a>
+            <p class="resultdes">Image 13: Procedure texture mapping - Texture generated with 2D and 3D functions</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/envmap.png" title="Environment mapping"><img class="resultimage"  src="./images/envmap.png"></a>
+            <p class="resultdes">Image 14: Environment mapping</p>
+        </div>
+        
+        <div class="resultentry">
+            <a class="fbox" href="./images/overview.png" title="Various mapping effects"><img class="resultimage"  src="./images/overview.png"></a>
+            <p class="resultdes">Image 15: Various mapping effects</p>
+        </div>
+        
+    </div>
+</div>
+</article>
+
+
+        <footer>
+          <div class="banner">
+          &copy; 2009-2014 &nbsp; <a class="mylink" href="http://www.github.com/phg1024">Peihong Guo</a> &nbsp; <script type="text/javascript"> writeEmailAddress(); </script>
+          </div>
+        </footer>
+
+    </body>
+</html>
