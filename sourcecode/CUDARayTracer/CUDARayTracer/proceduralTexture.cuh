@@ -131,11 +131,12 @@ __device__ float3 woodgrain(float3 p) {
 }
 
 __device__ float3 chessboard(float2 t) {
-	const int blocks = 8;
+	const int blocks = 64;
 	int blkx = t.x*blocks;
 	int blky = t.y*blocks;
 
 	int flag = (blkx&0x1) ^ (blky&0x1);
+	flag = (t.x*t.y>0)?flag:1-flag;
 	const float3 red = make_float3(1, 0, 0);
 	const float3 yellow = make_float3(1, 1, 0);
 	return mix(red, yellow, flag);

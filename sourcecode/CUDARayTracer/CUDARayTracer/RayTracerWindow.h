@@ -43,7 +43,7 @@ extern __global__ void clearCumulatedColor(float3*, int, int);
 
 extern __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height);
 extern __global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes, int nMaterials, Material* materials);
-extern __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height);
+extern __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int startIdx, int endIdx, int batchSize, unsigned int width, unsigned int height);
 extern __global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, int height);
 
 extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
@@ -345,8 +345,15 @@ struct CUDARayTracer {
 		const int maxBounces = scene.maxBounces();
 		const int nthreads = 1024;
 		for(int i=0;i<maxBounces;i++) {
-			raytrace_singlepass<<<ceil(count/(float)nthreads), nthreads>>>( seed, i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), count, imagesize.x, imagesize.y );
-			checkCudaErrors(cudaThreadSynchronize());
+			// trace at most 65536 rays at a time
+			const int maxRays = 65536;
+			int nround = ceil(count / (float)maxRays);
+			for(int j=0;j<nround;j++) {
+				int startIdx = j * maxRays;
+				int endIdx = min(startIdx + maxRays, count);
+				raytrace_singlepass<<<ceil(count/(float)nthreads), nthreads>>>( seed, i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), startIdx, endIdx, endIdx-startIdx, imagesize.x, imagesize.y );
+				checkCudaErrors(cudaThreadSynchronize());
+			}
 
 			thrust::device_vector<int>::iterator activeEnd = thrust::remove_if( activePixels0.begin(), activePixels0.begin()+count,  tester );
 			count = activeEnd - activePixels0.begin();

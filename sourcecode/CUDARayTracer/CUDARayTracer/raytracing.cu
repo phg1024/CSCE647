@@ -1149,7 +1149,7 @@ __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, int sid) 
         if( abs(u) > shapes[sid].radius[0] || abs(v) > shapes[sid].radius[1] ) return background();
         else {
             float2 t = clamp(make_float2(u / shapes[sid].radius[0], v / shapes[sid].radius[1]), -1.0, 1.0);
-			float scale = 1.0;//0.5 * (shapes[sid].radius[0]/10.0 + shapes[sid].radius[1]/10.0);
+			float scale = shapes[sid].radius[2];
 			h.tex = t * scale;
 			h.n = shapes[sid].axis[0];
 			h.objIdx = sid;
@@ -1782,7 +1782,7 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 			// merged glossy and diffuse
 			// change the coefficient Kr to adjust the glossy amount
 
-			// direct lighting
+			// direct lighting, should include this later
 			//float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx);
 			//accumulatedColor += shading * colormask;
 
@@ -1890,7 +1890,6 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 		}
 	case Material::Refractive:
 		{
-
 			if( mater.normalTex != -1 ) {
 				// modify normal direction
 				float3 n_normalmap = texturefunc(mater.normalTex, h.tex, h.p, 1)*2.0-1.0;
@@ -1900,11 +1899,11 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 					tangent = shapes[h.objIdx].axis[1];
 				else
 					tangent = normalize(sphere_tangent(h.n));
+				
 				float3 bitangent = cross(h.n, tangent);
 
 				// find the mapping from tangent space to camera space
 				mat3 m_t = mat3(tangent, bitangent, h.n);
-
 				mat3 m_t_inv = m_t.inv();
 
 				// change it
@@ -2093,11 +2092,12 @@ __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int t
 #endif
 }
 
-__global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height) 
+__global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int startIdx, int endIdx, int batchSize, unsigned int width, unsigned int height) 
 {
 	unsigned int tid = blockIdx.x*blockDim.x + threadIdx.x;
-	if( tid >= activeCount ) return;
-	int pidx = activeIdx[tid];
+	if( tid >= batchSize ) return;
+	int rayIdx = tid + startIdx;
+	int pidx = activeIdx[rayIdx];
 	PixelState& p = pixels[pidx];
 	if( p.isActive ) {
 		// only trace active ray
