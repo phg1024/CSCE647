@@ -181,7 +181,8 @@ struct d_Material {
 struct TriangleMeshInfo {
 	__device__ TriangleMeshInfo& operator=(const TriangleMeshInfo& info) {
 		nFaces = info.nFaces;
-		faces = info.faces;
+		indices = info.indices;
+		verts = info.verts;
 		normals = info.normals;
 		texcoords = info.texcoords;
 		materials = info.materials;
@@ -190,7 +191,8 @@ struct TriangleMeshInfo {
 	}
 	
 	int nFaces;
-	float4* faces;			// float4 texture of a list of faces, together with material indices
+	int4* indices;			// indices of vertex of the faces: x, y, z, together with material indices
+	float3* verts;			// float4 texture of a list of faces, together with material indices
 	float3* normals;		// float3 texture of a list of normal vectors
 	float2* texcoords;		// float2 texture of texture coordinates, if exists
 	Material* materials;	// material for the triangle mesh

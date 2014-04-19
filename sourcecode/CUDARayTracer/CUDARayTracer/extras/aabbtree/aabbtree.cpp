@@ -115,7 +115,7 @@ AABBTree::AABBTree(const vector<Triangle>& tris)
 	memset(nodeCountLevel, 0, sizeof(size_t)*128);
 	maxDepth = 0;
     cout << "building AABB tree ..." << endl;
-#if 1
+#if 0
     mRoot = buildAABBTree(tris);
 #else
 	mRoot = buildAABBTree_SAH(tris, SplittingPlane());
@@ -196,7 +196,7 @@ vector<AABBNode_Serial> AABBTree::toArray() const {
 		}
 	}
 
-#define WRITE_TREE 1
+#define WRITE_TREE 0
 #if WRITE_TREE
 
 	ofstream fout("tree.txt");
