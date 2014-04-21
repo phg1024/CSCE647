@@ -18,6 +18,9 @@ public:
     float w, h;		// canvas size
 
 	float apertureRadius, magRatio;
+
+	int cameraTex;
+	float camTexRatio;
 };
 
 class Material {

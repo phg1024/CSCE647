@@ -6,7 +6,7 @@
 #include "helper_math.h"
 
 struct PixelState {
-	operator bool() const { return isActive; }
+	//operator bool() const { return isActive; }
 	int idx;			// pixel index: pix_y * imagesize.x + pix_x
 	Ray ray;
 	float3 accumulatedColor;

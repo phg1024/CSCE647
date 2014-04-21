@@ -85,10 +85,18 @@ void Scene::parse(const string& line)
 	}
 	else if( tag == "camera" ) {
 		float fnumber, magratio;
-		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov >> fnumber >> cam.magRatio;
+		string camTexFile;
+		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov >> fnumber >> cam.magRatio >> cam.camTexRatio >> camTexFile;
 		cam.apertureRadius = cam.f / (2.0 * fnumber);
 		cam.dir = cam.dir.normalized();
 		cam.up = cam.up.normalized();
+
+		if( camTexFile != "none" ) {
+			cam.cameraTex = loadTexture(camTexFile.c_str(), texs);
+		}
+		else {
+			cam.cameraTex = -1;
+		}
 	}
 	else if( tag == "material" ) {
 		Material mater;

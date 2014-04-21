@@ -1735,6 +1735,7 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 		} else {
 			// Just absorption.
 			float3 trans = transmission(pix.asprop.absortionCoeffs, h.t);
+			//printf("%f %f %f\n", trans.x, trans.y, trans.z);
 			pix.colormask *= trans;
 		}
 	}
@@ -1937,6 +1938,9 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 
 					pix.ray.dir = normalize(mix(pix.ray.dir, pdir, mater.Kf));
 
+					//printf("%f %f %f %f %f %f\n", pix.ray.dir.x, pix.ray.dir.y, pix.ray.dir.z, pix.colormask.x, pix.colormask.y, pix.colormask.z);
+					
+
 					if(into) {
 						//printf("in\n");
 
@@ -1967,7 +1971,7 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 
 	if( dot(pix.colormask, pix.colormask) < Wcutoff ) {
 		// terminate low weight ray
-		const float3 bgcolor = make_float3(.955, .975, .995);
+		float3 bgcolor = computeBackgroundColor(pix.ray.dir);
 		pix.accumulatedColor += pix.colormask * bgcolor;
 		pix.isActive = false;
 	}
@@ -2016,6 +2020,12 @@ __device__ __forceinline__ Ray generateRay(Camera* cam, int seed, int pidx, int 
 
     // pixel on image plane	    
     float3 pcanvas = cam->pos.data + cam->f * cam->dir.data + u * cam->w * cam->right.data + v * cam->h * cam->up.data;
+
+	if( cam->cameraTex != -1 ) {
+		// purturb the image plane position by the input texture
+		float3 dp = texturefunc(cam->cameraTex, make_float2(u+0.5, v+0.5)) * cam->camTexRatio;
+		pcanvas = pcanvas + dp.x * cam->right.data + dp.y * cam->up.data + dp.z * cam->dir.data;
+	}
 
 	// convergence point
 	float3 cpoint = cam->pos.data + normalize(pcanvas - cam->pos.data) * cam->f * cam->magRatio;
