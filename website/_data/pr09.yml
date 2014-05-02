@@ -1,0 +1,23 @@
+- name: skin.png
+  des: Skin effect - pure diffuse (left), subsurface scattering (middle) and specular (right).
+  id: "1"
+
+- name: marble4096.png
+  des: Marble bunny - pure diffuse (left), subsurface scattering (middle) and specular (right).
+  id: "2"
+
+- name: juice.png
+  des: Juice.
+  id: "3"
+
+- name: jade8192.png
+  des: Subsurface scattering - color stone.
+  id: "4"
+
+- name: dragons.png
+  des: Subsurface scattering - dragons.
+  id: "5"
+
+- name: test32768.png
+  des: Subsurface scattering - cornell box with bunny.
+  id: "6"
