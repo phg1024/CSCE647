@@ -106,13 +106,22 @@ void Scene::parse(const string& line)
 			mater.diffuseTex = TextureObject::parseType(mater.diffuseTexName);
 			if( mater.diffuseTex == TextureObject::Image ){ 
 				// load texture from image file
-				if( mater.isSolidTex ) 
-					mater.diffuseTex += loadTexture(mater.diffuseTexName.c_str(), texs);
-				else
-					mater.diffuseTex = loadTexture(mater.diffuseTexName.c_str(), texs);
+				if( mater.isSolidTex ) {
+					if( isHDRFile(mater.diffuseTexName) )
+						mater.diffuseTex += loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+					else
+						mater.diffuseTex += loadTexture(mater.diffuseTexName.c_str(), texs);
+				}
+				else {
+					if( isHDRFile(mater.diffuseTexName) )
+						mater.diffuseTex = loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+					else
+						mater.diffuseTex = loadTexture(mater.diffuseTexName.c_str(), texs);
+				}
 			}
 		}
 		else mater.diffuseTex = -1;
+
 		if( mater.normalTexName != "none" ) {
 			mater.normalTex = TextureObject::parseType(mater.normalTexName);
 			if( mater.normalTex == TextureObject::Image ){ 
@@ -243,7 +252,16 @@ void Scene::parse(const string& line)
 
 		vec3 dim = mscl * vec3(1, 1, 1);
 
-		Shape sp = Shape::createMesh(T, S, mrot, materialMap[matName]);
+		bool useMaterialTable = true;
+		Shape sp = Shape::createMesh(T, S, mrot, -1);
+		if( materialMap.find(matName) != materialMap.end() ) {
+			sp.materialId = materialMap[matName];
+		}
+		else {
+			useMaterialTable = false;		// the mertrials are defined with a MTL file
+			//sp = Shape::createMesh(T, S, mrot, -1);
+		}
+
 		sp.v = V;
 		
 		// load the mesh and convert it to a texture
@@ -253,6 +271,99 @@ void Scene::parse(const string& line)
 		cout << "base path: " << basePath << endl;
 		cout << tinyobj::LoadObj(objs, meshFile.c_str(), basePath.c_str()) << endl;
 		cout << objs.size() << " shapes in total." << endl;
+
+		// TODO build a local material table
+		// load the materials
+		for(int i=0,tidx=0;i<objs.size();i++) {
+			const tinyobj::shape_t& shp = objs[i];
+
+			const tinyobj::mesh_t& msh = shp.mesh;
+			const tinyobj::material_t& mt = shp.material;
+
+			string mname = meshFile + mt.name;
+			if( materialMap.find(mname) == materialMap.end() ) {
+				// add the material to the list
+				Material mater;
+
+				// default option
+				mater.t = Material::Diffuse;
+				mater.diffuse = vec3(mt.diffuse[0], mt.diffuse[1], mt.diffuse[2]);
+				mater.Ks = 1.0;
+				mater.Kr = 1.0;		// full diffuse
+				auto illumop = mt.unknown_parameter.find("illum");
+				if( illumop != mt.unknown_parameter.end() ) {
+					int illumtype = atoi((*illumop).second.c_str());
+					switch( illumtype ) {
+					case 0:
+					case 1:
+					case 2:
+						mater.t = Material::Diffuse;
+						mater.diffuse = vec3(mt.diffuse[0], mt.diffuse[1], mt.diffuse[2]);
+						mater.Kr = 1.0;		// simply pure diffuse
+						break;
+					case 3:
+					case 4:
+					case 5:
+						mater.t = Material::Specular;
+						mater.diffuse = vec3(mt.diffuse[0], mt.diffuse[1], mt.diffuse[2]);
+						break;
+					case 6:
+					case 7:
+					case 8:
+					case 9:
+						mater.t = Material::Refractive;
+						mater.Ks = 0.0;
+						mater.Kf = 0.0;		// simply transparent
+						mater.diffuse = vec3(mt.transmittance[0], mt.transmittance[1], mt.transmittance[2]);
+						break;
+					}
+				}
+				mater.ambient = vec3(mt.ambient[0], mt.ambient[1], mt.ambient[2]);			
+
+				if( !mt.diffuse_texname.empty() ) {
+					// load a diffuse texture
+					mater.diffuseTexName = mt.diffuse_texname;
+
+					mater.diffuseTex = TextureObject::parseType(mater.diffuseTexName);
+					if( mater.diffuseTex == TextureObject::Image ){ 
+						// load texture from image file
+						if( mater.isSolidTex ) {
+							if( isHDRFile(mater.diffuseTexName) )
+								mater.diffuseTex += loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+							else
+								mater.diffuseTex += loadTexture(mater.diffuseTexName.c_str(), texs);
+						}
+						else {
+							if( isHDRFile(mater.diffuseTexName) )
+								mater.diffuseTex = loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+							else
+								mater.diffuseTex = loadTexture(mater.diffuseTexName.c_str(), texs);
+
+						}
+					}
+				}
+				else mater.diffuseTex = -1;
+
+				mater.specular = vec3(mt.specular[0], mt.specular[1], mt.specular[2]);
+				mater.emission = vec3(mt.emission[0], mt.emission[1], mt.emission[2]);
+				mater.eta = mt.ior;
+				mater.name = mname;
+
+				if( !mt.normal_texname.empty() ) {
+					// load a normal texture
+					mater.normalTexName = mt.normal_texname;
+					
+					mater.normalTex = TextureObject::parseType(mater.normalTexName);
+					if( mater.normalTex == TextureObject::Image ){ 
+						mater.normalTex = loadTexture(mater.normalTexName.c_str(), texs);
+					}
+				}
+				else mater.normalTex = -1;
+
+				materials.push_back(mater);
+				materialMap[mater.name] = materials.size()-1;
+			}
+		}
 
 		// count triangle number
 		int ntris = 0;
@@ -288,11 +399,14 @@ void Scene::parse(const string& line)
 			const tinyobj::mesh_t& msh = shp.mesh;
 			const tinyobj::material_t& mt = shp.material;
 
+			string mname = meshFile + mt.name;
+			int matIdx = useMaterialTable?sp.materialId:materialMap[mname];
+
 			bool hasNormal = !msh.normals.empty();
 			bool hasTexCoords = !msh.texcoords.empty();
 
 			for(int j=0;j<msh.indices.size();j+=3) {
-				int4 idx = make_int4(msh.indices[j] + toffset, msh.indices[j+1] + toffset, msh.indices[j+2] + toffset, i);
+				int4 idx = make_int4(msh.indices[j] + toffset, msh.indices[j+1] + toffset, msh.indices[j+2] + toffset, matIdx);
 				if( idx.x >= nverts || idx.y >= nverts || idx.z >= nverts || idx.x < 0 || idx.y < 0 || idx.z < 0 ) cout << "shit" << endl;
 				indices.push_back(idx);
 

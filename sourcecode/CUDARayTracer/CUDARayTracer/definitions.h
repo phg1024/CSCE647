@@ -378,4 +378,5 @@ struct Hit {
 	float3 n;		// normal vector
 	float2 tex;		// texture coordinates
 	int objIdx;		// hit object index
+	int matIdx;		// hit material index
 };

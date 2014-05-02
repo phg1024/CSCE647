@@ -26,7 +26,7 @@ __device__ bool jittered = true;
 __device__ int envMapIdx;
 
 // texture using tex object
-__device__ cudaTextureObject_t tex[64];
+__device__ cudaTextureObject_t tex[512];
 
 __global__ void setParams(int specType, int tracingType, int envmap) {
 	envMapIdx = envmap;
@@ -407,7 +407,7 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshI
 			// test intersection
 			float tmp;
 			int tmptri;
-			tmp = lightRayIntersectsTriangles(r, mesh, node, tmptri, info.tmin, t, disp);
+			tmp = lightRayIntersectsTriangles(r, mesh, node, tmptri, 0, t, disp);
 			if( tmp > 0 && tmp < t ) {
 				t = tmp;
 				tri = tmptri;
@@ -419,8 +419,8 @@ __device__ float lightRayIntersectsAABBTree_Iterative(Ray r, const TriangleMeshI
 			int leftIdx = node.leftChild, rightIdx = node.rightChild;
 
 			float tminL, tminR, tmaxL, tmaxR;
-			bool hitleft = lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tminL, tmaxL, info.tmin, t, disp);
-			bool hitright = lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tminR, tmaxR, info.tmin, t, disp);
+			bool hitleft = lightRayIntersectsBoundingBox(r, rdirinv, tree[leftIdx].aabb, tminL, tmaxL, 0, t, disp);
+			bool hitright = lightRayIntersectsBoundingBox(r, rdirinv, tree[rightIdx].aabb, tminR, tmaxR, 0, t, disp);
 			if( hitleft && hitright ) {
 				if( tminL < tminR ) { Q.push(TraverseInfo(leftIdx, tminL, tmaxL)); Q.push(TraverseInfo(rightIdx, tminR, tmaxR)); }
 				else { Q.push(TraverseInfo(rightIdx, tminR, tmaxR)); Q.push(TraverseInfo(leftIdx, tminL, tmaxL)); }
@@ -1136,6 +1136,7 @@ __device__ Hit rayIntersectsPlane(Ray r, d_Shape* shapes, int nShapes, int sid, 
 			h.tex = t * scale;
 			h.n = shapes[sid].axis[0];
 			h.objIdx = sid;
+			h.matIdx = shapes[sid].materialId;
 
 			return h;
         }
@@ -1160,6 +1161,8 @@ __device__ Hit rayIntersectsQuadraticSurface(Ray r, d_Shape* shapes, int nShapes
 		h.tex = spheremap(h.n);
 		
 		h.objIdx = sid;
+		h.matIdx = shapes[sid].materialId;
+
         return h;
     }
 	else return background();
@@ -1257,6 +1260,7 @@ __device__ Hit rayIntersectsTriangleMesh(Ray r, d_Shape* shapes, int nShapes, in
 		}
 
 		h.objIdx = sid;
+		h.matIdx = triidx.w;	// material index offset
         return h;
 	}
 	else return background();
@@ -1276,9 +1280,9 @@ __device__ __forceinline__ Hit rayIntersectsShape(Ray r, d_Shape* shapes, int nS
 	}
 }
 
-__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, float camtime = 0.0) {
+__device__ Hit rayIntersectsShapes(Ray r, int nShapes, d_Shape* shapes, float tmax = 1e10, float camtime = 0.0) {
 	Hit h;
-	h.t = 1e10;
+	h.t = tmax;
 	h.objIdx = -1;
 
     for(int i=0;i<nShapes;i++) {
@@ -1682,7 +1686,7 @@ __device__ float3 computeBackgroundColor(const float3 & direction) {
 	return (1 - x) * firstColor + x * secondColor;
 }
 
-__device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats) {
+__device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix, int nShapes, d_Shape* shapes, int nLights, int* lights, int nMats, d_Material* mats, float aorange = 1024.0) {
 
 	thrust::default_random_engine rng( myhash(seed) * myhash(pix.idx) * myhash(pass) );
 	thrust::uniform_real_distribution<float> uniformDistribution(0,1);
@@ -1691,7 +1695,7 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 	thrust::default_random_engine rng2( myhash(seed) * myhash(seed) * myhash(seed) );
 	float camtime = uniformDistribution(rng2);
 
-	Hit h = rayIntersectsShapes(pix.ray, nShapes, shapes, camtime);
+	Hit h = rayIntersectsShapes(pix.ray, nShapes, shapes, pass==0?1e10:aorange, camtime);
 
 	if( h.objIdx == -1 ) {	
 		// no hit, sample environment map
@@ -1709,7 +1713,7 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 		return;
 	}
 
-	const d_Material& mater = mats[shapes[h.objIdx].materialId];
+	const d_Material& mater = mats[h.matIdx];
 
 	// process scattering and absorption
 	const float ZERO_ABSOPTION_THRESHOLD = 0.00001;
@@ -1747,8 +1751,19 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 			//maxf = fmaxf(shapes[h.objIdx].material.emission.z, maxf);				
 
 			// hit a light
-			pix.accumulatedColor += mater.emission * pix.colormask;
-			pix.colormask *= mater.diffuse;
+
+			// if it has a texture, use it for emission color
+			if( mater.diffuseTex != -1 ) {
+				const float amplifier = mater.shininess;
+
+				float3 color = texturefunc(mater.diffuseTex, h.tex, h.p);
+				pix.accumulatedColor += color * amplifier * pix.colormask;
+				pix.colormask *= color;
+			}
+			else {
+				pix.accumulatedColor += mater.emission * pix.colormask;
+				pix.colormask *= mater.diffuse;
+			}
 
 			// send it out again
 			pix.ray.origin = h.p + 1e-3 * h.n;
@@ -1766,6 +1781,9 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 			//float3 shading = computeShadow(res, time, x, y, h.p, h.n, h.tex, ray, shapes, nShapes, lights, nLights, h.objIdx);
 			//accumulatedColor += shading * colormask;
 
+			//float dDn = dot(h.n, pix.ray.dir);
+			//if( dDn > 0 ){ h.n = -h.n; }
+
 			float3 color;
 			if( mater.diffuseTex != -1 ) {
 				color = texturefunc(mater.diffuseTex, h.tex, h.p);
@@ -1780,7 +1798,10 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 
 			float2 uv = make_float2(uniformDistribution(rng), uniformDistribution(rng));
 
-			pix.ray.dir = mix(pix.ray.dir, calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), mater.Kr);
+			if( mater.Kr != 0 )
+				pix.ray.dir = mix(pix.ray.dir, calculateRandomDirectionInHemisphere(pix.ray.dir, uv.x, uv.y), mater.Kr);
+			else
+				pix.ray.dir = mix(pix.ray.dir, calculateRandomDirectionInHemisphere(h.n, uv.x, uv.y), mater.Kr);
 
 			pix.ray.dir = normalize(pix.ray.dir);
 			break;
@@ -1811,6 +1832,7 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 			rf.origin = h.p; rf.dir = normalize(reflect(pix.ray.dir, h.n));
 
 			double dDn = dot(h.n, pix.ray.dir);
+			if( dDn > 0 ){ h.n = -h.n; dDn = -dDn; }
 			float3 n1 = -h.n;
 
 			double nc=1.0, nt=mater.eta;
@@ -1891,11 +1913,13 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 			}
 
 			float ior;
+			/*
 			if( mater.diffuseTex != -1 ) {
 				float3 texval = texturefunc(mater.diffuseTex, h.tex, h.p);
 				ior = fmaxf(length(texval), 1.0);
 			}
-			else ior = mater.eta;
+			else */
+			    ior = mater.eta;
 
 			// get the reflected ray
 			Ray rf;
@@ -1944,16 +1968,17 @@ __device__ void traceRay_general_singlepass(int seed, int pass, PixelState& pix,
 					if(into) {
 						//printf("in\n");
 
-						float3 Idiff = mater.diffuse;
+						float3 Idiff;
 
-						/*
 						if( mater.diffuseTex != -1 ) {
-						Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
+						    Idiff = texturefunc(mater.diffuseTex, h.tex, h.p);
+							//Idiff = fminf(make_float3(sqrtf(Idiff.x), sqrtf(Idiff.y), sqrtf(Idiff.z)), 0.999);
+							pix.asprop.absortionCoeffs = 1.0 - Idiff;
 						}
-						else Idiff = mater.diffuse;
-						*/
-
-						pix.asprop.absortionCoeffs = 1.0 - Idiff;
+						else{ 
+							Idiff = mater.diffuse;
+							pix.asprop.absortionCoeffs = 1.0 - Idiff;
+						}
 						pix.asprop.reducedScatteringCoeffs = mater.Ks;
 					}
 					else {
@@ -1983,7 +2008,7 @@ __device__ int dShapesCount;
 __device__ int dMaterialCount;
 __device__ d_Shape dShapes[16];
 __device__ int dLights[4];
-__device__ d_Material dMaterial[64];
+__device__ d_Material dMaterial[1024];
 
 __global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes, int nMaterials, Material* materials) {
 	int tidx = threadIdx.x;
@@ -2023,7 +2048,7 @@ __device__ __forceinline__ Ray generateRay(Camera* cam, int seed, int pidx, int 
 
 	if( cam->cameraTex != -1 ) {
 		// purturb the image plane position by the input texture
-		float3 dp = texturefunc(cam->cameraTex, make_float2(u+0.5, v+0.5)) * cam->camTexRatio;
+		float3 dp = texturefunc(cam->cameraTex, make_float2(u+0.5, 0.5-v)) * cam->camTexRatio;
 		pcanvas = pcanvas + dp.x * cam->right.data + dp.y * cam->up.data + dp.z * cam->dir.data;
 	}
 
@@ -2044,6 +2069,8 @@ __device__ __forceinline__ Ray generateRay(Camera* cam, int seed, int pidx, int 
 
 	return r;
 }
+
+__device__ float AOrange = 1024.0;
 
 __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height) {
 
@@ -2067,6 +2094,7 @@ __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int t
 	p.weight = 1.0;
 
 	p.ray = generateRay(cam, time, pidx, x, y, width, height);
+	if( pidx == 0 && cam->cameraTex == -1 ) AOrange = cam->camTexRatio;
 }
 
 __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int startIdx, int endIdx, int batchSize, unsigned int width, unsigned int height) 
@@ -2078,7 +2106,7 @@ __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int 
 	PixelState& p = pixels[pidx];
 
 	// just trace the ray, it is guaranteed to be active
-	traceRay_general_singlepass(seed, pass, p, dShapesCount, dShapes, dLightsCount, dLights, dMaterialCount, dMaterial);		
+	traceRay_general_singlepass(seed, pass, p, dShapesCount, dShapes, dLightsCount, dLights, dMaterialCount, dMaterial, AOrange);		
 }
 
 __global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, int height) {

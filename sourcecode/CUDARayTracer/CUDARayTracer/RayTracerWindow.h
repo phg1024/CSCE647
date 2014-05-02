@@ -339,7 +339,7 @@ struct CUDARayTracer {
 
 		//bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
 		//setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
-		initScene<<<1,64>>>(lights.size(), d_lights, shapes.size(), d_shapes, materials.size(), d_materials);
+		initScene<<<1,1024>>>(lights.size(), d_lights, shapes.size(), d_shapes, materials.size(), d_materials);
 
 		dim3 block(32, 32, 1);
 		dim3 grid(ceil(imagesize.x / (float)block.x), ceil(imagesize.y / (float)block.y), 1);
