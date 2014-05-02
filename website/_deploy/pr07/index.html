@@ -46,8 +46,14 @@
 <div class="maincontent">
     <h2>Project 07 - Distributed Ray Tracing</h2>
     <div class="projectbrief">
-        <p class="note">TBD - Project description goes here.</p>
+        <p>Visual effects produced with distributed ray tracing, including
+            motion blur, glossy reflection, translucency and depth of field, are implemented
+            in this project.
+        </p>
 
+        <p>
+            Painting camera effect is another interesting thing tried out in this project.
+        </p>
         <p>
             The source code of this project is available <a href="https://github.com/phg1024/CSCE647/tree/master/sourcecode/CUDARayTracer/CUDARayTracer">here</a>.
             It is a bit messy currently, but I will try to clean it up later.
@@ -55,10 +61,45 @@
     </div>
     <h2>Videos</h2>
     <div class="resultentry">
-        <iframe src="//player.vimeo.com/video/91676292?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+        <iframe src="//player.vimeo.com/video/93082073?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
         <p class="resultdes">
-            <a href="https://vimeo.com/91676292">Video 1</a>:
-            Moving spheres with motion blur, DOF and glossy/translucent material.
+            <a href="https://vimeo.com/93082073">Video 1</a>:
+            Final Video 0: Wrecking ball. Simulation by Blender. Rendered with my own renderer.
+        </p>
+    </div>
+    <div class="resultentry">
+        <iframe src="//player.vimeo.com/video/92817894?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+        <p class="resultdes">
+            <a href="https://vimeo.com/92817894">Video 1</a>:
+            Final Video 1: Rotating dragon with blue glass, glazed green and pink jade.
+        </p>
+    </div>
+    <div class="resultentry">
+        <iframe src="//player.vimeo.com/video/91875867?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+        <p class="resultdes">
+            <a href="https://vimeo.com/91875867">Video 2</a>:
+            Final Video 2: Moving spheres with motion blur, DOF and glossy/translucent material.
+        </p>
+    </div>
+    <div class="resultentry">
+        <iframe src="//player.vimeo.com/video/92530269?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+        <p class="resultdes">
+            <a href="https://vimeo.com/92530269">Video 3</a>:
+            Focusing process.
+        </p>
+    </div>
+    <div class="resultentry">
+        <iframe src="//player.vimeo.com/video/92583955?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+        <p class="resultdes">
+            <a href="https://vimeo.com/92583955">Video 4</a>:
+            Painting camera animation.
+        </p>
+    </div>
+    <div class="resultentry">
+        <iframe src="//player.vimeo.com/video/92651141?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+        <p class="resultdes">
+            <a href="http://vimeo.com/92651141">Video 5</a>:
+            Painting camera animation II.
         </p>
     </div>
     <h2>Images</h2>
@@ -85,18 +126,63 @@
     </div>
     
     <div class="resultentry">
+        <a class="fbox" href="./images/Lamborghini.png" title="Depth of field with Lamborghini aventador."><img class="resultimage"  src="./images/Lamborghini.png"></a>
+        <p class="resultdes">Image 5: Depth of field with Lamborghini aventador.</p>
+    </div>
+    
+    <div class="resultentry">
         <a class="fbox" href="./images/3dragons1792.png" title="Depth of field with dragons."><img class="resultimage"  src="./images/3dragons1792.png"></a>
-        <p class="resultdes">Image 5: Depth of field with dragons.</p>
+        <p class="resultdes">Image 6: Depth of field with dragons.</p>
     </div>
     
     <div class="resultentry">
         <a class="fbox" href="./images/translucency.png" title="Bunny with 0.005, 0.1, and 0.5 translucency from left to right."><img class="resultimage"  src="./images/translucency.png"></a>
-        <p class="resultdes">Image 6: Bunny with 0.005, 0.1, and 0.5 translucency from left to right.</p>
+        <p class="resultdes">Image 7: Bunny with 0.005, 0.1, and 0.5 translucency from left to right.</p>
     </div>
     
     <div class="resultentry">
         <a class="fbox" href="./images/7teapots2048.png" title="Teapots - red specular, green glossy, blue glass, mirror, gold, green diffuse and red diffuse."><img class="resultimage"  src="./images/7teapots2048.png"></a>
-        <p class="resultdes">Image 7: Teapots - red specular, green glossy, blue glass, mirror, gold, green diffuse and red diffuse.</p>
+        <p class="resultdes">Image 8: Teapots - red specular, green glossy, blue glass, mirror, gold, green diffuse and red diffuse.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/ref.png" title="Reference scene for painting camera effect ."><img class="resultimage"  src="./images/ref.png"></a>
+        <p class="resultdes">Image 9: Reference scene for painting camera effect .</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/swirl.png" title="Painting camera - wave pattern."><img class="resultimage"  src="./images/swirl.png"></a>
+        <p class="resultdes">Image 10: Painting camera - wave pattern.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/cloth.png" title="Painting camera - cloth effect."><img class="resultimage"  src="./images/cloth.png"></a>
+        <p class="resultdes">Image 11: Painting camera - cloth effect.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/brush4.png" title="Painting camera - oil painting effect."><img class="resultimage"  src="./images/brush4.png"></a>
+        <p class="resultdes">Image 12: Painting camera - oil painting effect.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/star.png" title="Painting camera effect IV - with Starry Night by Van Gogh."><img class="resultimage"  src="./images/star.png"></a>
+        <p class="resultdes">Image 13: Painting camera effect IV - with Starry Night by Van Gogh.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/sunrise.png" title="Painting camera effect IV - with Sunrise by Monet."><img class="resultimage"  src="./images/sunrise.png"></a>
+        <p class="resultdes">Image 14: Painting camera effect IV - with Sunrise by Monet.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/stereo.jpg" title="Stereo graphics."><img class="resultimage"  src="./images/stereo.jpg"></a>
+        <p class="resultdes">Image 15: Stereo graphics.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/stereo.gif" title="Stereo graphics animation."><img class="resultimage"  src="./images/stereo.gif"></a>
+        <p class="resultdes">Image 16: Stereo graphics animation.</p>
     </div>
     
 </div>
