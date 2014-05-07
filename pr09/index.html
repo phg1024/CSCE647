@@ -1,50 +1,11 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>Project 09 - Scattering and Subsurface Scattering Effects</title>
-        <meta name="viewport" content="width=device-width">
+---
+layout: project
+title: Project 09 - Scattering and Subsurface Scattering Effects
+---
 
-        <!-- syntax highlighting CSS -->
-        <link rel="stylesheet" href="../css/syntax.css">
-
-        <!-- Custom CSS -->
-        <link rel="stylesheet" href="../css/main.css">
-
-        <script type="text/javascript" src="../scripts/jquery-1.10.2.min.js"></script>
-        <script type="text/javascript" src="../scripts/d3.v3.min.js"></script>
-
-        <!-- Add mousewheel plugin (this is optional) -->
-        <script type="text/javascript" src="../fancybox/lib/jquery.mousewheel-3.0.6.pack.js"></script>
-
-        <!-- Add fancyBox -->
-        <link rel="stylesheet" href="../fancybox/source/jquery.fancybox.css" type="text/css" media="screen" />
-        <script type="text/javascript" src="../fancybox/source/jquery.fancybox.pack.js"></script>
-
-        <!-- Optionally add helpers - button, thumbnail and/or media -->
-        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-buttons.css" type="text/css" media="screen" />
-        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-buttons.js"></script>
-        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-media.js"></script>
-
-        <link rel="stylesheet" href="../fancybox/source/helpers/jquery.fancybox-thumbs.css" type="text/css" media="screen" />
-        <script type="text/javascript" src="../fancybox/source/helpers/jquery.fancybox-thumbs.js"></script>
-
-        <!-- Script -->
-        <script type="text/javascript" src="../scripts/phgscript.js"></script>
-
-    </head>
-    <body>
-
-	    <header>
-          <div class="banner">
-              <h1><a class="mylink" href="../index.html">Peihong's CSCE 647 Projects</a></h1>
-          </div>
-	    </header>
-
-        <article>
+<article>
 <div class="maincontent">
-    <h2>Project 09 - Scattering and Subsurface Scattering Effects</h2>
+    <h2>{{ page.title }}</h2>
     <div class="projectbrief">
     <p>
         I have tried subsurface scattering and scattering in this project. For subsurface scattering, I tested my implementation with skin, marble and juice. For scattering,
@@ -55,61 +16,11 @@
 
     <h2>Images</h2>
     <p class="note">Click on the images to view full size version.</p>
-    
+    {% for item in site.data.pr09 %}
     <div class="resultentry">
-        <a class="fbox" href="./images/skin.png" title="Skin effect - diffuse (left), subsurface scattering (middle) and specular (right)."><img class="resultimage"  src="./images/skin.png"></a>
-        <p class="resultdes">Image 1: Skin effect - diffuse (left), subsurface scattering (middle) and specular (right).</p>
+        <a class="fbox" href="./images/{{item.name}}" title="{{item.des}}"><img class="resultimage"  src="./images/{{item.name}}"></a>
+        <p class="resultdes">Image {{item.id}}: {{ item.des }}</p>
     </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/marble.png" title="Marble teapot - specular (left), subsurface scattering (middle) and diffuse (right)."><img class="resultimage"  src="./images/marble.png"></a>
-        <p class="resultdes">Image 2: Marble teapot - specular (left), subsurface scattering (middle) and diffuse (right).</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/juice.png" title="Juice."><img class="resultimage"  src="./images/juice.png"></a>
-        <p class="resultdes">Image 3: Juice.</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/jade8192.png" title="Subsurface scattering - color stone."><img class="resultimage"  src="./images/jade8192.png"></a>
-        <p class="resultdes">Image 4: Subsurface scattering - color stone.</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/dragons.png" title="Subsurface scattering - dragons."><img class="resultimage"  src="./images/dragons.png"></a>
-        <p class="resultdes">Image 5: Subsurface scattering - dragons.</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/test32768.png" title="Subsurface scattering - cornell box with bunny."><img class="resultimage"  src="./images/test32768.png"></a>
-        <p class="resultdes">Image 6: Subsurface scattering - cornell box with bunny.</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/foggy_tonemapped.png" title="Scattering with participating medium. This image is a tonemapped version. The original is stored as an <a href='./images/foggy.hdr'>HDR image</a>, and you can also see a linear-mapped LDR version <a href='./images/foggy.png'>here</a>."><img class="resultimage"  src="./images/foggy_tonemapped.png"></a>
-        <p class="resultdes">Image 7: Scattering with participating medium. This image is a tonemapped version. The original is stored as an <a href='./images/foggy.hdr'>HDR image</a>, and you can also see a linear-mapped LDR version <a href='./images/foggy.png'>here</a>.</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/foggy_bunny.png" title="Scattering with bunnies. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_bunny.hdr'>HDR image</a>."><img class="resultimage"  src="./images/foggy_bunny.png"></a>
-        <p class="resultdes">Image 8: Scattering with bunnies. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_bunny.hdr'>HDR image</a>.</p>
-    </div>
-    
-    <div class="resultentry">
-        <a class="fbox" href="./images/foggy_dragon.png" title="Scattering with dragon. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_dragon.hdr'>HDR image</a>."><img class="resultimage"  src="./images/foggy_dragon.png"></a>
-        <p class="resultdes">Image 9: Scattering with dragon. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_dragon.hdr'>HDR image</a>.</p>
-    </div>
-    
+    {% endfor %}
 </div>
 </article>
-
-
-        <footer>
-          <div class="banner">
-          &copy; 2009-2014 &nbsp; <a class="mylink" href="http://www.github.com/phg1024">Peihong Guo</a> &nbsp; <script type="text/javascript"> writeEmailAddress(); </script>
-          </div>
-        </footer>
-
-    </body>
-</html>
