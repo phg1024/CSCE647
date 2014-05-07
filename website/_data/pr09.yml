@@ -3,7 +3,7 @@
   id: "1"
 
 - name: marble.png
-  des: Marble teapot - specular (left), subsurface scattering (middle) and diffuse (right).
+  des: Marble teapot - diffuse (left), subsurface scattering (middle) and specular (right).
   id: "2"
 
 - name: juice.png
