@@ -46,18 +46,10 @@
 <div class="maincontent">
     <h2>Project 09 - Scattering and Subsurface Scattering Effects</h2>
     <div class="projectbrief">
-    <p><b>Subsurface Scattering</b>
-        <ol>
-    <li>Skin</li>
-    <li>Marble</li>
-    <li>Milk or other juices</li>
-        </ol>
-        </p>
-    <p><b>Scattering</b>
-    <ol>
-    <li>Sky</li>
-    <li>Clouds</li>
-    </ol>
+    <p>
+        I have tried subsurface scattering and scattering in this project. For subsurface scattering, I tested my implementation with skin, marble and juice. For scattering,
+        I attempted to render scenes with participating medium and achieved foggy effects. Basically my current implementation can handle sky rendering too, but I have not tried that.
+        I think cloud rendering is more about volumetric effects so I may try that in the <a href="../pr10/index.html">the other project</a>.
     </p>
     </div>
 
@@ -65,13 +57,13 @@
     <p class="note">Click on the images to view full size version.</p>
     
     <div class="resultentry">
-        <a class="fbox" href="./images/skin.png" title="Skin effect - pure diffuse (left), subsurface scattering (middle) and specular (right)."><img class="resultimage"  src="./images/skin.png"></a>
-        <p class="resultdes">Image 1: Skin effect - pure diffuse (left), subsurface scattering (middle) and specular (right).</p>
+        <a class="fbox" href="./images/skin.png" title="Skin effect - diffuse (left), subsurface scattering (middle) and specular (right)."><img class="resultimage"  src="./images/skin.png"></a>
+        <p class="resultdes">Image 1: Skin effect - diffuse (left), subsurface scattering (middle) and specular (right).</p>
     </div>
     
     <div class="resultentry">
-        <a class="fbox" href="./images/marble4096.png" title="Marble bunny - pure diffuse (left), subsurface scattering (middle) and specular (right)."><img class="resultimage"  src="./images/marble4096.png"></a>
-        <p class="resultdes">Image 2: Marble bunny - pure diffuse (left), subsurface scattering (middle) and specular (right).</p>
+        <a class="fbox" href="./images/marble.png" title="Marble teapot - specular (left), subsurface scattering (middle) and diffuse (right)."><img class="resultimage"  src="./images/marble.png"></a>
+        <p class="resultdes">Image 2: Marble teapot - specular (left), subsurface scattering (middle) and diffuse (right).</p>
     </div>
     
     <div class="resultentry">
@@ -92,6 +84,21 @@
     <div class="resultentry">
         <a class="fbox" href="./images/test32768.png" title="Subsurface scattering - cornell box with bunny."><img class="resultimage"  src="./images/test32768.png"></a>
         <p class="resultdes">Image 6: Subsurface scattering - cornell box with bunny.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/foggy_tonemapped.png" title="Scattering with participating medium. This image is a tonemapped version. The original is stored as an <a href='./images/foggy.hdr'>HDR image</a>, and you can also see a linear-mapped LDR version <a href='./images/foggy.png'>here</a>."><img class="resultimage"  src="./images/foggy_tonemapped.png"></a>
+        <p class="resultdes">Image 7: Scattering with participating medium. This image is a tonemapped version. The original is stored as an <a href='./images/foggy.hdr'>HDR image</a>, and you can also see a linear-mapped LDR version <a href='./images/foggy.png'>here</a>.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/foggy_bunny.png" title="Scattering with bunnies. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_bunny.hdr'>HDR image</a>."><img class="resultimage"  src="./images/foggy_bunny.png"></a>
+        <p class="resultdes">Image 8: Scattering with bunnies. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_bunny.hdr'>HDR image</a>.</p>
+    </div>
+    
+    <div class="resultentry">
+        <a class="fbox" href="./images/foggy_dragon.png" title="Scattering with dragon. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_dragon.hdr'>HDR image</a>."><img class="resultimage"  src="./images/foggy_dragon.png"></a>
+        <p class="resultdes">Image 9: Scattering with dragon. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_dragon.hdr'>HDR image</a>.</p>
     </div>
     
 </div>
