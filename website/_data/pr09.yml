@@ -1,9 +1,9 @@
 - name: skin.png
-  des: Skin effect - pure diffuse (left), subsurface scattering (middle) and specular (right).
+  des: Skin effect - diffuse (left), subsurface scattering (middle) and specular (right).
   id: "1"
 
-- name: marble4096.png
-  des: Marble bunny - pure diffuse (left), subsurface scattering (middle) and specular (right).
+- name: marble.png
+  des: Marble teapot - specular (left), subsurface scattering (middle) and diffuse (right).
   id: "2"
 
 - name: juice.png
@@ -21,3 +21,15 @@
 - name: test32768.png
   des: Subsurface scattering - cornell box with bunny.
   id: "6"
+
+- name: foggy_tonemapped.png
+  des: Scattering with participating medium. This image is a tonemapped version. The original is stored as an <a href='./images/foggy.hdr'>HDR image</a>, and you can also see a linear-mapped LDR version <a href='./images/foggy.png'>here</a>.
+  id: "7"
+
+- name: foggy_bunny.png
+  des: Scattering with bunnies. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_bunny.hdr'>HDR image</a>.
+  id: "8"
+
+- name: foggy_dragon.png
+  des: Scattering with dragon. This image is a tonemapped version. The original is stored as an <a href='./images/foggy_dragon.hdr'>HDR image</a>.
+  id: "9"
