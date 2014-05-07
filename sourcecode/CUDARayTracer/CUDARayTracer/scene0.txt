@@ -1,28 +1,31 @@
 canvas 1280 720
+name refraction
 tracingtype 2
-maxiters 1024
-camera 0 0 70 0 0 -15 0 15 0 1.0 60.0
+maxiters 4096
+save_interval 256
+maxbounces 64
+camera 0 5 55 0 -1 -15 0 15 1 5.0 60.0 1000.0 8.0
 gamma 1.0
 # material	name type	emis	amb		diff	spec	Ks Kr Kf	shininess	ior	kcool			kwarm			alpha	beta	diffusetex		solidtexflag		normaltex
 material light0 emissive 0.25 0.25 0.25 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material light1 emissive 0.5 0.5 0.5 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material light2 emissive 1. 1. 1. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
-material light3 emissive 2.5 2.5 2.5 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
-material light4 emissive 8. 8. 8. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
+material light3 emissive 2.5 2.5 2.5 0.25 0.25 0.25 0.1 0.1 0.1 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
+material light4 emissive 5. 5. 5. 0.25 0.25 0.25 0.1 0.1 0.1 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material light5 emissive 100. 100. 100. 0.25 0.25 0.25 0.85 0.85 0.85 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
 material black diffuse	0 0 0	0 0 0	0.0 0.0 0.0	1 1 1 	1 0 0 		50 			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material red diffuse	0 0 0	0 0 0	0.87 0.15 0.15	1 1 1 	1 0 0 		50 			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material green diffuse	0 0 0	0 0 0	0.15 0.87 0.15	1 1 1	1 0.25 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material lightgreen diffuse	0 0 0	0 0 0	0.45 0.95 0.45	1 1 1	1 0.05 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material blue diffuse	0 0 0	0 0 0	0.15 0.15 0.87	1 1 1	1 0.0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material red diffuse	0 0 0	0 0 0	0.87 0.15 0.15	1 1 1 	1 1.0 0 		50 			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material green diffuse	0 0 0	0 0 0	0.15 0.87 0.15	1 1 1	1 1.0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material lightgreen diffuse	0 0 0	0 0 0	0.45 0.95 0.45	1 1 1	1 0.25 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material blue diffuse	0 0 0	0 0 0	0.15 0.15 0.87	1 1 1	1 1.0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material lightblue diffuse	0 0 0	0 0 0	0.75 0.75 0.995	1 1 1	1 0.0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material yellow diffuse	0 0 0	0 0 0	0.87 0.87 0.15	1 1 1	1 0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material lightgray diffuse	0 0 0	0 0 0	.85 .85 .85	1 1 1	1 0.75 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material gray diffuse	0 0 0	0 0 0	.5 .5 .5	1 1 1	1 0.75 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material gray diffuse	0 0 0	0 0 0	.455 .43 .39	1 1 1	1 1.0 0		50			1.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material mirror specular 0.0 0.0 0.0 0.25 0.125 0.105 .95 .95 .95 1.0 1.0 1.0 1.0 0.0 0.0 50.0 13.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
-material redmirror specular 0.0 0.0 0.0 0.0 0.0 0.0 .87 .15 .15 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.75 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
-material greenmirror specular	0 0 0	0 0 0	0.15 0.87 0.15	1 1 1	1 0.25 0		50			2.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material yellowmirror specular	0 0 0	0 0 0	0.95 0.95 0.45	1 1 1	1 0.05 0		50			3.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material redmirror specular 0.0 0.0 0.0 0.0 0.0 0.0 .87 .15 .15 1.0 1.0 1.0 1.0 0.0 0.0 50.0 2.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
+material greenmirror specular	0 0 0	0 0 0	0.15 0.87 0.15	1 1 1	1 0.25 0		50			2.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0 none
+material yellowmirror specular	0 0 0	0 0 0	0.87 0.87 0.15	1 1 1	1 0.05 0		50			2.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material bluemirror specular	0 0 0	0 0 0	0.15 0.15 0.87	1 1 1	1 0.0 0		50			2.0 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material jade refractive 0.0 0.0 0.0 0.125 0.25 0.105 .65 .96 .65 1.0 1.0 1.0 1.5 0.0 0.0 50.0 1.625 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material yellowmarble refractive 0.0 0.0 0.0 0.125 0.25 0.105 .87 .87 .15 1.0 1.0 1.0 8.0 0.0 0.0 50.0 1.625 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
@@ -30,9 +33,13 @@ material whitejade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .96 .96 .96 1.0 1.0 
 material bluejade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .85 .9 .98 1.0 1.0 1.0 3.0 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material yellowjade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .98 .98 .1 1.0 1.0 1.0 2.0 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
 material redjade refractive 0.0 0.0 0.0 0.125 0.125 0.105 .98 .7 .7 1.0 1.0 1.0 1.05 0.0 0.0 50.0 1.682 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none ./textures/earth/earthmap4k.png 0 none ./textures/earth/earth_normalmap_4k.png
-material glass refractive 0 0 0	0 0 0	.995 .995 .995	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material redglass refractive 0.1 0 0	0.1 0 0	.99 .75 .75	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
-material redglass refractive 0.1 0 0	0.1 0 0	.99 .85 .85	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		./textures/wall_normal.jpg			0					none
+material glass refractive 0 0 0	0 0 0	.97 .97 .99	1 1 1 	0 0 0 		50 			1.15 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material glass2 refractive 0 0 0	0 0 0	.97 .97 .99	1 1 1 	0 0 0 		50 			1.35 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material glass3 refractive 0 0 0	0 0 0	.97 .97 .99	1 1 1 	0 0 0 		50 			1.55 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material glass4 refractive 0 0 0	0 0 0	.97 .97 .99	1 1 1 	0 0 0 		50 			1.75 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material glass5 refractive 0 0 0	0 0 0	.97 .97 .99	1 1 1 	0 0 0 		50 			1.95 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material redglass refractive 0.1 0 0	0.1 0 0	.99 .75 .75	1 1 1 	0 0 0 		50 			1.62 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material redglass1 refractive 0.1 0 0	0.1 0 0	.99 .85 .85	1 1 1 	0 0 0 		50 			1.25 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		./textures/wall_normal.jpg			0					none
 material yellowglass refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.0 		50 			1.5 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material yellowglass0 refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.005 		50 			1.15 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material yellowglass1 refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.1 		50 			1.15 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
@@ -41,7 +48,7 @@ material yellowglass3 refractive 0 0 0	0.0 0 0	.995 .995 .005	1 1 1 	0 0 0.0 		5
 material greenglass refractive 0 0 0	0.1 0 0	.8 .99 .8	1 1 1 	0 0 0 		50 			1.62 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material greenglass1 refractive 0 0 0	0.1 0 0	.8 .99 .8	1 1 1 	0 0 0 		50 			1.62 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none 0 ./textures/circle-grid.png
 material greenglass2 refractive 0 0 0	0.1 0 0	.8 .99 .8	1 1 1 	0 0 0 		50 			1.62 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		./textures/circle-grid.png 0 none
-material blueglass refractive 0 0 0	0.1 0 0	.85 .90 .995	1 1 1 	0 0 0 		50 			1.45 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
+material blueglass refractive 0 0 0	0.1 0 0	.85 .90 .995	1 1 1 	0 0 0 		50 			1.62 0.0 0.0 0.75	0.75 0.75 0.0	0.5		0.5		none			0					none
 material earth diffuse  0 0 0 	0.125 0.125 0.125 0.995 0.995 0.995 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 ./textures/earth/earthmap4k.png 0 ./textures/earth/earth_normalmap_4k.png
 material silverearth specular  0 0 0 	0.125 0.125 0.125 0.995 0.995 0.995 1.0 1.0 1.0 1.0 0.0 0.0 50.0 3.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 ./textures/earth/earth_normalmap_flat_4k.png
 material glassearth refractive  0 0 0 0 0 0 .995 .995 .995	1 1 1 	0 0 0 		50 			1.5 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 ./textures/earth/earth_normalmap_flat_4k.png
@@ -50,9 +57,10 @@ material wood diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 1.0
 material marble2 refractive 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 0.1 0.0 0.0 50.0 1.25 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/marble2.jpg 1 none
 material marble3 refractive 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 2.5 0.0 0.0 50.0 1.025 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/marble3.jpg 1 none
 material julia2d diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 julia2d 0 none
-material chessboard2d diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 chessboard2d 0 none
+material chessboard2d diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.5 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 chessboard2d 0 none
 material chessboard diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 chessboard 0 none
 material checker diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 1.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/chessboard.png 0 none
+material wallpaper diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 1.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/wallpaper5.jpg 0 none
 material marble refractive 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 0.5 0.0 0.0 50.0 1.25 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 marble 0 none
 material stonewall diffuse 0.0 0.0 0.0 0.05 0.05 0.05 0.5 0.5 0.5 1.0 1.0 1.0 1.0 0.0 0.0 50.0 1.0 0.05 0.05 0.05 0.15 0.16 0.17 0.5 0.5 ./textures/brick1.jpg 1 ./textures/wall_normal.jpg
 material glossywhite glossy 0.0 0.0 0.0 0.075 0.185 0.25 0.95 0.965 0.995 1.0 1.0 1.0 1.0 0.15 0.0 50.0 1.25 0.0 0.0 0.75 0.75 0.75 0.0 0.5 0.5 none 0 none
@@ -61,7 +69,7 @@ material glossygray glossy 0.0 0.0 0.0	0.075 0.185 0.25	0.5 0.5 0.5 1.0 1.0 1.0 
 #environment ./textures/room2.jpg
 #environment ./textures/room.jpg
 # shape Tx Ty Tz Sx Sy Sz Rx Ry Rz material
-sphere -40.0 80 40 50 50 50 0.753 0.753 0.0 light2
+sphere 0 0 0 -40.0 40 40 20 20 20 0.753 0.753 0.0 light4
 #sphere 0 10 70 0.15 .15 .15 0 0 0 light1
 #sphere 0 10 85 15 15 4.5 0 0 0 light1
 #sphere -2.0 10 70 2 2 2 0.753 0.753 0.0 light2
@@ -80,20 +88,20 @@ sphere -40.0 80 40 50 50 50 0.753 0.753 0.0 light2
 #plane 0.0 15.0 -10.0 20.0 15.0 20.0 1.57 0.0 0.0 julia2d
 #plane 0.0 39.5 0.0 10.0 10.0 10.0 0.0 0.0 0.0 light4		# top light
 #plane 0.0 40.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 lightgray		# top
-plane 0.0 -5.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray wood checker	# bottom
+plane 0 0 0 0 0 0 80.0 80.0 2.0 0.0 0.0 0.0 wood	# bottom
 #sphere 0 -1005 0 1000 1000 1000 0 0 0 lightgray
 #plane -30.0 0.0 0.0 80.0 80.0 80.0 0.0 0.0 1.571 red			# left
 #plane 30.0 0.0 0.0 80.0 80.0 80.0 0.0 0.0 -1.571 green		# right
-#plane 0.0 0.0 -40.0 80.0 80.0 80.0 1.571.0 0.0 0.0 lightgray	# back
+plane 0 0 0 0 0 0.0 40.0 40.0 4.0 1.571 0.0 0.0 wallpaper	# back
 #box 8.0 2.0 14.0 5.0 5.0 5.0 0.0 0.0 0.0 glossywhite
 #sphere 10.0 -5.0 -10.0 15 15 15 0.0 0.0 0.0 mirror
 #sphere 0.0 -7 35 3 3 3 0.0 0.0 0.0 greenglass
 # sphere tower
-#sphere 9.0 -4.5 25.5 4.5 4.5 4.5 0.0 0.0 0.0 redjade
-#sphere 9.0 2.5 25.5 2.5 2.5 2.5 0.0 0.0 0.0 redjade
-#sphere 9.0 6.25 25.5 1.25 1.25 1.25 0.0 0.0 0.0 redjade
-#sphere 9.0 8.125 25.5 .625 .625 .625 0.0 0.0 0.0 redjade
-#sphere 9.0 9.0625 25.5 .3125 .3125 .3125 0.0 0.0 0.0 redjade
+#sphere 9.0 -0.5 25.5 4.5 4.5 4.5 0.0 0.0 0.0 red
+#sphere 9.0 6.5 25.5 2.5 2.5 2.5 0.0 0.0 0.0 red
+#sphere 9.0 10.25 25.5 1.25 1.25 1.25 0.0 0.0 0.0 light3
+#sphere 9.0 12.125 25.5 .625 .625 .625 0.0 0.0 0.0 red
+#sphere 9.0 13.0625 25.5 .3125 .3125 .3125 0.0 0.0 0.0 red
 # other stuff
 #mesh -14.5 5.0 35.5 10.0 10.0 10.0 0.0 0.0 0.0 ./meshes/sphere.obj mirror bluejade
 #mesh -13.5 -5 25.5 6 6 6 0 0.753 0 ./meshes/tetrahedron.obj wood
@@ -101,24 +109,68 @@ plane 0.0 -5.0 0.0 80.0 80.0 80.0 0.0 0.0 0.0 gray wood checker	# bottom
 #mesh -10.0 -1.0 25 0.4 0.4 0.4 0.0 0.753 0.0 ./meshes/teapot.obj redglass
 #sphere 4 -10 5 10.0 10.0 10.0 0.0 0.753 0.0 mirror yellowglass
 #mesh -12 -5 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper_res2.obj marble3
-#mesh 0 -6.0 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellowglass1
+#mesh 0 -6.0 35 75.0 75.0 75.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj yellowglass
 #mesh 12 -5 35 2.0 2.0 2.0 0.0 -0.753 0.0 ./meshes/teapot.obj greenglass
-mesh -8 -6.5 15 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj redglass metal
-mesh 0 -7.5 20 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj greenglass metal
-mesh 8 -8.5 25 90.0 90.0 90.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj blueglass metal
 #mesh 12 -6.5 45 60.0 60.0 60.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj mirror
 #mesh 0 -5 20 6.0 6.0 6.0 0.0 -0.753 0.0 ./meshes/avent/Avent.obj blueglass mirror
-#mesh 0 2 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj yellowmirror yellow
-#mesh 0 2 35 0.075 0.075 0.075 0.0 3.14 0.0 ./meshes/xyzrgb_dragon.obj yellow
+#mesh 0 2 35 15.0 15.0 15.0 0.0 3.14 0.0 ./meshes/buddha.obj glass2 yellowmirror yellow
+#mesh 0 2 35 0.075 0.075 0.075 0.0 3.14 0.0 ./meshes/xyzrgb_dragon.obj yellowjade
 #mesh 0 4 35 0.05 0.05 0.05 0.0 3.14 0.0 ./meshes/xyzrgb_statuette.obj lightgreen
-#mesh 0 -2.5 35 2.5 2.5 2.5 0.0 1.51 0.0 ./meshes/dabrovic-sponza/sponza.obj whitejade
+#mesh 0 -2.5 35 2.5 2.5 2.5 0.0 1.51 0.0 ./meshes/dabrovic-sponza/sponza.obj lightgray whitejade
 #mesh -742.5 22 260 1 1 1 1.68 3.14 0 ./meshes/T000/T000.obj gray
 #mesh 0 -2.5 35 .1 .1 .1 0.0 1.51 0.0 ./meshes/lost-empire/lost_empire.obj whitejade
 #mesh 0 -1 35 .8 .8 .8 0.0 0.0 0.0 ./meshes/bigguy2.obj lightgray
+#7 teapot group
+#mesh 0.0 -1.0 50 0.5 0.5 0.5 0.0 0.753 0.0 ./meshes/teapot.obj redmirror
+#mesh 4.0 -1.0 40 0.45 0.45 0.45 0.0 0.753 0.0 ./meshes/teapot.obj lightgreen
+#mesh 8.0 -1.0 30 0.4 0.4 0.4 0.0 0.753 0.0 ./meshes/teapot.obj blueglass
+#mesh 12.0 -1.0 20 0.35 0.35 0.35 0.0 0.753 0.0 ./meshes/teapot.obj mirror
+#mesh 16.0 -1.0 10 0.3 0.3 0.3 0.0 0.753 0.0 ./meshes/teapot.obj yellow
+#mesh 20.0 -1.0 0 0.25 0.25 0.25 0.0 0.753 0.0 ./meshes/teapot.obj green
+#mesh 24.0 -1.0 -10 0.2 0.2 0.2 0.0 0.753 0.0 ./meshes/teapot.obj red
+#3 dragons group
+#mesh 0 0 0 -8 -6.5 15 70.0 70.0 70.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj redjade redglass metal
+#mesh 0 0 0 0 -7.5 20 70.0 70.0 70.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj greenmirror jade greenglass metal
+#mesh 0 0 0 8 -8.5 25 70.0 70.0 70.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj blueglass metal
 #5 spheres group
-#sphere 10.0 0.0 25.5 4.0 4.0 4.0 0.0 0.0 0.0 redglass redmirror
-#sphere 0.0 3.0 10.0 6 6 6 0.17 0.375 0.75 glassearth silverearth
-#sphere -7.5 0.0 25.5 3 3 3 0.17 0.375 0.75 yellowglass0 yellowmirror
-#sphere -2.5 -2.2 35.5 2 2 2 0.17 0.375 0.75 greenglass1 greenmirror
-#sphere 2.5 -2.2 35.5 2 2 2 0.17 0.375 0.75 greenglass2 greenmirror
-#sphere 3.5 -3.5 38.5 1.5 1.5 1.5 0.17 0.375 0.75 blueglass bluemirror
+#sphere -2 0 0 10.0 0.0 25.5 4.0 4.0 4.0 0.0 0.0 0.0 green greenmirror redmirror
+#mesh -1.5 0 0 10 -5.0 25.5 45.0 45.0 45.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj greenmirror
+#sphere 0 0 0 0.0 3.0 10.0 6 6 6 0.17 0.375 0.75 mirror glassearth silverearth
+#sphere 0 0 0 -7.5 0.0 25.5 3 3 3 0.17 0.375 0.75 yellow yellowmirror
+#sphere 0 2 0 -2.5 -2.2 35.5 2 2 2 0.17 0.375 0.75 red greenglass1 greenmirror
+#sphere 0 0 0 3.5 -3.5 38.5 1.5 1.5 1.5 0.17 0.375 0.75 blue blueglass bluemirror
+#mesh -1. -1. 0 0 -2.5 40 30.0 30.0 30.0 0.0 0.0 0.0 ./meshes/dragon_vrip.obj redglass metal
+# 9 spheres group
+#sphere 11.0 -3.0 35.5 1.5 1.5 1.5 0.17 0.375 0.75 blue blueglass bluemirror
+#sphere 9.0 -2.5 32.5 1.75 1.75 1.75 0.17 0.375 0.75 green blueglass bluemirror
+#sphere 7.0 -2.0 28.5 2.0 2.0 2.0 0.17 0.375 0.75 red blueglass bluemirror
+#sphere 4.0 -1.5 25.5 2.25 2.25 2.25 0.17 0.375 0.75 bluemirror blueglass bluemirror
+#sphere 0.0 -1.0 20.5 2.5 2.5 2.5 0.17 0.375 0.75 greenmirror blueglass bluemirror
+#sphere -4.0 -1.5 25.5 2.25 2.25 2.25 0.17 0.375 0.75 redmirror blueglass bluemirror
+#sphere -7.0 -2.0 28.5 2.0 2.0 2.0 0.17 0.375 0.75 blueglass blueglass bluemirror
+#sphere -9.0 -2.5 32.5 1.75 1.75 1.75 0.17 0.375 0.75 greenglass blueglass bluemirror
+#sphere -11.0 -3.0 35.5 1.5 1.5 1.5 0.17 0.375 0.75 redglass blueglass bluemirror
+# 5 spheres group, refraction
+sphere 0 0 0 -14.0 3.0 10.0 3 3 3 0.17 0.375 0.75 glass
+sphere 0 0 0 -7.0 3.0 10.0 3 3 3 0.17 0.375 0.75 glass2
+sphere 0 0 0 0.0 3.0 10.0 3 3 3 0.17 0.375 0.75 glass3
+sphere 0 0 0 7.0 3.0 10.0 3 3 3 0.17 0.375 0.75 glass4
+sphere 0 0 0 14.0 3.0 10.0 3 3 3 0.17 0.375 0.75 glass5
+# 5 cubes group, refraction
+#mesh 0 0 0 -14.0 -1.0 15.5 1 1 1 0.0 0.753 0.0 ./meshes/cube.obj glass
+#mesh 0 0 0 -7.0 -1.0 15.5 1 1 1 0.0 0.753 0.0 ./meshes/cube.obj glass2
+#mesh 0 0 0 0.0 -1.0 15.5 1 1 1 0.0 0.753 0.0 ./meshes/cube.obj glass3
+#mesh 0 0 0 7.0 -1.0 15.5 1 1 1 0.0 0.753 0.0 ./meshes/cube.obj glass4
+#mesh 0 0 0 14.0 -1.0 15.5 1 1 1 0.0 0.753 0.0 ./meshes/cube.obj glass5
+# 5 bunny group, refraction
+#mesh 0 0 0 -10 -5 35 35.0 35.0 35.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj glass
+#mesh 0 0 0 -5 -5 35 35.0 35.0 35.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj glass2
+#mesh 0 0 0 0 -5 35 35.0 35.0 35.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj glass3
+#mesh 0 0 0 5 -5 35 35.0 35.0 35.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj glass4
+#mesh 0 0 0 10 -5 35 35.0 35.0 35.0 0.0 0.753 0.0 ./meshes/bun_zipper.obj glass5
+# 5 teapot group, refraction
+#mesh 0 0 0 -14.0 -1.0 5 0.3 0.3 0.3 0.0 0.753 0.0 ./meshes/teapot.obj glass
+#mesh 0 0 0 -7.0 -1.0 5 0.3 0.3 0.3 0.0 0.753 0.0 ./meshes/teapot.obj glass2
+#mesh 0 0 0 0.0 -1.0 5 0.3 0.3 0.3 0.0 0.753 0.0 ./meshes/teapot.obj glass3
+#mesh 0 0 0 7.0 -1.0 5 0.3 0.3 0.3 0.0 0.753 0.0 ./meshes/teapot.obj glass4
+#mesh 0 0 0 14.0 -1.0 5 0.3 0.3 0.3 0.0 0.753 0.0 ./meshes/teapot.obj glass5

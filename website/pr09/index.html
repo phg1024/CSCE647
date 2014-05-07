@@ -6,7 +6,29 @@ title: Project 09 - Scattering and Subsurface Scattering Effects
 <article>
 <div class="maincontent">
     <h2>{{ page.title }}</h2>
-	<div class="underconstruction">
-	</div>
+    <div class="projectbrief">
+    <p><b>Subsurface Scattering</b>
+        <ol>
+    <li>Skin</li>
+    <li>Marble</li>
+    <li>Milk or other juices</li>
+        </ol>
+        </p>
+    <p><b>Scattering</b>
+    <ol>
+    <li>Sky</li>
+    <li>Clouds</li>
+    </ol>
+    </p>
+    </div>
+
+    <h2>Images</h2>
+    <p class="note">Click on the images to view full size version.</p>
+    {% for item in site.data.pr09 %}
+    <div class="resultentry">
+        <a class="fbox" href="./images/{{item.name}}" title="{{item.des}}"><img class="resultimage"  src="./images/{{item.name}}"></a>
+        <p class="resultdes">Image {{item.id}}: {{ item.des }}</p>
+    </div>
+    {% endfor %}
 </div>
 </article>

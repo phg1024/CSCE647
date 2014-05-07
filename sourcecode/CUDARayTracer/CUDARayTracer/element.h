@@ -87,6 +87,7 @@ public:
 	__device__ __host__ vec3():x(0), y(0), z(0){}
 	__device__ __host__ vec3(const float3& v):x(v.x), y(v.y), z(v.z){}
 	__device__ __host__ vec3(float x, float y, float z):x(x), y(y), z(z){}
+	__device__ __host__ vec3(float *val):x(val[0]), y(val[1]), z(val[2]){}
 	__device__ __host__ vec3(const vec3& v):x(v.x),y(v.y), z(v.z){}
 	__device__ __host__ vec3& operator=(const vec3& v){
 		x = v.x; y = v.y; z = v.z;

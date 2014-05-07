@@ -85,10 +85,18 @@ void Scene::parse(const string& line)
 	}
 	else if( tag == "camera" ) {
 		float fnumber, magratio;
-		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov >> fnumber >> cam.magRatio;
+		string camTexFile;
+		ss >> cam.pos >> cam.dir >> cam.up >> cam.f >> cam.fov >> fnumber >> cam.magRatio >> cam.camTexRatio >> camTexFile;
 		cam.apertureRadius = cam.f / (2.0 * fnumber);
 		cam.dir = cam.dir.normalized();
 		cam.up = cam.up.normalized();
+
+		if( camTexFile != "none" ) {
+			cam.cameraTex = loadTexture(camTexFile.c_str(), texs);
+		}
+		else {
+			cam.cameraTex = -1;
+		}
 	}
 	else if( tag == "material" ) {
 		Material mater;
@@ -98,13 +106,22 @@ void Scene::parse(const string& line)
 			mater.diffuseTex = TextureObject::parseType(mater.diffuseTexName);
 			if( mater.diffuseTex == TextureObject::Image ){ 
 				// load texture from image file
-				if( mater.isSolidTex ) 
-					mater.diffuseTex += loadTexture(mater.diffuseTexName.c_str(), texs);
-				else
-					mater.diffuseTex = loadTexture(mater.diffuseTexName.c_str(), texs);
+				if( mater.isSolidTex ) {
+					if( isHDRFile(mater.diffuseTexName) )
+						mater.diffuseTex += loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+					else
+						mater.diffuseTex += loadTexture(mater.diffuseTexName.c_str(), texs);
+				}
+				else {
+					if( isHDRFile(mater.diffuseTexName) )
+						mater.diffuseTex = loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+					else
+						mater.diffuseTex = loadTexture(mater.diffuseTexName.c_str(), texs);
+				}
 			}
 		}
 		else mater.diffuseTex = -1;
+
 		if( mater.normalTexName != "none" ) {
 			mater.normalTex = TextureObject::parseType(mater.normalTexName);
 			if( mater.normalTex == TextureObject::Image ){ 
@@ -235,7 +252,16 @@ void Scene::parse(const string& line)
 
 		vec3 dim = mscl * vec3(1, 1, 1);
 
-		Shape sp = Shape::createMesh(T, S, mrot, materialMap[matName]);
+		bool useMaterialTable = true;
+		Shape sp = Shape::createMesh(T, S, mrot, -1);
+		if( materialMap.find(matName) != materialMap.end() ) {
+			sp.materialId = materialMap[matName];
+		}
+		else {
+			useMaterialTable = false;		// the mertrials are defined with a MTL file
+			//sp = Shape::createMesh(T, S, mrot, -1);
+		}
+
 		sp.v = V;
 		
 		// load the mesh and convert it to a texture
@@ -246,42 +272,150 @@ void Scene::parse(const string& line)
 		cout << tinyobj::LoadObj(objs, meshFile.c_str(), basePath.c_str()) << endl;
 		cout << objs.size() << " shapes in total." << endl;
 
-		// count triangle number
-		int ntris = 0;
-		for(int i=0,tidx=0;i<objs.size();i++) {
-			const tinyobj::shape_t& shp = objs[i];
-			const tinyobj::mesh_t& msh = shp.mesh;
-			ntris += msh.indices.size() / 3;
-		}
-
-		cout << "number of triangles in the mesh: " << ntris << endl;
-		
-		vector<float4> triangles;
-		triangles.reserve(ntris);
-		vector<aabbtree::Triangle> tris;		// for building AABB tree
-		tris.reserve(ntris);
-		vector<float3> normals;
-		normals.reserve(ntris);
-		vector<float2> texcoords;
-		texcoords.reserve(ntris);
-		cout << "space reserved for processing the mesh." << endl;
-
-		float3 maxPt = make_float3(-FLT_MAX), minPt = make_float3(FLT_MAX);
-
+		// TODO build a local material table
+		// load the materials
 		for(int i=0,tidx=0;i<objs.size();i++) {
 			const tinyobj::shape_t& shp = objs[i];
 
 			const tinyobj::mesh_t& msh = shp.mesh;
 			const tinyobj::material_t& mt = shp.material;
 
+			string mname = meshFile + mt.name;
+			if( materialMap.find(mname) == materialMap.end() ) {
+				// add the material to the list
+				Material mater;
+
+				// default option
+				mater.t = Material::Diffuse;
+				mater.diffuse = vec3(mt.diffuse[0], mt.diffuse[1], mt.diffuse[2]);
+				mater.Ks = 1.0;
+				mater.Kr = 1.0;		// full diffuse
+				auto illumop = mt.unknown_parameter.find("illum");
+				if( illumop != mt.unknown_parameter.end() ) {
+					int illumtype = atoi((*illumop).second.c_str());
+					switch( illumtype ) {
+					case 0:
+					case 1:
+					case 2:
+						mater.t = Material::Diffuse;
+						mater.diffuse = vec3(mt.diffuse[0], mt.diffuse[1], mt.diffuse[2]);
+						mater.Kr = 1.0;		// simply pure diffuse
+						break;
+					case 3:
+					case 4:
+					case 5:
+						mater.t = Material::Specular;
+						mater.diffuse = vec3(mt.diffuse[0], mt.diffuse[1], mt.diffuse[2]);
+						break;
+					case 6:
+					case 7:
+					case 8:
+					case 9:
+						mater.t = Material::Refractive;
+						mater.Ks = 0.0;
+						mater.Kf = 0.0;		// simply transparent
+						mater.diffuse = vec3(mt.transmittance[0], mt.transmittance[1], mt.transmittance[2]);
+						break;
+					}
+				}
+				mater.ambient = vec3(mt.ambient[0], mt.ambient[1], mt.ambient[2]);			
+
+				if( !mt.diffuse_texname.empty() ) {
+					// load a diffuse texture
+					mater.diffuseTexName = mt.diffuse_texname;
+
+					mater.diffuseTex = TextureObject::parseType(mater.diffuseTexName);
+					if( mater.diffuseTex == TextureObject::Image ){ 
+						// load texture from image file
+						if( mater.isSolidTex ) {
+							if( isHDRFile(mater.diffuseTexName) )
+								mater.diffuseTex += loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+							else
+								mater.diffuseTex += loadTexture(mater.diffuseTexName.c_str(), texs);
+						}
+						else {
+							if( isHDRFile(mater.diffuseTexName) )
+								mater.diffuseTex = loadHDRTexture(mater.diffuseTexName.c_str(), texs);
+							else
+								mater.diffuseTex = loadTexture(mater.diffuseTexName.c_str(), texs);
+
+						}
+					}
+				}
+				else mater.diffuseTex = -1;
+
+				mater.specular = vec3(mt.specular[0], mt.specular[1], mt.specular[2]);
+				mater.emission = vec3(mt.emission[0], mt.emission[1], mt.emission[2]);
+				mater.eta = mt.ior;
+				mater.name = mname;
+
+				if( !mt.normal_texname.empty() ) {
+					// load a normal texture
+					mater.normalTexName = mt.normal_texname;
+					
+					mater.normalTex = TextureObject::parseType(mater.normalTexName);
+					if( mater.normalTex == TextureObject::Image ){ 
+						mater.normalTex = loadTexture(mater.normalTexName.c_str(), texs);
+					}
+				}
+				else mater.normalTex = -1;
+
+				materials.push_back(mater);
+				materialMap[mater.name] = materials.size()-1;
+			}
+		}
+
+		// count triangle number
+		int ntris = 0;
+		int nverts = 0;
+		for(int i=0,tidx=0;i<objs.size();i++) {
+			const tinyobj::shape_t& shp = objs[i];
+			const tinyobj::mesh_t& msh = shp.mesh;
+			ntris += msh.indices.size() / 3;
+			nverts += msh.positions.size() / 3;
+		}
+
+		cout << "number of triangles in the mesh: " << ntris << endl;
+		cout << "number of vertices in the mesh: " << nverts << endl;
+		
+		vector<int4> indices;
+		indices.reserve(ntris);
+		vector<float3> vertices;
+		vertices.reserve(nverts);
+		vector<aabbtree::Triangle> tris;		// for building AABB tree
+		tris.reserve(ntris);
+		vector<float3> normals;
+		normals.reserve(nverts);
+		vector<float2> texcoords;
+		texcoords.reserve(nverts);
+		cout << "space reserved for processing the mesh." << endl;
+
+		float3 maxPt = make_float3(-FLT_MAX), minPt = make_float3(FLT_MAX);
+
+		int toffset = 0;
+		for(int i=0,tidx=0;i<objs.size();i++) {
+			const tinyobj::shape_t& shp = objs[i];
+
+			const tinyobj::mesh_t& msh = shp.mesh;
+			const tinyobj::material_t& mt = shp.material;
+
+			string mname = meshFile + mt.name;
+			int matIdx = useMaterialTable?sp.materialId:materialMap[mname];
+
 			bool hasNormal = !msh.normals.empty();
 			bool hasTexCoords = !msh.texcoords.empty();
 
 			for(int j=0;j<msh.indices.size();j+=3) {
-				float3 v0 = make_float3(msh.positions[msh.indices[j]*3], msh.positions[msh.indices[j]*3+1], msh.positions[msh.indices[j]*3+2]);
-				float3 v1 = make_float3(msh.positions[msh.indices[j+1]*3], msh.positions[msh.indices[j+1]*3+1], msh.positions[msh.indices[j+1]*3+2]);
-				float3 v2 = make_float3(msh.positions[msh.indices[j+2]*3], msh.positions[msh.indices[j+2]*3+1], msh.positions[msh.indices[j+2]*3+2]);
+				int4 idx = make_int4(msh.indices[j] + toffset, msh.indices[j+1] + toffset, msh.indices[j+2] + toffset, matIdx);
+				if( idx.x >= nverts || idx.y >= nverts || idx.z >= nverts || idx.x < 0 || idx.y < 0 || idx.z < 0 ) cout << "shit" << endl;
+				indices.push_back(idx);
 
+				int idx0 = msh.indices[j]*3, idx1 = msh.indices[j+1]*3, idx2 = msh.indices[j+2]*3;
+				float3 v0 = make_float3(msh.positions[idx0], msh.positions[idx0+1], msh.positions[idx0+2]);
+				float3 v1 = make_float3(msh.positions[idx1], msh.positions[idx1+1], msh.positions[idx1+2]);
+				float3 v2 = make_float3(msh.positions[idx2], msh.positions[idx2+1], msh.positions[idx2+2]);
+
+				// transform the vertices to world space
 				v0 = M * v0 + T.data;
 				v1 = M * v1 + T.data;
 				v2 = M * v2 + T.data;
@@ -290,36 +424,48 @@ void Scene::parse(const string& line)
 				maxPt = fmaxf(v1, maxPt); minPt = fminf(v1, minPt);
 				maxPt = fmaxf(v2, maxPt); minPt = fminf(v2, minPt);
 				
-				triangles.push_back(make_float4(v0, i));
-				triangles.push_back(make_float4(v1, i));
-				triangles.push_back(make_float4(v2, i));
-
-				float3 n0 = aabbtree::zero3, n1 = aabbtree::zero3, n2 = aabbtree::zero3;
-				if( hasNormal ) {
-					n0 = make_float3(msh.normals[msh.indices[j]*3], msh.normals[msh.indices[j]*3+1], msh.normals[msh.indices[j]*3+2]);
-					n1 = make_float3(msh.normals[msh.indices[j+1]*3], msh.normals[msh.indices[j+1]*3+1], msh.normals[msh.indices[j+1]*3+2]);
-					n2 = make_float3(msh.normals[msh.indices[j+2]*3], msh.normals[msh.indices[j+2]*3+1], msh.normals[msh.indices[j+2]*3+2]);
-
-					n0 = normalize(mrot * n0);
-					n1 = normalize(mrot * n1);
-					n2 = normalize(mrot * n2);
-
-					normals.push_back(n0);
-					normals.push_back(n1);
-					normals.push_back(n2);
-				}
-				//tris.push_back(aabbtree::Triangle(tidx++, v0, v1, v2, n0, n1, n2));
 				tris.push_back(aabbtree::Triangle(tidx++, v0, v1, v2));
+			}
+
+			toffset += msh.positions.size()/3;
+
+			for(int j=0;j<msh.positions.size();j+=3) {
+				float3 v = make_float3(msh.positions[j], msh.positions[j+1], msh.positions[j+2]);
+				vertices.push_back( M * v + T.data );
+			}
+			
+			if( hasNormal ) {
+				for(int j=0;j<msh.normals.size();j+=3) {
+
+					float3 n = make_float3(msh.normals[j], msh.normals[j+1], msh.normals[j+2]);					
+					// rotate the normals
+					const float THRES = 1e-3;
+					if( length(n) > THRES ) n = normalize(mrot * n);
+					normals.push_back(n);
+				}
+			}
+
+			if( hasTexCoords ) {
+				for(int j=0;j<msh.texcoords.size();j+=2) {
+
+					float2 t = make_float2(msh.texcoords[j], msh.texcoords[j+1]);					
+					//texcoords.push_back(t);
+				}
 			}
 		}
 
 		sp.bb.minPt = minPt;
 		sp.bb.maxPt = maxPt;
 
+		cout << "uploading indices ..." << endl;
+		cout << "copying " << bytes2MB(sizeof(int4)*indices.size()) << " MB to GPU ..." << endl;
+		cudaMalloc(&sp.trimesh.indices, sizeof(int4)*indices.size());
+		cudaMemcpy(sp.trimesh.indices, &indices[0], sizeof(int4)*indices.size(), cudaMemcpyHostToDevice);
+
 		cout << "uploading vertices ..." << endl;
-		cout << "copying " << bytes2MB(sizeof(float4)*triangles.size()) << " MB to GPU ..." << endl;
-		cudaMalloc(&sp.trimesh.faces, sizeof(float4)*triangles.size());
-		cudaMemcpy(sp.trimesh.faces, &triangles[0], sizeof(float4)*triangles.size(), cudaMemcpyHostToDevice);
+		cout << "copying " << bytes2MB(sizeof(float3)*vertices.size()) << " MB to GPU ..." << endl;
+		cudaMalloc(&sp.trimesh.verts, sizeof(float3)*vertices.size());
+		cudaMemcpy(sp.trimesh.verts, &vertices[0], sizeof(float3)*vertices.size(), cudaMemcpyHostToDevice);
 
 		if( normals.empty() )
 			sp.trimesh.normals = NULL;
@@ -340,15 +486,15 @@ void Scene::parse(const string& line)
 			cudaMemcpy(sp.trimesh.texcoords, &texcoords[0], sizeof(float2)*texcoords.size(), cudaMemcpyHostToDevice);
 		}
 
-		sp.trimesh.nFaces = triangles.size()/3;
+		sp.trimesh.nFaces = indices.size();
 
-		cout << sp.trimesh.faces << ' '
+		cout << sp.trimesh.verts << ' '
 			 << sp.trimesh.normals << ' '
 			 << sp.trimesh.texcoords << ' '
 			 << sp.trimesh.nFaces << endl;
 		
 		// release some memory
-		triangles.clear();
+		vertices.clear();
 		normals.clear();
 		texcoords.clear();
 

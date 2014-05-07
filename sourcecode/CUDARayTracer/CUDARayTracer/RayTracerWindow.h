@@ -43,7 +43,7 @@ extern __global__ void clearCumulatedColor(float3*, int, int);
 
 extern __global__ void initPixel(PixelState* pixels, int* activeIdx, Camera* cam, int time, int width, int height);
 extern __global__ void initScene( int nLights, int* lights, int nShapes, Shape* shapes, int nMaterials, Material* materials);
-extern __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int activeCount, unsigned int width, unsigned int height);
+extern __global__ void raytrace_singlepass(int seed, int pass, PixelState *pixels, int *activeIdx, int startIdx, int endIdx, int batchSize, unsigned int width, unsigned int height);
 extern __global__ void collectPixelValue(float3 *color, PixelState* pixels, int width, int height);
 
 extern __global__ void raytrace(float time, float3 *pos, Camera* cam, 
@@ -120,6 +120,8 @@ struct CUDARayTracer {
 		g_Index = 0;
 		avgFPS = 0.0f;
 		frameCount = 0;
+
+		updateCamera = false;
 	}
 
 	void init() {
@@ -161,6 +163,11 @@ struct CUDARayTracer {
 		pixels.resize(npixels());
 		activePixels0.resize(npixels());
 		activePixels1.resize(npixels());
+
+		// set up global settings
+		bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
+		setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
+		//checkCudaErrors(cudaThreadSynchronize());
 
 		clear();
 	}
@@ -210,6 +217,9 @@ struct CUDARayTracer {
 	}
 
 	void clear() {
+		// need to update camera
+		updateCamera = true;
+
 		dim3 block(32, 32, 1);
 		dim3 grid(ceil(imagesize.x / (float)block.x), ceil(imagesize.y / (float)block.y), 1);
 		clearCumulatedColor<<<grid,block>>>(cumulatedColor, imagesize.x, imagesize.y);
@@ -219,29 +229,28 @@ struct CUDARayTracer {
 	}
 
 	void launch_rendering_kernel(float3 *pos, int sMode) {
-		TrackBall& tball = window->trackball();
-		mat4 mat(tball.getInverseMatrix());
-		mat = mat.trans();
+		if( updateCamera ) {
+			TrackBall& tball = window->trackball();
+			mat4 mat(tball.getInverseMatrix());
+			mat = mat.trans();
 
-		vec3 camPos = cam.pos;
-		vec3 camDir = cam.dir;
-		vec3 camUp = cam.up;
+			vec3 camPos = cam.pos;
+			vec3 camDir = cam.dir;
+			vec3 camUp = cam.up;
 
-		camPos = (mat * (camPos / tball.getScale()));
-		camDir = (mat * camDir);
-		camUp = (mat * camUp);
+			camPos = (mat * (camPos / tball.getScale()));
+			camDir = (mat * camDir);
+			camUp = (mat * camUp);
 
-		Camera caminfo = cam;
-		caminfo.dir = camDir;
-		caminfo.up = camUp;
-		caminfo.pos = camPos;
-		caminfo.right = caminfo.dir.cross(caminfo.up);
+			Camera caminfo = cam;
+			caminfo.dir = camDir;
+			caminfo.up = camUp;
+			caminfo.pos = camPos;
+			caminfo.right = caminfo.dir.cross(caminfo.up);
 
-		cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
-
-		bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
-		setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
-		//checkCudaErrors(cudaThreadSynchronize());
+			cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
+			updateCamera = false;
+		}
 
 		switch( kernelIdx ) {
 		case 0:{
@@ -306,29 +315,31 @@ struct CUDARayTracer {
 	}
 
 	void launch_rendering_kernel_singlepass_mode(float3 *pos) {
-		TrackBall& tball = window->trackball();
-		mat4 mat(tball.getInverseMatrix());
-		mat = mat.trans();
+		if( updateCamera ) {
+			TrackBall& tball = window->trackball();
+			mat4 mat(tball.getInverseMatrix());
+			mat = mat.trans();
 
-		vec3 camPos = cam.pos;
-		vec3 camDir = cam.dir;
-		vec3 camUp = cam.up;
+			vec3 camPos = cam.pos;
+			vec3 camDir = cam.dir;
+			vec3 camUp = cam.up;
 
-		camPos = (mat * (camPos / tball.getScale()));
-		camDir = (mat * camDir);
-		camUp = (mat * camUp);
+			camPos = (mat * (camPos / tball.getScale()));
+			camDir = (mat * camDir);
+			camUp = (mat * camUp);
 
-		Camera caminfo = cam;
-		caminfo.dir = camDir.normalized();
-		caminfo.up = camUp.normalized();
-		caminfo.pos = camPos;
-		caminfo.right = caminfo.dir.cross(caminfo.up).normalized();
+			Camera caminfo = cam;
+			caminfo.dir = camDir.normalized();
+			caminfo.up = camUp.normalized();
+			caminfo.pos = camPos;
+			caminfo.right = caminfo.dir.cross(caminfo.up).normalized();
 
-		cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
+			cudaMemcpy(d_cam, &caminfo, sizeof(Camera), cudaMemcpyHostToDevice);
+		}
 
-		bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
-		setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
-		initScene<<<1,64>>>(lights.size(), d_lights, shapes.size(), d_shapes, materials.size(), d_materials);
+		//bindTexture2<<< 1, 1 >>>(d_texobjs, scene.getTextures().size());
+		//setParams<<<1, 1>>>(specType, tracingType, scene.getEnvironmentMap());
+		initScene<<<1,1024>>>(lights.size(), d_lights, shapes.size(), d_shapes, materials.size(), d_materials);
 
 		dim3 block(32, 32, 1);
 		dim3 grid(ceil(imagesize.x / (float)block.x), ceil(imagesize.y / (float)block.y), 1);
@@ -343,10 +354,17 @@ struct CUDARayTracer {
 
 		int count = activePixels0.size();
 		const int maxBounces = scene.maxBounces();
-		const int nthreads = 1024;
+		const int nthreads = 512;
 		for(int i=0;i<maxBounces;i++) {
-			raytrace_singlepass<<<ceil(count/(float)nthreads), nthreads>>>( seed, i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), count, imagesize.x, imagesize.y );
-			checkCudaErrors(cudaThreadSynchronize());
+			// trace at most 65536 rays at a time
+			const int maxRays = 65536;
+			int nround = ceil(count / (float)maxRays);
+			for(int j=0;j<nround;j++) {
+				int startIdx = j * maxRays;
+				int endIdx = min(startIdx + maxRays, count);
+				raytrace_singlepass<<<ceil(maxRays/(float)nthreads), nthreads>>>( seed, i, thrust::raw_pointer_cast(&pixels[0]), thrust::raw_pointer_cast(&activePixels0[0]), startIdx, endIdx, endIdx-startIdx, imagesize.x, imagesize.y );
+				checkCudaErrors(cudaThreadSynchronize());
+			}
 
 			thrust::device_vector<int>::iterator activeEnd = thrust::remove_if( activePixels0.begin(), activePixels0.begin()+count,  tester );
 			count = activeEnd - activePixels0.begin();
@@ -423,6 +441,7 @@ struct CUDARayTracer {
 	int kernelIdx;
 	int tracingType;
 	int specType;
+	bool updateCamera;
 
 	// benchmarker
 	StopWatchInterface *timer;

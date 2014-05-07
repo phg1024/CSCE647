@@ -14,14 +14,50 @@
   des: Depth of field with various materials.
   id: "4"
 
+- name: Lamborghini.png
+  des: Depth of field with Lamborghini aventador.
+  id: "5"
+
 - name: 3dragons1792.png
   des: Depth of field with dragons.
-  id: "5"
+  id: "6"
 
 - name: translucency.png
   des: Bunny with 0.005, 0.1, and 0.5 translucency from left to right.
-  id: "6"
+  id: "7"
 
 - name: 7teapots2048.png
   des: Teapots - red specular, green glossy, blue glass, mirror, gold, green diffuse and red diffuse.
-  id: "7"
+  id: "8"
+
+- name: ref.png
+  des: Reference scene for painting camera effect .
+  id: "9"
+
+- name: swirl.png
+  des: Painting camera - wave pattern.
+  id: "10"
+
+- name: cloth.png
+  des: Painting camera - cloth effect.
+  id: "11"
+
+- name: brush4.png
+  des: Painting camera - oil painting effect.
+  id: "12"
+
+- name: star.png
+  des: Painting camera effect IV - with Starry Night by Van Gogh.
+  id: "13"
+
+- name: sunrise.png
+  des: Painting camera effect IV - with Sunrise by Monet.
+  id: "14"
+
+- name: stereo.jpg
+  des: Stereo graphics.
+  id: "15"
+
+- name: stereo.gif
+  des: Stereo graphics animation.
+  id: "16"
